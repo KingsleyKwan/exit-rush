@@ -1,0 +1,397 @@
+:root {
+  --mtr-red: #b01c2e;
+  --mtr-red-dark: #8a1523;
+  --ink: #1a1d22;
+  --paper: #f5f6f8;
+  --silver: #c5ccd3;
+  --good: #2e7d32;
+  --warn: #e65100;
+  --font: system-ui, -apple-system, 'PingFang HK', 'Noto Sans HK', sans-serif;
+  color-scheme: dark;
+}
+
+* {
+  box-sizing: border-box;
+  -webkit-tap-highlight-color: transparent;
+  user-select: none;
+}
+
+html,
+body {
+  margin: 0;
+  height: 100%;
+  overflow: hidden;
+  font-family: var(--font);
+  background: var(--ink);
+  color: var(--paper);
+  touch-action: none;
+}
+
+#app {
+  position: relative;
+  width: 100%;
+  height: 100%;
+}
+
+#game-canvas {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+#ui-root,
+#hud {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+#hud > * {
+  pointer-events: auto;
+}
+
+.top-bar {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: max(10px, env(safe-area-inset-top)) 12px 8px;
+  background: linear-gradient(to bottom, rgba(26, 29, 34, 0.85), transparent);
+  z-index: 5;
+}
+
+.brand {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+}
+
+.brand-mark {
+  background: var(--mtr-red);
+  border-radius: 8px;
+  padding: 2px 6px;
+}
+
+.icon-btn,
+.spend-btn,
+.skill-use,
+.level-btn,
+.primary,
+.ghost {
+  font: inherit;
+  cursor: pointer;
+  border: none;
+  border-radius: 12px;
+}
+
+.icon-btn {
+  background: rgba(255, 255, 255, 0.12);
+  color: var(--paper);
+  padding: 8px 12px;
+  font-size: 14px;
+}
+
+.panel {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  width: min(420px, calc(100% - 28px));
+  max-height: min(78vh, 640px);
+  overflow: auto;
+  background: rgba(28, 32, 38, 0.94);
+  border: 2px solid var(--mtr-red);
+  border-radius: 18px;
+  padding: 18px 16px 20px;
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.45);
+  z-index: 10;
+}
+
+.menu-panel h1,
+.skills-panel h2 {
+  margin: 0 0 6px;
+  color: #fff;
+}
+
+.menu-panel h1 small {
+  font-size: 0.55em;
+  opacity: 0.7;
+  font-weight: 500;
+}
+
+.tagline {
+  margin: 0 0 8px;
+  color: var(--silver);
+}
+
+.howto,
+.sfx-note {
+  font-size: 13px;
+  opacity: 0.75;
+  line-height: 1.4;
+}
+
+.points {
+  margin: 10px 0;
+}
+
+.level-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin: 12px 0;
+}
+
+.level-btn {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  grid-template-rows: auto auto;
+  gap: 2px 10px;
+  text-align: left;
+  padding: 12px;
+  background: rgba(255, 255, 255, 0.06);
+  color: var(--paper);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.level-btn:active {
+  background: rgba(176, 28, 46, 0.35);
+}
+
+.lv-num {
+  grid-row: span 2;
+  align-self: center;
+  background: var(--mtr-red);
+  padding: 8px;
+  border-radius: 10px;
+  font-weight: 700;
+  font-size: 12px;
+}
+
+.lv-name {
+  font-weight: 700;
+}
+
+.lv-flav,
+.lv-meta {
+  font-size: 12px;
+  opacity: 0.7;
+  grid-column: 2;
+}
+
+.level-teaser {
+  text-align: center;
+  font-size: 12px;
+  opacity: 0.55;
+  padding: 8px;
+  border: 1px dashed rgba(255, 255, 255, 0.2);
+  border-radius: 10px;
+}
+
+.play-hud {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  padding: 8px 12px max(14px, env(safe-area-inset-bottom));
+  background: linear-gradient(to top, rgba(26, 29, 34, 0.92), transparent);
+  z-index: 5;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.station-chip {
+  align-self: center;
+  background: var(--mtr-red);
+  padding: 4px 12px;
+  border-radius: 999px;
+  font-size: 13px;
+  font-weight: 600;
+  position: absolute;
+  top: -120px;
+  left: 50%;
+  transform: translateX(-50%);
+  white-space: nowrap;
+}
+
+.meters {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.meter {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.meter-bar {
+  flex: 1;
+  height: 12px;
+  background: rgba(255, 255, 255, 0.12);
+  border-radius: 999px;
+  overflow: hidden;
+}
+
+.meter-bar i {
+  display: block;
+  height: 100%;
+  width: 0;
+  background: linear-gradient(90deg, var(--mtr-red), #ff6b7a);
+  border-radius: inherit;
+}
+
+.meter-bar.stamina i {
+  background: linear-gradient(90deg, #1565c0, #4fc3f7);
+}
+
+.timer-val {
+  font-variant-numeric: tabular-nums;
+  font-weight: 700;
+  min-width: 48px;
+}
+
+.timer.urgent .timer-val {
+  color: #ff8a80;
+  animation: pulse 0.6s ease infinite alternate;
+}
+
+@keyframes pulse {
+  from {
+    opacity: 1;
+  }
+  to {
+    opacity: 0.5;
+  }
+}
+
+.skill-rail {
+  display: flex;
+  justify-content: center;
+  gap: 10px;
+}
+
+.skill-use {
+  width: 48px;
+  height: 48px;
+  font-size: 22px;
+  background: rgba(255, 255, 255, 0.12);
+  color: #fff;
+}
+
+.skill-use.dim {
+  opacity: 0.35;
+}
+
+.overlay {
+  position: absolute;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.45);
+  z-index: 20;
+  pointer-events: auto;
+}
+
+.primary {
+  display: block;
+  width: 100%;
+  margin-top: 10px;
+  padding: 14px;
+  background: var(--mtr-red);
+  color: #fff;
+  font-weight: 700;
+}
+
+.primary:active {
+  background: var(--mtr-red-dark);
+}
+
+.ghost {
+  display: block;
+  width: 100%;
+  margin-top: 8px;
+  padding: 12px;
+  background: transparent;
+  color: var(--silver);
+  border: 1px solid rgba(255, 255, 255, 0.2) !important;
+}
+
+.bonus {
+  color: #81c784;
+  font-weight: 600;
+}
+
+.skill-branch {
+  margin: 14px 0;
+  padding: 10px;
+  background: rgba(255, 255, 255, 0.05);
+  border-radius: 12px;
+}
+
+.skill-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.skill-ico {
+  font-size: 28px;
+}
+
+.skill-prog {
+  font-size: 12px;
+  opacity: 0.7;
+}
+
+.spend-btn {
+  margin-left: auto;
+  background: var(--mtr-red);
+  color: #fff;
+  width: 40px;
+  height: 40px;
+  font-size: 18px;
+  font-weight: 700;
+}
+
+.spend-btn:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+
+.skill-bar {
+  margin-top: 8px;
+  height: 10px;
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 999px;
+  overflow: hidden;
+}
+
+.skill-bar i {
+  display: block;
+  height: 100%;
+  background: linear-gradient(90deg, #ffd54f, var(--mtr-red));
+}
+
+.ult {
+  margin-top: 6px;
+  font-size: 12px;
+  opacity: 0.6;
+}
+
+.ult.on {
+  opacity: 1;
+  color: #ffd54f;
+}
+
+/* Place station chip under top bar on play */
+.play-hud .station-chip {
+  position: fixed;
+  top: max(52px, calc(env(safe-area-inset-top) + 44px));
+  top: max(52px, calc(env(safe-area-inset-top) + 44px));
+}
