@@ -1,0 +1,19 @@
+{
+  "name": "hk-mtr-exit-rush",
+  "version": "0.1.0",
+  "description": "逼落車 — HK MTR Exit Rush: push through crowds to exit the train",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc && vite build",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "three": "^0.169.0"
+  },
+  "devDependencies": {
+    "@types/three": "^0.169.0",
+    "typescript": "^5.6.3",
+    "vite": "^5.4.10"
+  }
+}
