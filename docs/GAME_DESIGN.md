@@ -1,3 +1,4 @@
+<!-- v0.5.0: short levels, intro cards, FTUE, L100 gated behind L30 -->
 <!-- v0.4.1: side-wall sliding doors; car ends = gangway -->
 # Game Design — 逼落車 (Exit Rush)
 
@@ -38,7 +39,7 @@ Player exits through an **open side door** onto the platform (green floor marker
 
 ## Stations & levels
 
-See [`LEVELS.md`](LEVELS.md). ~20 drafted; remaining TBD up to 100. Naming is bilingual (EN + 粵) and **inspired by** real stations — not an official map product.
+See [`LEVELS.md`](LEVELS.md). **Levels 1–30 + 100** playable (v0.5 short exits + staged specials). 31–99 TBD. Naming is bilingual (EN + 粵) and **inspired by** real stations — not an official map product.
 
 ## Passenger types
 
@@ -58,7 +59,7 @@ Future: tourist with map, influencer filming, elderly with cane, etc.
 
 ## Skill tree
 
-- **+1 skill point** per level clear. v0.2.2 stop-gap while only 21 levels exist: replays also award +1, capped at **5 points per level** (`MAX_POINTS_PER_LEVEL`), so the ~99-point L100 loadout is reachable; drop the cap to 1 once levels 21–99 ship.
+- **+3 skill points** on the **first** clear of each playable level (v0.5). Replays award **0**. 31 clears → 93 SP (full branch+ult = 70).
 - Three branches: **Strength (STR)** · **Speed (SPD)** · **Wisdom (WIS / INT)**.
 - **60 points** to fill one branch (tiers), then **+10** to unlock that branch’s **ultimate** → **70** for full branch + ultimate.
 
@@ -182,7 +183,7 @@ All cues are **original Web Audio synthesis** — never ripped or embedded offic
 
 - [x] Readable silhouette passenger types at phone distance (v0.3 chibi looks + type icons)
 - [x] Haptic ticks on shove (web `navigator.vibrate`; Capacitor later)
-- [ ] Onboarding: 3-beat gesture tutorial
+- [x] Onboarding: L1 FTUE auto-start + ghost-hand; intro cards per special (v0.5)
 - [x] Safe-area insets / notch (v0.2.2) · 44 px touch targets
 - [x] Reduced-motion mode (camera shake/kick scaled down)
 - [ ] Offline PWA cache
