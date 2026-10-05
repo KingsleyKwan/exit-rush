@@ -54,9 +54,9 @@ export const TUNING = {
     shoulderRadius: 0.19,
     baseMass: 1.3,
     /** Extra mass per point of STR `resist` (0–0.5). */
-    massPerResist: 1.6,
+    massPerResist: 1.0,
     /** Top walking speed (m/s) before SPD modifiers. */
-    maxSpeed: 2.0,
+    maxSpeed: 1.5,
     /** How hard velocity chases the stick (1/s). Higher = snappier. */
     accel: 13,
     /** Braking when the stick is released (1/s). */
@@ -107,6 +107,12 @@ export const TUNING = {
       /** Smoothing rate of the assisted direction (1/s). */
       smooth: 12,
     },
+    /**
+     * Crowd drag: top speed shrinks with the number of bodies within `radius`
+     * (each weighted 1 − d/radius): × (1 − min(max, n·perBody)). WIS gapSense
+     * cuts it by gapSense·perGapSense; the SPD dash keeps `dashMul` of it.
+     */
+    crowdDrag: { radius: 0.9, perBody: 0.25, max: 0.65, perGapSense: 1.0, dashMul: 0.5 },
     /** Control loss after an angry shove (s). */
     stunTime: 0.3,
     /** Invulnerability to further angry shoves after being hit (s). */
@@ -131,10 +137,10 @@ export const TUNING = {
     boardRamp: 2.5,
     boardRateBase: 0.35,
     boardRatePerPressure: 1.9,
-    boardBudgetBase: 3,
-    boardBudgetPerPressure: 28,
-    boardQueueBase: 2,
-    boardQueuePerPressure: 7,
+    boardBudgetBase: 8,
+    boardBudgetPerPressure: 16,
+    boardQueueBase: 5,
+    boardQueuePerPressure: 5,
     boardSpeed: 1.8,
     boardAccel: 6,
     boardMaxDrive: 12,
@@ -153,11 +159,29 @@ export const TUNING = {
     luggage: { caseRadius: 0.2, caseMass: 2.6, caseDamping: 7, rest: 0.4, k: 95, linkDamping: 8 },
   },
 
+  /**
+   * Skill-tree passives at a full branch (60 points); linear per point.
+   * STR: push force ×(1+pushForce), +staminaMax, resist (mass + angry-shove/drain resistance).
+   * SPD: move speed ×(1+moveSpeed), +staminaRegen. WIS: auraResist, gapSense (aim assist,
+   * riders sidestep, less crowd drag).
+   */
+  skills: {
+    pushForce: 0.6,
+    resist: 0.5,
+    staminaBase: 100,
+    staminaMax: 50,
+    moveSpeed: 0.45,
+    regenBase: 12,
+    staminaRegen: 18,
+    auraResist: 0.7,
+    gapSense: 0.4,
+  },
+
   ult: {
     cooldown: 10,
-    str: { radius: 2.9, impulse: 7.5, duration: 2.2, massMul: 3, driveMul: 2.2 },
-    spd: { burst: 6.2, duration: 1.1, speedMul: 2.1, massMul: 3 },
-    wis: { duration: 3.5, calm: 0.75, pathEvery: 0.2 },
+    str: { radius: 2.9, impulse: 5.5, duration: 1.6, massMul: 2.2, driveMul: 1.8 },
+    spd: { burst: 5.5, duration: 1.0, speedMul: 1.7, massMul: 2.2 },
+    wis: { duration: 3.0, calm: 0.65, pathEvery: 0.2 },
   },
 
   door: {

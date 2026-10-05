@@ -1,4 +1,5 @@
 import type { SkillState } from './storage';
+import { TUNING } from './sim/tuning';
 
 /** Points to fill one branch before ultimate */
 export const BRANCH_FILL = 60;
@@ -18,18 +19,23 @@ export interface SkillModifiers {
   gapSense: number; // wis: slight auto-steer / reduced crowd friction
 }
 
+/**
+ * Passive effects scale linearly with points in a branch (t = points / 60).
+ * Coefficients live in TUNING.skills so balance can be tuned with the sim.
+ */
 export function modifiersFromSkills(s: SkillState): SkillModifiers {
-  const strT = s.str / BRANCH_FILL;
-  const spdT = s.spd / BRANCH_FILL;
-  const wisT = s.wis / BRANCH_FILL;
+  const K = TUNING.skills;
+  const strT = Math.min(1, s.str / BRANCH_FILL);
+  const spdT = Math.min(1, s.spd / BRANCH_FILL);
+  const wisT = Math.min(1, s.wis / BRANCH_FILL);
   return {
-    pushForce: 1 + strT * 0.85,
-    moveSpeed: 1 + spdT * 0.7,
-    staminaMax: 100 + strT * 50,
-    staminaRegen: 12 + spdT * 18,
-    resist: strT * 0.5,
-    auraResist: wisT * 0.7,
-    gapSense: wisT * 0.4,
+    pushForce: 1 + strT * K.pushForce,
+    moveSpeed: 1 + spdT * K.moveSpeed,
+    staminaMax: K.staminaBase + strT * K.staminaMax,
+    staminaRegen: K.regenBase + spdT * K.staminaRegen,
+    resist: strT * K.resist,
+    auraResist: wisT * K.auraResist,
+    gapSense: wisT * K.gapSense,
   };
 }
 

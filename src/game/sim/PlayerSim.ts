@@ -44,6 +44,8 @@ export class PlayerSim {
   /** 0–1 how much the stick is driving right now. */
   moving = 0;
   pushing = false;
+  /** 0–1 current crowd-drag slow (shuffling through a packed crowd). */
+  drag = 0;
   path: PathPoint[] = [];
   private pathT = 0;
   private tmp: Body[] = [];
@@ -129,8 +131,9 @@ export class PlayerSim {
 
     // ---- Speed / drive.
     const slow = crowd.auraSlowAt(b.x, b.z) * (1 - this.mods.auraResist);
+    this.drag = this.crowdDrag(world, dashing);
     const St = P.stamina;
-    let maxV = P.maxSpeed * this.mods.moveSpeed * (1 - slow);
+    let maxV = P.maxSpeed * this.mods.moveSpeed * (1 - slow) * (1 - this.drag);
     if (charging) maxV *= 1.3;
     if (dashing) maxV *= U.spd.speedMul;
     if (this.winded) maxV *= St.windedSpeedMul;
@@ -229,6 +232,26 @@ export class PlayerSim {
     } else if (this.path.length) {
       this.path = [];
     }
+  }
+
+  /**
+   * Shuffling through a packed crowd is slow: each nearby body (weighted by
+   * closeness) shaves a little off top speed, up to `max`. WIS slips through
+   * better; the SPD dash mostly ignores it.
+   */
+  private crowdDrag(world: World, dashing: boolean): number {
+    const D = TUNING.player.crowdDrag;
+    if (D.perBody <= 0) return 0;
+    const b = this.body;
+    let n = 0;
+    for (const o of world.query(b.x, b.z, D.radius, this.tmp)) {
+      if (o === b) continue;
+      const d = Math.hypot(o.x - b.x, o.z - b.z);
+      if (d < D.radius) n += 1 - d / D.radius;
+    }
+    let drag = Math.min(D.max, n * D.perBody) * (1 - Math.min(1, this.mods.gapSense * D.perGapSense));
+    if (dashing) drag *= D.dashMul;
+    return drag;
   }
 
   private tryShove(power: number, world: World, crowd: CrowdSim, emit: Emit): boolean {
