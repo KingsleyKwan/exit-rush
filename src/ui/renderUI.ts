@@ -3,6 +3,7 @@ import type { Game } from '../game/Game';
 import { playableLevels, type LevelDef } from '../game/levels';
 import type { QualitySetting } from '../game/storage';
 import { LINE_COLORS, linesFor, lineColor } from '../game/lines';
+import { themeFor } from '../game/stationThemes';
 import type { PassengerKind } from '../game/PassengerTypes';
 import { icon, langIcon } from './icons';
 import {
@@ -75,6 +76,7 @@ function wireCommon(scope: ParentNode, game: Game): void {
     game.setQuality(QUALITY_CYCLE[(i + 1) % QUALITY_CYCLE.length]);
   });
   on('icons', () => game.setTypeIcons(!game.save.typeIcons));
+  on('mute', () => game.toggleMute());
 }
 
 /** Language toggle shows the language you'd switch TO. */
@@ -203,6 +205,7 @@ function renderMenu(game: Game): HTMLElement {
         <div class="settings-row">
           <button type="button" class="setting" data-act="quality" aria-label="${dict.quality}: ${qualityLabel(game)}">${icon('quality', 'sm')}<span>${qualityLabel(game)}</span></button>
           <button type="button" class="setting ${game.save.typeIcons ? 'on' : ''}" data-act="icons" aria-pressed="${game.save.typeIcons}" aria-label="${dict.typeIcons}">${icon('tag', 'sm')}<span>${dict.typeIcons} · ${game.save.typeIcons ? dict.on : dict.off}</span></button>
+          <button type="button" class="setting ${game.save.muted ? '' : 'on'}" data-act="mute" aria-pressed="${!game.save.muted}" aria-label="${game.save.muted ? dict.unmute : dict.mute}">${icon(game.save.muted ? 'mute' : 'volume', 'sm')}<span>${dict.sound} · ${game.save.muted ? dict.off : dict.on}</span></button>
         </div>
         ${game.needsReloadForAA() ? `<p class="sfx-note">${dict.qualityNote}</p>` : ''}
         <p class="sfx-note">${dict.sfxNote}<br />${dict.artCredit}</p>
@@ -229,7 +232,8 @@ function renderLevels(game: Game): HTMLElement {
     const lines = linesFor(lv.stationEn);
     const flav = getLang() === 'en' ? lv.flavourEn : lv.flavourZh;
     const btn = el(`
-      <button type="button" class="lv-card ${done ? 'done' : ''} ${finale ? 'finale' : ''}" data-id="${lv.id}" style="--line:${LINE_COLORS[lines[0]]}${finale ? `;background-image:linear-gradient(90deg,rgba(14,18,28,.92),rgba(14,18,28,.35)),url('${asset('art/key-art.webp')}')` : ''}" title="${flav}" aria-label="${dict.level} ${lv.id} ${stationName(lv)}${done ? ` · ${dict.cleared}` : ''}">
+      <button type="button" class="lv-card ${done ? 'done' : ''} ${finale ? 'finale' : ''}" data-id="${lv.id}" style="--line:${LINE_COLORS[lines[0]]};--station:${themeFor(lv.stationEn).wall}${finale ? `;background-image:linear-gradient(90deg,rgba(14,18,28,.92),rgba(14,18,28,.35)),url('${asset('art/key-art.webp')}')` : ''}" title="${flav}" aria-label="${dict.level} ${lv.id} ${stationName(lv)}${done ? ` · ${dict.cleared}` : ''}">
+        <span class="lv-swatch" aria-hidden="true"></span>
         <span class="lv-badge">${lv.id}<span class="lv-lines">${lines.map((l) => `<i style="background:${LINE_COLORS[l]}"></i>`).join('')}</span></span>
         <span class="lv-station"><b>${stationName(lv)}</b><small>${stationAlt(lv)}</small></span>
         <span class="lv-meta"><span>${icon('crowd', 'xs')}${lv.density}</span><span>${icon('timer', 'xs')}${lv.timer}</span></span>
@@ -398,6 +402,7 @@ function renderPause(game: Game): HTMLElement {
           ${roundBtn('id="btn-restart"', 'restart', dict.retry)}
           ${roundBtn('data-act="skills"', 'skills', dict.skills)}
           <button type="button" class="round-btn" data-act="lang" aria-label="${dict.language}">${langIcon(getLang() === 'en' ? '粵' : 'EN')}<small>${dict.language}</small></button>
+          ${roundBtn('data-act="mute"', game.save.muted ? 'mute' : 'volume', game.save.muted ? dict.unmute : dict.mute)}
           ${roundBtn('data-act="home"', 'home', dict.menu)}
         </div>
       </div>
