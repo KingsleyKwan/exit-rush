@@ -2,7 +2,7 @@
 
 ## Elevator pitch
 
-You must **exit** a packed MTR car before the doors close. Crowds are trying to board (逼上車). Density, passenger types, and timer scale with **station + time of day**. Feel like Golden Week Mong Kok — not a sterile sim.
+You must **exit** a packed metro car before the doors close. Crowds are trying to board (逼上車). Density, passenger types, and timer scale with **station + time of day**. Feel like Golden Week 望角 — not a sterile sim.
 
 ## Core loop
 
@@ -33,7 +33,7 @@ Player reaches the door zone (green floor marker: `z <= DOOR_Z + winDepth`, `|x|
 | Timer | Shorter close window |
 | Car layout | Narrower aisles (future) |
 
-**Level 100 (hardest):** 尖沙嘴 · 十一煙花後 (Tsim Sha Tsui after National Day fireworks) — max density, hostile mix, brutal timer.
+**Level 100 (hardest):** 尖沙嘴 · 十一煙花後 (Tsim Sha Mouth after National Day fireworks) — max density, hostile mix, brutal timer.
 
 ## Stations & levels
 
@@ -120,8 +120,8 @@ Everything lives in **`src/game/sim/tuning.ts`** (`TUNING`), grouped as `physics
 
 - **Mobile-first**, portrait preferred; Three.js WebGL.
 - **Icon-first HUD**; text only where icons fail (station name, win/lose, skill labels).
-- Look: MTR-inspired **red (#B01C2E) / white / silver / navy**, line-colour accents, bilingual station strip.
-- **No copyrighted MTR logos**; SVG/CSS/canvas originals only.
+- Look: metro-inspired **red (#B01C2E) / white / silver / navy**, line-colour accents, bilingual station strip.
+- **No copyrighted metro logos**; SVG/CSS/canvas originals only.
 
 ### Art direction (v0.3.0)
 
@@ -140,25 +140,42 @@ Everything lives in **`src/game/sim/tuning.ts`** (`TUNING`), grouped as `physics
 | Tourist | teal shirt, sun hat | camera, big brown suitcase |
 
 - **Type icons:** small round billboards (same glyphs as the legend) over special passengers within ~3.4 m of the player, plus any angry man winding up; toggle in settings.
-- **Car:** white walls, red stripe, stainless longitudinal benches, glass partitions, poles + overhead rails with red grips, red door frame with indicator lights, line-map strip above the door, yellow edge line, PSDs, red/white tiled pillars, navy bilingual station sign (level `stationEn` / `stationZh`, with an "inspired look · not affiliated" note). Static meshes merged per material.
+- **Car:** white walls, red stripe, stainless longitudinal benches, glass partitions, poles + overhead rails with red grips, red door frame with indicator lights, line-map strip above the door, yellow edge line, PSDs, **per-station coloured** tiled pillars + back wall, navy bilingual station sign (OFL fonts; level `stationEn` / `stationZh`, with an "inspired look · not affiliated" note). Static meshes merged per material.
 - **UI:** authored SVG icon set (`src/ui/icons.ts`), bold rounded filled glyphs; title over key art; level cards = number badge + line dots + station 中/EN + density/timer icons; passenger legend with concept portraits.
 - **Quality:** Low drops stink lines/flies/most puffs and the shadow map; High keeps everything.
+
+## Setting (fiction)
+
+**香城鐵路 / Hong City Rail (HCR)** — parody of Hong Kong metro culture. Station/line names are playful fiction (`docs/STATIONS.md`). Not affiliated with MTR Corporation or any real railway. No real-operator logos or audio.
 
 ## Bilingual
 
 `src/i18n/en.ts` + `zh-HK.ts`. Toggle persists. Prefer 粵 for flavour strings (逼落車, 十一煙花後…).
 
-## Audio plan
+## Audio (v0.4)
 
-| Cue | v0.1 | Target |
-|-----|------|--------|
-| Door open / close | Web Audio beep/whoosh placeholders | Licensed or original MTR-*style* chime |
-| Arrival | Soft arpeggio placeholder | Same |
-| Push / collide | Noise blip | Foleys |
-| Win / lose | Major / minor sting | Polished stings |
-| Ultimate | Rising whoosh | Distinct per branch |
+All cues are **original Web Audio synthesis** — never ripped or embedded official metro recordings.
 
-**Do not rip** official MTR door/PA audio.
+| Cue | Implementation |
+|-----|----------------|
+| Door-closing warning | Rapid two-tone square beeps (HK metro *style*), interval from Game's last-5s timer |
+| Arrival | Original multi-note triangle/sine jingle |
+| Station announce | Stylised chime + on-screen bilingual sign flash (no cloud TTS; open offline TTS deferred) |
+| Doors open / close | Filtered noise whoosh/hiss + thunk |
+| Departure | Low rumble on the music bus |
+| Crowd ambience | Looping band-passed noise; gain ∝ density; L100 adds sparse fireworks pops |
+| UI / skill point / win / lose | Short synthetic stings / buzzer |
+| Ultimates | Existing branch whooshes / boom / shimmer |
+
+**JR-style announce:** original short 発車メロディ-like jingle (Web Audio; not any real JR melody) + on-screen JA/EN/粵 flash with **parody** station names. Scripts e.g. 「まもなく、太仔です。お出口は左側です。」 / “The next station is Tai Jai.”
+
+**TODO (TTS):** ship offline open-licensed Japanese female voice (e.g. Piper / Open JTalk with redistributable voice) for the script above; until then jingle + sign flash only. Never use real JR recordings.
+
+**Mixer:** `masterVol` / `musicVol` / `sfxVol` / `muted` in save (defaults for old saves). Mute icon in menu + pause. Visibility-pause still suspends the AudioContext; first gesture unlocks (iOS).
+
+## Station themes (v0.4)
+
+`src/game/stationThemes.ts` — one entry per station in `levels.ts` (21): `wall`, `accent`, `line`, `lettering` (`sans` | `serif`), optional `approx`. Colours approximate published fan/wiki station tile charts (no logos). `TrainScene` retints pillars + back wall and redraws the navy sign with OFL subset fonts (`public/fonts/`, see `OFL-Noto.txt`). Level cards show a station-colour edge swatch.
 
 ## Polish checklist (aspiration)
 
@@ -177,7 +194,7 @@ Everything lives in **`src/game/sim/tuning.ts`** (`TUNING`), grouped as `physics
 
 - Vite + TypeScript + Three.js
 - `src/game/sim/` = pure gameplay sim (fixed step, headless-testable); `src/game/*.ts` views read it
-- Persist: `localStorage` key `hk-mtr-exit-rush-v1` (v0.2.2: never throws — in-memory fallback + one-time toast when storage is blocked; new fields `clears`, `quality`, `autoQuality` default safely for old saves)
+- Persist: `localStorage` key `hk-mtr-exit-rush-v1` (never throws — in-memory fallback + toast; new fields default safely for old saves: `clears`, `quality`, `autoQuality`, `typeIcons`, `masterVol`, `musicVol`, `sfxVol`, `muted`)
 - Graphics quality (v0.2.2): Auto / Low / High — see `src/game/quality.ts`. Low = no shadow map, no antialias, pixel ratio 1; Auto = device hints + FPS probe (cached)
 - Lifecycle (v0.2.2): `visibilitychange` / `pagehide` / `blur` auto-pause the run; AudioContext suspended while hidden
 - Future: Capacitor shell; no secrets in repo
