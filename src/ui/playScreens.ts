@@ -1,0 +1,215 @@
+import { t, getLang, fmt } from '../i18n';
+import type { Game } from '../game/Game';
+import { INTROS, type IntroKind } from '../game/intros';
+import { playableLevels } from '../game/levels';
+import { POINTS_PER_FIRST_CLEAR, MAX_POINTS_PER_LEVEL, modifiersFromSkills } from '../game/SkillTree';
+import { linesFor, lineColor } from '../game/lines';
+import { icon, langIcon } from './icons';
+import { el, portrait, iconBtn, langBtn, qualityLabel, stationName } from './uiShared';
+
+export function renderPlayHud(game: Game): HTMLElement {
+  const dict = t();
+  const lv = game.level!;
+  // Ults / actives available in this run = skills the run started with.
+  const s = game.runSkills;
+  const mods = modifiersFromSkills(s);
+  const ult = (k: 'str' | 'spd' | 'sta', title: string, on: boolean) =>
+    `<button type="button" class="skill-use ult-${k} ${on ? '' : 'dim'}" data-ult="${k}" title="${title}" aria-label="${title}" ${on ? '' : 'disabled'}>${icon(on ? k : 'lock')}</button>`;
+  const act = (id: string, title: string, on: boolean, ico: string) =>
+    `<button type="button" class="skill-use act-${id} ${on ? '' : 'dim'}" data-act-skill="${id}" title="${title}" aria-label="${title}" ${on ? '' : 'disabled'}>${icon(on ? ico : 'lock')}</button>`;
+
+  const hud = el(`
+    <div class="play-hud" data-ui="1">
+      <div class="hud-top">
+        <div class="hud-row">
+          <div class="station-chip" style="--line:${lineColor(lv.stationEn)}"><span class="lv-badge sm">${lv.id}</span><span>${stationName(lv)}</span></div>
+          <button type="button" class="icon-btn pause-btn" id="btn-pause" title="${dict.pause}" aria-label="${dict.pause}">${icon('pause')}</button>
+        </div>
+        <div class="meters">
+          <div class="meter door-meter">
+            <span class="meter-icon" title="${dict.door}">${icon('door')}</span>
+            <div class="meter-bar"><i id="m-door"></i><b class="tick" style="left:25%"></b><b class="tick" style="left:50%"></b><b class="tick" style="left:75%"></b></div>
+          </div>
+          <div class="meter stam-meter">
+            <span class="meter-icon" title="${dict.stamina}">${icon('stamina')}</span>
+            <div class="meter-bar stamina"><i id="m-stam"></i></div>
+          </div>
+          <div class="meter timer" id="m-timer">
+            <span class="meter-icon" title="${dict.time}">${icon('timer')}</span>
+            <span class="timer-val" id="m-time"></span>
+          </div>
+        </div>
+      </div>
+      ${game.activeTip ? `<div class="tip-chip" id="tip-chip">${icon(`kind_${game.activeTip}`, 'xs')}<span>${dict.tipChip}: ${getLang() === 'en' ? (INTROS[game.activeTip as IntroKind]?.tipEn ?? '') : (INTROS[game.activeTip as IntroKind]?.tipZh ?? '')}</span></div>` : ''}
+      <div class="drag-hint ${game.showFtueGhost ? 'ftue-ghost' : ''}" aria-hidden="true">
+        ${game.showFtueGhost ? `<span class="ghost-hand"></span><span class="ghost-label">${dict.hintDrag}</span>` : icon('drag')}
+      </div>
+      <div class="hud-actions">
+        <div class="ult-col">
+          ${ult('str', dict.ultStr, s.ultStr)}
+          ${ult('spd', dict.ultSpd, s.ultSpd)}
+          ${ult('sta', dict.ultSta, s.ultSta)}
+          ${mods.hasBriefDash ? act('dash', dict.skillNodeActive + ': Brief Dash', true, 'spd') : ''}
+          ${mods.hasSecondWind ? act('wind', dict.skillNodeActive + ': Second Wind', true, 'sta') : ''}
+        </div>
+        <button type="button" class="shove-btn" id="btn-shove" title="${dict.shove}" aria-label="${dict.shove}">${icon('shove')}</button>
+      </div>
+    </div>
+  `);
+
+  hud.querySelectorAll('[data-ult]').forEach((b) => {
+    b.addEventListener('pointerdown', (e) => {
+      e.preventDefault();
+      const k = (b as HTMLElement).dataset.ult as 'str' | 'spd' | 'sta';
+      game.tryUltimate(k);
+    });
+  });
+  hud.querySelectorAll('[data-act-skill]').forEach((b) => {
+    b.addEventListener('pointerdown', (e) => {
+      e.preventDefault();
+      const id = (b as HTMLElement).dataset.actSkill;
+      if (id === 'dash') game.tryBriefDash();
+      if (id === 'wind') game.trySecondWind();
+    });
+  });
+  hud.querySelector('#btn-pause')?.addEventListener('click', () => {
+    game.togglePause();
+  });
+  const shove = hud.querySelector('#btn-shove') as HTMLElement | null;
+  if (shove) {
+    const down = (e: PointerEvent) => {
+      e.preventDefault();
+      try {
+        shove.setPointerCapture(e.pointerId);
+      } catch {
+        /* ignore */
+      }
+      game.audio.unlock();
+      game.setShoveHeld(true);
+    };
+    const up = () => game.setShoveHeld(false);
+    shove.addEventListener('pointerdown', down);
+    shove.addEventListener('pointerup', up);
+    shove.addEventListener('pointercancel', up);
+    shove.addEventListener('lostpointercapture', up);
+    shove.addEventListener('contextmenu', (e) => e.preventDefault());
+  }
+  return hud;
+}
+
+/** Patch dynamic HUD values in place (cheap; no DOM rebuild). */
+export function updatePlayHud(root: HTMLElement, game: Game): void {
+  const q = (id: string) => root.querySelector<HTMLElement>(id);
+  const progress = Math.round(game.doorProgress() * 100);
+  const stam = Math.round(game.staminaFrac() * 100);
+  const time = Math.max(0, game.timeLeft);
+  const door = q('#m-door');
+  if (door) door.style.width = `${progress}%`;
+  const doorMeter = root.querySelector('.door-meter');
+  doorMeter?.classList.toggle('pulse', game.clock - game.milestoneAt < 0.45);
+  const st = q('#m-stam');
+  if (st) st.style.width = `${stam}%`;
+  root.querySelector('.stam-meter')?.classList.toggle('winded', game.isWinded());
+  root.querySelector('.stam-meter')?.classList.toggle('low', stam < 25);
+  const tv = q('#m-time');
+  if (tv) tv.textContent = time.toFixed(1);
+  q('#m-timer')?.classList.toggle('urgent', time < 10);
+  q('#m-timer')?.classList.toggle('critical', time < 5);
+  const shove = q('#btn-shove');
+  if (shove) {
+    shove.style.setProperty('--cd', game.shoveCooldown().toFixed(3));
+    shove.style.setProperty('--charge', game.shoveCharge().toFixed(3));
+    shove.classList.toggle('cooling', game.shoveCooldown() > 0);
+    shove.classList.toggle('charging', game.shoveCharge() > 0);
+  }
+  root.querySelectorAll<HTMLElement>('[data-ult]').forEach((b) => {
+    const k = b.dataset.ult as 'str' | 'spd' | 'sta';
+    b.style.setProperty('--cd', game.ultCooldown(k).toFixed(3));
+    b.classList.toggle('active', game.ultActive(k));
+    b.classList.toggle('cooling', game.ultCooldown(k) > 0);
+  });
+  root.querySelector('.drag-hint')?.classList.toggle('gone', !game.showFtueGhost && (game.doorProgress() > 0.05 || (game.sim?.time ?? 0) > 4));
+}
+
+/** Round icon button with a tiny caption (pause / end overlays). */
+const roundBtn = (attrs: string, name: string, label: string, cls = ''): string =>
+  `<button type="button" class="round-btn ${cls}" ${attrs} aria-label="${label}">${icon(name)}<small>${label}</small></button>`;
+
+export function renderPause(game: Game): HTMLElement {
+  const dict = t();
+  const p = el(`
+    <div class="overlay" data-ui="1">
+      <div class="panel end-panel">
+        <div class="end-icon pause-ico">${icon('pause', 'xl')}</div>
+        <h2>${dict.pause}</h2>
+        ${game.autoPaused ? `<p class="howto">${dict.autoPaused}</p>` : ''}
+        <button type="button" class="primary" id="btn-resume">${icon('play', 'sm')}<span>${dict.resume}</span></button>
+        <div class="round-row">
+          ${roundBtn('id="btn-restart"', 'restart', dict.retry)}
+          ${roundBtn('data-act="skills"', 'skills', dict.skills)}
+          <button type="button" class="round-btn" data-act="lang" aria-label="${dict.language}">${langIcon(getLang() === 'en' ? '粵' : 'EN')}<small>${dict.language}</small></button>
+          ${roundBtn('data-act="mute"', game.save.muted ? 'mute' : 'volume', game.save.muted ? dict.unmute : dict.mute)}
+          ${roundBtn('data-act="home"', 'home', dict.menu)}
+        </div>
+      </div>
+    </div>
+  `);
+  p.querySelector('#btn-resume')?.addEventListener('click', () => game.resume());
+  p.querySelector('#btn-restart')?.addEventListener('click', () => {
+    if (game.level) game.startLevel(game.level.id);
+  });
+  return p;
+}
+
+export function renderEnd(game: Game, win: boolean): HTMLElement {
+  const dict = t();
+  const lv = game.level;
+  const hasNext = win && lv && lv.id !== 100;
+  const p = el(`
+    <div class="overlay" data-ui="1">
+      <div class="panel end-panel ${win ? 'win' : 'lose'}">
+        ${
+          win
+            ? `<div class="end-hero">${portrait('hero', 'lg')}<span class="burst" aria-hidden="true"></span></div>`
+            : `<div class="end-icon lose-ico">${icon('door', 'xl')}<span class="x">${icon('close')}</span></div>`
+        }
+        <h2>${win ? dict.win : dict.lose}</h2>
+        ${lv ? `<p class="end-station"><span class="lv-badge sm" style="--line:${lineColor(lv.stationEn)}">${lv.id}</span>${stationName(lv)}</p>` : ''}
+        ${win ? endBonus(game) : `<p class="howto">${dict.loseHint}</p>`}
+        ${
+          hasNext
+            ? `<button type="button" class="primary" id="btn-next">${icon('next', 'sm')}<span>${dict.next}</span></button>`
+            : `<button type="button" class="primary" id="btn-retry">${icon('restart', 'sm')}<span>${dict.retry}</span></button>`
+        }
+        <div class="round-row">
+          ${hasNext ? roundBtn('id="btn-retry"', 'restart', dict.retry) : ''}
+          ${roundBtn('data-act="skills"', 'skills', dict.skills)}
+          ${roundBtn('data-act="home"', 'home', dict.menu)}
+        </div>
+      </div>
+    </div>
+  `);
+  p.querySelectorAll('#btn-retry').forEach((b) =>
+    b.addEventListener('click', () => {
+      if (game.level) game.startLevel(game.level.id);
+    }),
+  );
+  p.querySelector('#btn-next')?.addEventListener('click', () => {
+    if (!game.level) return;
+    const list = playableLevels();
+    const idx = list.findIndex((l) => l.id === game.level!.id);
+    const next = list[idx + 1];
+    if (next) game.startLevel(next.id);
+  });
+  return p;
+}
+
+function endBonus(game: Game): string {
+  const dict = t();
+  const c = game.lastClear;
+  const star = icon('star', 'sm');
+  if (!c || (c.awarded && c.count === 1)) return `<p class="bonus">${star}${fmt(dict.clearBonusN, { n: POINTS_PER_FIRST_CLEAR })}</p>`;
+  if (c.awarded) return `<p class="bonus">${star}${fmt(dict.replayBonus, { n: c.count, max: MAX_POINTS_PER_LEVEL })}</p>`;
+  return `<p class="howto">${dict.clearNoBonus}</p>`;
+}
+
