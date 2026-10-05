@@ -55,6 +55,8 @@ const STATION_LINES: Record<string, LineId[]> = {
   'Hung Hom': ['eal', 'tml'],
   'East Tsim Sha Tsui': ['tml'],
   'Tsim Sha Tsui': ['twl'],
+  'Yuen Long': ['tml'],
+  'Long Ping': ['tml'],
 };
 
 export function linesFor(stationEn: string): LineId[] {
