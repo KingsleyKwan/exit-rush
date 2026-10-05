@@ -10,7 +10,7 @@ export interface LevelDef {
   timer: number; // seconds
   /** Relative weights for special spawns */
   mix: Partial<Record<PassengerKind, number>>;
-  /** Boarding pressure 0–1 */
+  /** Boarding pressure: 0–1 for regular levels; >1 = event surge (L100). */
   pressure: number;
   playable: boolean;
 }
@@ -20,7 +20,11 @@ const baseMix = (extra: Partial<Record<PassengerKind, number>> = {}): LevelDef['
   ...extra,
 });
 
-/** Draft curve; 1–5 fully tuned for vertical slice */
+/**
+ * v0.2.1 balance pass: densities / pressures / timers tuned with the headless
+ * sim (see docs/BALANCE.md). Difficulty is composite — luggage-heavy levels use
+ * lower density, boarding-wave levels lower density but higher pressure.
+ */
 export const LEVELS: LevelDef[] = [
   {
     id: 1,
@@ -28,8 +32,8 @@ export const LEVELS: LevelDef[] = [
     stationZh: '上環',
     flavourEn: 'Mid-morning quiet',
     flavourZh: '早上人少',
-    density: 2,
-    timer: 60,
+    density: 10,
+    timer: 36,
     mix: baseMix({ luggage: 1 }),
     pressure: 0.15,
     playable: true,
@@ -40,10 +44,10 @@ export const LEVELS: LevelDef[] = [
     stationZh: '炮台山',
     flavourEn: 'Lunch trickle',
     flavourZh: '午飯時段',
-    density: 3,
-    timer: 55,
+    density: 6,
+    timer: 38,
     mix: baseMix({ luggage: 2, stench: 1 }),
-    pressure: 0.25,
+    pressure: 0.2,
     playable: true,
   },
   {
@@ -52,8 +56,8 @@ export const LEVELS: LevelDef[] = [
     stationZh: '太古',
     flavourEn: 'After-school',
     flavourZh: '放學潮',
-    density: 4,
-    timer: 50,
+    density: 10,
+    timer: 37,
     mix: baseMix({ brat: 3, luggage: 1, family: 1 }),
     pressure: 0.35,
     playable: true,
@@ -64,10 +68,10 @@ export const LEVELS: LevelDef[] = [
     stationZh: '鰂魚涌',
     flavourEn: 'Office spill',
     flavourZh: '放工潮',
-    density: 5,
-    timer: 48,
+    density: 8,
+    timer: 37,
     mix: baseMix({ angry: 3, couple: 1, luggage: 1 }),
-    pressure: 0.45,
+    pressure: 0.3,
     playable: true,
   },
   {
@@ -76,10 +80,10 @@ export const LEVELS: LevelDef[] = [
     stationZh: '北角',
     flavourEn: 'Evening peak start',
     flavourZh: '晚高峰開始',
-    density: 6,
-    timer: 45,
+    density: 5,
+    timer: 40,
     mix: baseMix({ family: 3, angry: 2, stench: 1, couple: 1, brat: 1, luggage: 2 }),
-    pressure: 0.55,
+    pressure: 0.6,
     playable: true,
   },
   // 6–20 stubs from LEVELS.md
@@ -90,9 +94,9 @@ export const LEVELS: LevelDef[] = [
     flavourEn: 'Weekend shoppers',
     flavourZh: '週末購物',
     density: 6,
-    timer: 44,
+    timer: 36,
     mix: baseMix({ luggage: 5, couple: 2 }),
-    pressure: 0.5,
+    pressure: 0.3,
     playable: true,
   },
   {
@@ -101,10 +105,10 @@ export const LEVELS: LevelDef[] = [
     stationZh: '天后',
     flavourEn: 'Temple fair spill',
     flavourZh: '廟會散場',
-    density: 5,
-    timer: 46,
+    density: 9,
+    timer: 37,
     mix: baseMix({ stench: 3, family: 3 }),
-    pressure: 0.4,
+    pressure: 0.3,
     playable: true,
   },
   {
@@ -113,10 +117,10 @@ export const LEVELS: LevelDef[] = [
     stationZh: '灣仔',
     flavourEn: 'Conference let-out',
     flavourZh: '會議散場',
-    density: 7,
-    timer: 42,
+    density: 8,
+    timer: 39,
     mix: baseMix({ couple: 3, angry: 3 }),
-    pressure: 0.55,
+    pressure: 0.6,
     playable: true,
   },
   {
@@ -125,10 +129,10 @@ export const LEVELS: LevelDef[] = [
     stationZh: '金鐘',
     flavourEn: 'Cross-platform crush',
     flavourZh: '轉車迫爆',
-    density: 7,
+    density: 8,
     timer: 40,
     mix: baseMix({ angry: 2, luggage: 2, family: 2 }),
-    pressure: 0.65,
+    pressure: 0.6,
     playable: true,
   },
   {
@@ -138,9 +142,9 @@ export const LEVELS: LevelDef[] = [
     flavourEn: 'Fri 18:30',
     flavourZh: '金曜傍晚',
     density: 8,
-    timer: 38,
+    timer: 40,
     mix: baseMix({ angry: 3, couple: 2, luggage: 2, stench: 1 }),
-    pressure: 0.7,
+    pressure: 0.4,
     playable: true,
   },
   {
@@ -149,10 +153,10 @@ export const LEVELS: LevelDef[] = [
     stationZh: '香港',
     flavourEn: 'Airport transfer vibe',
     flavourZh: '機場轉車感',
-    density: 6,
-    timer: 40,
+    density: 7,
+    timer: 41,
     mix: baseMix({ luggage: 8 }),
-    pressure: 0.5,
+    pressure: 0.2,
     playable: true,
   },
   {
@@ -161,7 +165,7 @@ export const LEVELS: LevelDef[] = [
     stationZh: '九龍',
     flavourEn: 'Tourist wave',
     flavourZh: '遊客潮',
-    density: 7,
+    density: 6,
     timer: 39,
     mix: baseMix({ couple: 3, luggage: 4 }),
     pressure: 0.55,
@@ -173,10 +177,10 @@ export const LEVELS: LevelDef[] = [
     stationZh: '奧運',
     flavourEn: 'Concert let-out',
     flavourZh: '演唱會散場',
-    density: 8,
-    timer: 36,
+    density: 9,
+    timer: 42,
     mix: baseMix({ angry: 5, brat: 2 }),
-    pressure: 0.7,
+    pressure: 0.85,
     playable: true,
   },
   {
@@ -185,8 +189,8 @@ export const LEVELS: LevelDef[] = [
     stationZh: '旺角',
     flavourEn: 'Sat night',
     flavourZh: '週六夜晚',
-    density: 9,
-    timer: 34,
+    density: 8,
+    timer: 45,
     mix: baseMix({
       family: 2,
       brat: 2,
@@ -195,7 +199,7 @@ export const LEVELS: LevelDef[] = [
       stench: 2,
       luggage: 2,
     }),
-    pressure: 0.8,
+    pressure: 0.6,
     playable: true,
   },
   {
@@ -204,10 +208,10 @@ export const LEVELS: LevelDef[] = [
     stationZh: '太子',
     flavourEn: 'Calm then surge',
     flavourZh: '突然湧入',
-    density: 8,
-    timer: 35,
+    density: 9,
+    timer: 48,
     mix: baseMix({ angry: 3, family: 2 }),
-    pressure: 0.75,
+    pressure: 0.9,
     playable: true,
   },
   {
@@ -216,10 +220,10 @@ export const LEVELS: LevelDef[] = [
     stationZh: '深水埗',
     flavourEn: 'Market close',
     flavourZh: '墟市收檔',
-    density: 7,
-    timer: 37,
+    density: 8,
+    timer: 40,
     mix: baseMix({ stench: 4, family: 3 }),
-    pressure: 0.55,
+    pressure: 0.65,
     playable: true,
   },
   {
@@ -228,8 +232,8 @@ export const LEVELS: LevelDef[] = [
     stationZh: '美孚',
     flavourEn: 'Typhoon signal eve',
     flavourZh: '打風前夕',
-    density: 8,
-    timer: 33,
+    density: 7,
+    timer: 37,
     mix: baseMix({ luggage: 3, angry: 2, family: 2 }),
     pressure: 0.8,
     playable: true,
@@ -241,9 +245,9 @@ export const LEVELS: LevelDef[] = [
     flavourEn: 'Terminal dump',
     flavourZh: '總站瀉人',
     density: 8,
-    timer: 32,
+    timer: 45,
     mix: baseMix({ angry: 3, luggage: 2 }),
-    pressure: 0.85,
+    pressure: 0.75,
     playable: true,
   },
   {
@@ -252,10 +256,10 @@ export const LEVELS: LevelDef[] = [
     stationZh: '紅磡',
     flavourEn: 'Through-train fantasy',
     flavourZh: '過境幻想',
-    density: 9,
-    timer: 30,
+    density: 7,
+    timer: 45,
     mix: baseMix({ luggage: 5, angry: 4 }),
-    pressure: 0.8,
+    pressure: 0.6,
     playable: true,
   },
   {
@@ -264,8 +268,8 @@ export const LEVELS: LevelDef[] = [
     stationZh: '尖東',
     flavourEn: 'Pre-fireworks',
     flavourZh: '煙花前',
-    density: 9,
-    timer: 28,
+    density: 10,
+    timer: 50,
     mix: baseMix({
       family: 3,
       couple: 3,
@@ -273,7 +277,7 @@ export const LEVELS: LevelDef[] = [
       angry: 2,
       brat: 2,
     }),
-    pressure: 0.85,
+    pressure: 0.8,
     playable: true,
   },
   {
@@ -283,16 +287,17 @@ export const LEVELS: LevelDef[] = [
     flavourEn: 'After fireworks',
     flavourZh: '十一煙花後',
     density: 10,
-    timer: 22,
-    mix: baseMix({
-      angry: 4,
-      luggage: 4,
+    timer: 23,
+    mix: {
+      normal: 2,
+      angry: 7,
+      luggage: 5,
       family: 3,
-      couple: 3,
+      couple: 2,
       stench: 2,
-      brat: 2,
-    }),
-    pressure: 1,
+      brat: 1,
+    },
+    pressure: 1.6,
     playable: true,
   },
 ];
