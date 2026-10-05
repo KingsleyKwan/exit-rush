@@ -8,15 +8,15 @@ You must **exit** a packed metro car before the doors close. Crowds are trying t
 ## Core loop
 
 1. **Select level** (station + time flavour text).
-2. **Spawn** in car mid/rear; door ahead; crowd between you and door + inbound boarders.
+2. **Spawn** deep in the car on the far (+X) side; **side doors** on the left wall; crowd between you and the open door(s) + inbound boarders.
 3. **Push** via swipe/drag. Stamina drains on heavy push; regenerates slowly.
 4. **Avoid / negotiate** special passengers (see below).
-5. **Reach door zone** with timer > 0 → clear → **+1 skill point**.
+5. **Reach an open side door / platform** with timer > 0 → clear → **+1 skill point**.
 6. Spend points in **skill tree**; replay / next level.
 
 ### Win
 
-Player reaches the door zone (green floor marker: `z <= DOOR_Z + winDepth`, `|x| < winHalf`) before the timer expires. Progress bar fills as distance-to-door shrinks (milestone pings at 25/50/75%).
+Player exits through an **open side door** onto the platform (green floor markers at open bays: `x <= −halfWidth − winDepth`, `|z − bay| < winHalf`) before the timer expires. Progress bar fills as you close on the nearest open bay (milestone pings at 25/50/75%).
 
 ### Lose
 
@@ -141,7 +141,7 @@ Everything lives in **`src/game/sim/tuning.ts`** (`TUNING`), grouped as `physics
 | Tourist | teal shirt, sun hat | camera, big brown suitcase |
 
 - **Type icons:** small round billboards (same glyphs as the legend) over special passengers within ~3.4 m of the player, plus any angry man winding up; toggle in settings.
-- **Car:** white walls, red stripe, stainless longitudinal benches, glass partitions, poles + overhead rails with red grips, red door frame with indicator lights, line-map strip above the door, yellow edge line, PSDs, **per-station coloured** tiled pillars + back wall, navy bilingual station sign (OFL fonts; level `stationEn` / `stationZh`, with an "inspired look · not affiliated" note). Static meshes merged per material.
+- **Car (v0.4.1):** white walls, red stripe, stainless longitudinal benches between door bays, glass partitions, poles + overhead rails with red grips. **Side-wall sliding doors** on the left (−X) platform wall (red frames + indicator lights); **gangway ends are not exits**. Line-map strip above the door wall, yellow edge line, PSDs, **per-station coloured** tiled pillars + back wall, navy bilingual station sign (OFL fonts; level `stationEn` / `stationZh`, with an "inspired look · not affiliated" note). Static meshes merged per material.
 - **UI:** authored SVG icon set (`src/ui/icons.ts`), bold rounded filled glyphs; title over key art; level cards = number badge + line dots + station 中/EN + density/timer icons; passenger legend with concept portraits.
 - **Quality:** Low drops stink lines/flies/most puffs and the shadow map; High keeps everything.
 
