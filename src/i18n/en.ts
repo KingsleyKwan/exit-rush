@@ -60,6 +60,12 @@ export interface Dict {
     luggage: string;
   };
   sfxNote: string;
+  mute: string;
+  unmute: string;
+  sound: string;
+  volMaster: string;
+  volMusic: string;
+  volSfx: string;
   // ---- v0.3 icon-first UI
   levelsTitle: string;
   legendTitle: string;
@@ -144,7 +150,13 @@ export const en: Dict = {
     angry: 'Angry man',
     luggage: 'Luggage',
   },
-  sfxNote: 'SFX are placeholders (not official MTR audio).',
+  sfxNote: 'All sounds are original. Fiction: 香城鐵路 / Hong City Rail — not affiliated with any real railway.',
+  mute: 'Mute',
+  unmute: 'Unmute',
+  sound: 'Sound',
+  volMaster: 'Master',
+  volMusic: 'Music',
+  volSfx: 'SFX',
   levelsTitle: 'Stations',
   legendTitle: 'Passengers',
   you: 'You',
@@ -166,5 +178,5 @@ export const en: Dict = {
   hintExit: 'Get off',
   finale: 'Finale',
   cleared: 'Cleared',
-  artCredit: 'Concept art generated with Grok Image.',
+  artCredit: 'Concept art: Grok Image. 香城鐵路 is fiction — inspired by HK metro, not affiliated.',
 };
