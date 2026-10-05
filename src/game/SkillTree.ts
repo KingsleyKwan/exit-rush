@@ -8,12 +8,15 @@ export const ULTIMATE_COST = 10;
 export const BRANCH_TOTAL = BRANCH_FILL + ULTIMATE_COST;
 
 /**
- * Max skill points one level can award (first clear + replays). v0.2.2 stop-gap
- * while levels 21–99 don't exist: 21 playable levels × 5 = 105 points, enough for
- * the ~99-point L100 loadout (branch + ultimate) that docs/BALANCE.md tunes for.
- * Set back to 1 once the full 100-level curve ships.
+ * v0.5 skill-point economy (see docs/BALANCE.md):
+ * - First clear of each playable level awards POINTS_PER_FIRST_CLEAR.
+ * - Replays award nothing (replay cap removed).
+ * - 31 playable clears × 3 = 93 SP — enough for one full branch+ult (70)
+ *   and a strong L100 loadout (~90).
  */
-export const MAX_POINTS_PER_LEVEL = 5;
+export const POINTS_PER_FIRST_CLEAR = 3;
+/** Kept for UI/docs: only the first clear of a level awards points. */
+export const MAX_POINTS_PER_LEVEL = 1;
 
 export type Branch = 'str' | 'spd' | 'wis';
 
@@ -24,13 +27,9 @@ export interface SkillModifiers {
   staminaRegen: number;
   resist: number;
   auraResist: number;
-  gapSense: number; // wis: slight auto-steer / reduced crowd friction
+  gapSense: number;
 }
 
-/**
- * Passive effects scale linearly with points in a branch (t = points / 60).
- * Coefficients live in TUNING.skills so balance can be tuned with the sim.
- */
 export function modifiersFromSkills(s: SkillState): SkillModifiers {
   const K = TUNING.skills;
   const strT = Math.min(1, s.str / BRANCH_FILL);
@@ -51,7 +50,6 @@ export function canSpend(s: SkillState, branch: Branch): boolean {
   if (s.points < 1) return false;
   const v = s[branch];
   if (v < BRANCH_FILL) return true;
-  // ultimate
   if (branch === 'str' && !s.ultStr) return s.points >= ULTIMATE_COST;
   if (branch === 'spd' && !s.ultSpd) return s.points >= ULTIMATE_COST;
   if (branch === 'wis' && !s.ultWis) return s.points >= ULTIMATE_COST;
@@ -82,8 +80,7 @@ export function spendPoint(s: SkillState, branch: Branch): SkillState {
 
 export function branchProgressLabel(s: SkillState, branch: Branch, ultLabel = 'Ult'): string {
   const v = s[branch];
-  const ult =
-    branch === 'str' ? s.ultStr : branch === 'spd' ? s.ultSpd : s.ultWis;
+  const ult = branch === 'str' ? s.ultStr : branch === 'spd' ? s.ultSpd : s.ultWis;
   if (ult) return `${BRANCH_TOTAL}/${BRANCH_TOTAL}`;
   if (v >= BRANCH_FILL) return `${BRANCH_FILL}/${BRANCH_FILL} → ${ultLabel} ${ULTIMATE_COST}`;
   return `${v}/${BRANCH_FILL}`;
