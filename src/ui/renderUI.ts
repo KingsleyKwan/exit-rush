@@ -18,7 +18,7 @@ let lastKey = '';
 
 /** Key that forces a full rebuild when it changes; otherwise the play HUD is patched in place. */
 function uiKey(game: Game): string {
-  return `${game.screen}|${getLang()}|${game.level?.id ?? ''}|${game.skillsReturn}|${game.pendingIntro ?? ''}|${game.showFtueGhost ? 1 : 0}`;
+  return `${game.screen}|${getLang()}|${game.level?.id ?? ''}|${game.skillsReturn}|${game.pendingIntro ?? ''}|${game.showFtueGhost ? 1 : 0}|${game.doorBannerT > 0 ? 1 : 0}`;
 }
 
 function rerender(game: Game): void {

@@ -18,27 +18,43 @@ export function renderPlayHud(game: Game): HTMLElement {
   const act = (id: string, title: string, on: boolean, ico: string) =>
     `<button type="button" class="skill-use act-${id} ${on ? '' : 'dim'}" data-act-skill="${id}" title="${title}" aria-label="${title}" ${on ? '' : 'disabled'}>${icon(on ? ico : 'lock')}</button>`;
 
+  const doorBanner = game.doorBannerT > 0
+    ? `<div class="door-banner" id="door-banner" role="status">
+        <span class="door-banner-zh">${fmt(dict.doorBannerZh, { n: game.doorBannerOpen })}</span>
+        <span class="door-banner-en">${game.doorBannerOpen === 1 ? dict.doorBannerEnOne : fmt(dict.doorBannerEn, { n: game.doorBannerOpen })}</span>
+        <span class="door-icons" aria-hidden="true">${[0, 1, 2]
+          .map(
+            (i) =>
+              `<span class="door-ico ${i < game.doorBannerOpen ? 'open' : 'shut'}" title="${i < game.doorBannerOpen ? dict.doorOpenIcon : dict.doorClosedIcon}">${icon('door', 'xs')}${i < game.doorBannerOpen ? '' : '<b>×</b>'}</span>`,
+          )
+          .join('')}</span>
+      </div>`
+    : '';
+
   const hud = el(`
     <div class="play-hud" data-ui="1">
-      <div class="hud-top">
-        <div class="hud-row">
-          <div class="station-chip" style="--line:${lineColor(lv.stationEn)}"><span class="lv-badge sm">${lv.id}</span><span>${stationName(lv)}</span></div>
-          <button type="button" class="icon-btn pause-btn" id="btn-pause" title="${dict.pause}" aria-label="${dict.pause}">${icon('pause')}</button>
+      <div class="hud-stack">
+        <div class="hud-top">
+          <div class="hud-row">
+            <div class="station-chip" style="--line:${lineColor(lv.stationEn)}"><span class="lv-badge sm">${lv.id}</span><span>${stationName(lv)}</span></div>
+            <button type="button" class="icon-btn pause-btn" id="btn-pause" title="${dict.pause}" aria-label="${dict.pause}">${icon('pause')}</button>
+          </div>
+          <div class="meters">
+            <div class="meter door-meter">
+              <span class="meter-icon" title="${dict.door}">${icon('door')}</span>
+              <div class="meter-bar"><i id="m-door"></i><b class="tick" style="left:25%"></b><b class="tick" style="left:50%"></b><b class="tick" style="left:75%"></b></div>
+            </div>
+            <div class="meter stam-meter">
+              <span class="meter-icon" title="${dict.stamina}">${icon('stamina')}</span>
+              <div class="meter-bar stamina"><i id="m-stam"></i></div>
+            </div>
+            <div class="meter timer" id="m-timer">
+              <span class="meter-icon" title="${dict.time}">${icon('timer')}</span>
+              <span class="timer-val" id="m-time"></span>
+            </div>
+          </div>
         </div>
-        <div class="meters">
-          <div class="meter door-meter">
-            <span class="meter-icon" title="${dict.door}">${icon('door')}</span>
-            <div class="meter-bar"><i id="m-door"></i><b class="tick" style="left:25%"></b><b class="tick" style="left:50%"></b><b class="tick" style="left:75%"></b></div>
-          </div>
-          <div class="meter stam-meter">
-            <span class="meter-icon" title="${dict.stamina}">${icon('stamina')}</span>
-            <div class="meter-bar stamina"><i id="m-stam"></i></div>
-          </div>
-          <div class="meter timer" id="m-timer">
-            <span class="meter-icon" title="${dict.time}">${icon('timer')}</span>
-            <span class="timer-val" id="m-time"></span>
-          </div>
-        </div>
+        ${doorBanner}
       </div>
       ${game.activeTip ? `<div class="tip-chip" id="tip-chip">${icon(`kind_${game.activeTip}`, 'xs')}<span>${dict.tipChip}: ${getLang() === 'en' ? (INTROS[game.activeTip as IntroKind]?.tipEn ?? '') : (INTROS[game.activeTip as IntroKind]?.tipZh ?? '')}</span></div>` : ''}
       <div class="drag-hint ${game.showFtueGhost ? 'ftue-ghost' : ''}" aria-hidden="true">
