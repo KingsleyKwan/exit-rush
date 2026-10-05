@@ -1,7 +1,7 @@
 {
-  "name": "逼落車 · Exit Rush",
+  "name": "逼落車 · Exit Rush · 香城鐵路",
   "short_name": "逼落車",
-  "description": "Push through the Hong Kong rush-hour crowd and get off before the doors close.",
+  "description": "逼落車 on 香城鐵路 / Hong City Rail — get off before the doors close. Fiction; not affiliated with any real railway.",
   "start_url": "./",
   "scope": "./",
   "display": "fullscreen",
@@ -10,8 +10,23 @@
   "theme_color": "#B01C2E",
   "lang": "zh-HK",
   "icons": [
-    { "src": "icons/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
-    { "src": "icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
-    { "src": "icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+    {
+      "src": "icons/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "icons/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "icons/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    }
   ]
 }
