@@ -15,7 +15,8 @@ export interface Dict {
   skillPoints: string;
   strength: string;
   speed: string;
-  wisdom: string;
+  wisdom: string; // legacy alias
+  staminaBranch: string;
   ultimate: string;
   locked: string;
   spend: string;
@@ -23,7 +24,11 @@ export interface Dict {
   branchFull: string;
   ultStr: string;
   ultSpd: string;
-  ultWis: string;
+  ultWis: string; // legacy
+  ultSta: string;
+  tier3Tbd: string;
+  skillNodePassive: string;
+  skillNodeActive: string;
   door: string;
   shove: string;
   stamina: string;
@@ -58,6 +63,7 @@ export interface Dict {
     couple: string;
     angry: string;
     luggage: string;
+    squat: string;
   };
   sfxNote: string;
   mute: string;
@@ -79,6 +85,7 @@ export interface Dict {
     couple: string;
     angry: string;
     luggage: string;
+    squat: string;
   };
   typeIcons: string;
   on: string;
@@ -116,7 +123,8 @@ export const en: Dict = {
   skillPoints: 'Skill points',
   strength: 'Strength',
   speed: 'Speed',
-  wisdom: 'Wisdom',
+  wisdom: 'Stamina',
+  staminaBranch: 'Stamina',
   ultimate: 'Ultimate',
   locked: 'Locked',
   spend: 'Spend',
@@ -124,7 +132,11 @@ export const en: Dict = {
   branchFull: 'Branch filled',
   ultStr: 'Iron Bull Charge',
   ultSpd: 'Slip-Off Dash',
-  ultWis: 'Crowd Sense',
+  ultWis: 'Iron Stance',
+  ultSta: 'Iron Stance',
+  tier3Tbd: 'Tier 3 TBD',
+  skillNodePassive: 'Passive',
+  skillNodeActive: 'Active',
   door: 'Door',
   shove: 'Hold to shove',
   stamina: 'Stamina',
@@ -138,7 +150,7 @@ export const en: Dict = {
   clearNoBonus: 'No more skill points from this level — first clear only',
   back: 'Back',
   levelsTeaser: 'Levels 1–30 playable · clear 30 to unlock Lv100',
-  skillHowto: '{fill} points fill a branch · +{ult} for the Ultimate',
+  skillHowto: 'Constellation: spend into a branch · major skills every ~10 · +{ult} for the Ultimate after {fill}',
   ultShort: 'Ult',
   skillsApplyNext: 'Changes apply from your next run.',
   quality: 'Graphics',
@@ -157,6 +169,7 @@ export const en: Dict = {
     couple: 'Couple',
     angry: 'Angry man',
     luggage: 'Luggage',
+    squat: 'Squatter',
   },
   sfxNote: 'All sounds are original. Fiction: 香城鐵路 / Hong City Rail — not affiliated with any real railway.',
   mute: 'Mute',
@@ -177,6 +190,7 @@ export const en: Dict = {
     couple: 'Holding hands. Go around, not through.',
     angry: 'Winds up, then shoves hard.',
     luggage: 'That giant suitcase blocks the aisle.',
+    squat: 'Crouched low — shove barely works; weave wide.',
   },
   typeIcons: 'Type icons',
   on: 'On',
@@ -195,4 +209,3 @@ export const en: Dict = {
   clearBonusN: '+{n} skill points',
   levelsTeaserV05: 'Short exits · learn one special every few levels',
 };
-
