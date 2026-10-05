@@ -110,21 +110,23 @@ export class Sim {
       if (!open.has(bz)) w.addBox(wallX - 1, wallX, bz - dh, bz + dh);
     }
 
-    // Longitudinal benches (matches TrainScene v0.5.1):
+    // Longitudinal benches (matches TrainScene v0.6):
     // BOTH walls: only long between-bay segments (skip short end stubs at door Z).
-    // Never overlap a door vestibule [bayZ ± doorHalf].
-    const benchMargin = 0.12;
+    // Never overlap a door vestibule [bayZ ± doorHalf]. Fill most of each segment.
     const betweenBaySegs: [number, number][] = [];
     for (let i = 0; i < bays.length - 1; i++) betweenBaySegs.push([bays[i] + dh, bays[i + 1] - dh]);
     const aislePoleZs: number[] = [];
     const seatInset = 0.1;
     const seatW = 0.62;
+    /** Small clearance from vestibule edge; segment already excludes [bay±doorHalf]. */
+    const BENCH_MARGIN = 0.06;
+    const BENCH_FILL = 0.96; // use 96% of (segment − margins)
     const addBench = (sx: -1 | 1, z0: number, z1: number, opts: { minAvail?: number; margin?: number } = {}): boolean => {
-      const margin = opts.margin ?? benchMargin;
-      const minAvail = opts.minAvail ?? 0.85;
+      const margin = opts.margin ?? BENCH_MARGIN;
+      const minAvail = opts.minAvail ?? 0.5;
       const avail = z1 - z0 - 2 * margin;
       if (avail < minAvail) return false;
-      const halfLen = Math.min(0.95, avail) / 2;
+      const halfLen = (avail * BENCH_FILL) / 2;
       const cz = (z0 + z1) / 2;
       // Keep colliders inside the car (do not cross doorWallX / +halfWidth).
       const outer = sx * (hw - seatInset);
@@ -133,10 +135,10 @@ export class Sim {
       return true;
     };
     for (const [z0, z1] of betweenBaySegs) {
-      if (addBench(-1, z0, z1, { margin: 0.28, minAvail: 0.5 })) aislePoleZs.push((z0 + z1) / 2);
+      if (addBench(-1, z0, z1)) aislePoleZs.push((z0 + z1) / 2);
     }
     for (const [z0, z1] of betweenBaySegs) {
-      addBench(1, z0, z1, { margin: 0.28, minAvail: 0.5 });
+      addBench(1, z0, z1);
     }
     // Grab poles in the aisle at between-door centres (never in a doorway).
     for (const pz of aislePoleZs.slice(0, 2)) {
@@ -188,7 +190,7 @@ export class Sim {
     const spanX = PLAYER_START_X - (wall - TUNING.car.winDepth);
     const tX = (PLAYER_START_X - b.x) / Math.max(0.5, spanX);
     const tZ = 1 - Math.min(1, Math.abs(b.z - bay) / 3.5);
-    return Math.max(0, Math.min(1, tX * 0.75 + tZ * 0.25 * Math.max(0, tX)));
+    return Math.max(0, Math.min(1, tX * 0.75 + tZ * 0.25 * Math.max(0, tX));
   }
 
   reachedDoor(): boolean {
@@ -240,7 +242,7 @@ export class Sim {
       d.leafNeg.enabled = d.leafPos.enabled = this.doorOpen < 0.999;
     }
 
-    const sensing = pl.isSensing(now);
+    const iron = pl.isIronStance(now);
     const boardingActive = !this.ambient && now >= TUNING.crowd.boardDelay && this.doorOpen > 0.5;
     const nearDoor = this.crowd.activeBoardersNearDoor(wall, this.openBays);
     const pressureField = boardingActive ? this.level.pressure * Math.min(1, nearDoor / 4) : 0;
@@ -257,7 +259,7 @@ export class Sim {
       pressure: this.level.pressure,
       boardingActive,
       pressureField,
-      calm: sensing ? TUNING.ult.wis.calm : 0,
+      calm: iron ? TUNING.ult.sta.calm : 0,
       player: pl.body,
       playerDirX: pl.aimX,
       playerDirZ: pl.aimZ,
@@ -266,6 +268,7 @@ export class Sim {
       angryImmune:
         pl.isCharging(now) ||
         pl.isDashing(now) ||
+        iron ||
         this.result !== null ||
         now - this.lastAngryHit < TUNING.player.hitIFrames,
       angryResist: Math.min(0.85, pl.mods.resist * 1.2),
@@ -275,7 +278,7 @@ export class Sim {
         pl.stunT = TUNING.player.stunTime * (1 - pl.mods.resist);
       },
     });
-    // Tell the player which bay to aim for (WIS path / dash).
+    // Tell the player which bay to aim for (dash / aim assist).
     pl.targetDoorZ = nearestDoorBay(pl.body.z, this.openBays);
     pl.step(dt, now, input, this.world, this.crowd, this.emit);
     this.world.step(dt);
