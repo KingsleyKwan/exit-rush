@@ -35,6 +35,10 @@ export interface SaveData {
   musicVol: number;
   sfxVol: number;
   muted: boolean;
+  /** v0.5: passenger kinds whose intro card has been shown (or re-viewed from legend). */
+  seenIntros: string[];
+  /** v0.5: first-run FTUE (auto L1 + ghost hand) completed. */
+  ftueDone: boolean;
 }
 
 const KEY = 'hk-mtr-exit-rush-v1';
@@ -72,6 +76,8 @@ export function defaultSave(): SaveData {
     musicVol: DEFAULT_AUDIO.music,
     sfxVol: DEFAULT_AUDIO.sfx,
     muted: DEFAULT_AUDIO.muted,
+    seenIntros: [],
+    ftueDone: false,
   };
 }
 
@@ -121,6 +127,10 @@ export function normalizeSave(parsed: Partial<SaveData> | null | undefined): Sav
     musicVol: vol(parsed.musicVol, d.musicVol),
     sfxVol: vol(parsed.sfxVol, d.sfxVol),
     muted: typeof parsed.muted === 'boolean' ? parsed.muted : false,
+    seenIntros: Array.isArray(parsed.seenIntros)
+      ? [...new Set(parsed.seenIntros.filter((s): s is string => typeof s === 'string'))]
+      : [],
+    ftueDone: parsed.ftueDone === true,
   };
 }
 
