@@ -29,13 +29,16 @@ Operator: **香城鐵路** · **Hong City Rail** (HCR) — a parody inspired by 
 | 19 | 紅磡 Hung Hom | 萬國 | Maan Gwok | 紅磡→萬國 |
 | 20 | 尖東 East Tsim Sha Tsui | 頓東 | Dun East | 尖→頓 |
 | 100 | 尖沙咀 Tsim Sha Tsui | 頓沙嘴 | Dun Sha Mouth | 尖→頓 · 咀→嘴 |
+| 21 | 元朗 Yuen Long | 元國 | Yuen Kwok | 朗→國 |
+| 22 | 朗屏 Long Ping | 塱平 | Long Ping Flat | owner: 塱平 |
 
-## Extra (owner examples, not yet in levels)
+Levels **23–30** reuse earlier parody stations with new flavour text (same display names).
+
+## Extra (reserved for future levels)
 
 | Real | Parody 中 | Parody EN |
 |------|-----------|-----------|
-| 元朗 Yuen Long | 元國 | Yuen Kwok |
-| 朗屏 Long Ping | 塱平 | Long Ping Flat |
+| *(none currently)* | | |
 
 ## Lines (parody)
 
