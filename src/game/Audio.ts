@@ -382,6 +382,12 @@ export class GameAudio {
     this.tone(720, 0.04, 'sine', 0.035);
     this.tone(960, 0.05, 'triangle', 0.025, 0.03);
   }
+  /** Short buzz when the player pushes a closed door. */
+  deny(): void {
+    this.tone(90, 0.09, 'square', 0.05);
+    this.tone(70, 0.12, 'sawtooth', 0.035, 0.05, 40);
+    this.noise(0.1, 0.08, 180, 1.2, 0.02, 60);
+  }
 }
 function clamp01(v: number): number {
   if (!Number.isFinite(v)) return 0;

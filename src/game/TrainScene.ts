@@ -120,12 +120,22 @@ export class TrainScene {
     psdPos: THREE.Object3D;
     open: boolean;
     exitZone: THREE.Mesh;
+    stripMat: THREE.MeshStandardMaterial;
+    lampMats: THREE.MeshStandardMaterial[];
+    closedSign: THREE.Mesh;
+    closedFloor: THREE.Mesh;
+    guide: THREE.Object3D;
+    /** Seconds left to flash closed-bay lights (player push feedback). */
+    flashT: number;
   }[] = [];
   private doorOpen = 0;
   private targetOpen = 1;
   private openBayZs: number[] = [...DOOR_BAYS];
-  private warnMats: THREE.MeshStandardMaterial[] = [];
   private exitMat: THREE.MeshBasicMaterial;
+  private closedSignMat: THREE.MeshBasicMaterial | null = null;
+  private guideMat: THREE.MeshBasicMaterial | null = null;
+  private guideGeo: THREE.BufferGeometry | null = null;
+  private closedFloorMat: THREE.MeshBasicMaterial | null = null;
   private warn = 0;
   private dirLight: THREE.DirectionalLight;
   private signTex: THREE.CanvasTexture;
@@ -225,18 +235,119 @@ export class TrainScene {
   setOpenBays(bays: readonly number[]): void {
     this.openBayZs = [...bays];
     const open = new Set(bays);
+    const wall = doorWallX();
     for (const d of this.doorBays) {
       d.open = open.has(d.z);
-      d.leafNeg.visible = d.leafPos.visible = d.open;
-      d.psdNeg.visible = d.psdPos.visible = d.open;
+      // Closed bays keep leaves/PSD visibly shut (never hide them).
+      d.leafNeg.visible = d.leafPos.visible = true;
+      d.psdNeg.visible = d.psdPos.visible = true;
       d.exitZone.visible = d.open;
+      d.closedSign.visible = !d.open;
+      d.closedFloor.visible = !d.open;
+      d.guide.visible = d.open;
+      d.flashT = 0;
+      if (!d.open) {
+        d.leafNeg.position.set(wall - 0.04, 0, d.z - 0.48);
+        d.leafPos.position.set(wall - 0.04, 0, d.z + 0.48);
+        d.psdNeg.position.set(wall - 0.22, 0, d.z - 0.48);
+        d.psdPos.position.set(wall - 0.22, 0, d.z + 0.48);
+      }
+    }
+  }
+
+  /** Flash a closed bay's red lights (player pushed into it). */
+  flashClosedBay(bayZ: number, duration = 0.55): void {
+    for (const d of this.doorBays) {
+      if (!d.open && Math.abs(d.z - bayZ) < 0.05) d.flashT = Math.max(d.flashT, duration);
+    }
+  }
+
+  private ensureDoorSharedMats(): void {
+    if (!this.closedSignMat) {
+      // Vertical stack: no-entry icon → 粵 → EN. No overlapping glyphs.
+      const W = 512;
+      const H = 480;
+      const tex = canvasTex(W, H, (ctx) => {
+        ctx.clearRect(0, 0, W, H);
+        // High-contrast dark red panel
+        ctx.fillStyle = '#140608';
+        ctx.fillRect(0, 0, W, H);
+        ctx.fillStyle = '#9a1424';
+        ctx.fillRect(18, 18, W - 36, H - 36);
+        ctx.strokeStyle = '#ffffff';
+        ctx.lineWidth = 10;
+        ctx.strokeRect(28, 28, W - 56, H - 56);
+
+        // No-entry circle + X (top, own band)
+        const cx = W / 2;
+        const cy = 118;
+        const r = 62;
+        ctx.beginPath();
+        ctx.arc(cx, cy, r, 0, Math.PI * 2);
+        ctx.fillStyle = '#ffffff';
+        ctx.fill();
+        ctx.lineWidth = 14;
+        ctx.strokeStyle = '#c81020';
+        ctx.stroke();
+        ctx.beginPath();
+        ctx.arc(cx, cy, r - 18, 0, Math.PI * 2);
+        ctx.strokeStyle = '#c81020';
+        ctx.lineWidth = 10;
+        ctx.stroke();
+        ctx.strokeStyle = '#c81020';
+        ctx.lineWidth = 16;
+        ctx.lineCap = 'round';
+        ctx.beginPath();
+        ctx.moveTo(cx - 32, cy - 32);
+        ctx.lineTo(cx + 32, cy + 32);
+        ctx.moveTo(cx + 32, cy - 32);
+        ctx.lineTo(cx - 32, cy + 32);
+        ctx.stroke();
+
+        // Chinese — large, below icon, clear of X
+        ctx.fillStyle = '#ffffff';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.font = "bold 72px 'Noto Sans HK', 'PingFang HK', 'Microsoft JhengHei', system-ui, sans-serif";
+        ctx.fillText('此門不開', cx, 268);
+
+        // English — readable size, below Chinese
+        ctx.font = 'bold 40px system-ui, -apple-system, sans-serif';
+        ctx.fillStyle = '#ffe8e8';
+        ctx.fillText('Door not in use', cx, 360);
+      });
+      tex.needsUpdate = true;
+      this.closedSignMat = new THREE.MeshBasicMaterial({
+        map: tex,
+        transparent: true,
+        depthWrite: false,
+        side: THREE.DoubleSide,
+      });
+    }
+    if (!this.guideMat) {
+      this.guideMat = new THREE.MeshBasicMaterial({ color: 0x3dff8a, transparent: true, opacity: 0.92, depthWrite: false });
+    }
+    if (!this.guideGeo) {
+      this.guideGeo = new THREE.ConeGeometry(0.14, 0.32, 4);
+    }
+    if (!this.closedFloorMat) {
+      this.closedFloorMat = new THREE.MeshBasicMaterial({
+        color: 0xff3030,
+        transparent: true,
+        opacity: 0.35,
+        depthWrite: false,
+      });
     }
   }
 
   private buildSideDoors(): void {
+    this.ensureDoorSharedMats();
     const wall = doorWallX();
     const dh = TUNING.car.doorHalf;
     this.scene.add(this.doorGroup);
+    const lampGeo = new THREE.CylinderGeometry(0.075, 0.075, 0.05, 12);
+    const stripGeo = new THREE.BoxGeometry(0.05, 0.06, dh * 2 + 0.2);
+    const signGeo = new THREE.PlaneGeometry(1.45, 1.35);
     for (const bz of DOOR_BAYS) {
       const leafNeg = this.makeDoorLeaf(1);
       const leafPos = this.makeDoorLeaf(-1);
@@ -254,18 +365,18 @@ export class TrainScene {
       psdPos.position.set(wall - 0.22, 0, bz);
       this.scene.add(psdNeg, psdPos);
 
-      const stripMat = new THREE.MeshStandardMaterial({ color: HCR_RED, emissive: HCR_RED, emissiveIntensity: 0.45 });
-      const strip = new THREE.Mesh(new THREE.BoxGeometry(0.05, 0.06, dh * 2 + 0.2), stripMat);
+      const stripMat = new THREE.MeshStandardMaterial({ color: 0x1a8f4a, emissive: 0x22ee66, emissiveIntensity: 0.7 });
+      const strip = new THREE.Mesh(stripGeo, stripMat);
       strip.position.set(wall + 0.1, 2.17, bz);
       this.scene.add(strip);
-      this.warnMats.push(stripMat);
+      const lampMats: THREE.MeshStandardMaterial[] = [];
       for (const sz of [-1, 1]) {
-        const lampMat = new THREE.MeshStandardMaterial({ color: 0x552222, emissive: 0xff3030, emissiveIntensity: 0.1 });
-        const lamp = new THREE.Mesh(new THREE.CylinderGeometry(0.075, 0.075, 0.05, 12), lampMat);
+        const lampMat = new THREE.MeshStandardMaterial({ color: 0x145a32, emissive: 0x22ee66, emissiveIntensity: 0.55 });
+        const lamp = new THREE.Mesh(lampGeo, lampMat);
         lamp.rotation.z = Math.PI / 2;
         lamp.position.set(wall + 0.12, 2.2, bz + sz * (dh + 0.12));
         this.scene.add(lamp);
-        this.warnMats.push(lampMat);
+        lampMats.push(lampMat);
       }
 
       const exit = new THREE.Mesh(new THREE.PlaneGeometry(TUNING.car.winDepth + 0.15, dh * 2 - 0.15), this.exitMat);
@@ -273,7 +384,47 @@ export class TrainScene {
       exit.position.set(wall - TUNING.car.winDepth / 2 - 0.05, 0.013, bz);
       this.scene.add(exit);
 
-      this.doorBays.push({ z: bz, leafNeg, leafPos, psdNeg, psdPos, open: true, exitZone: exit });
+      // Closed-door glass decal (car-interior side, faces +X / camera).
+      const closedSign = new THREE.Mesh(signGeo, this.closedSignMat!);
+      closedSign.rotation.y = Math.PI / 2;
+      closedSign.position.set(wall + 0.08, 1.45, bz);
+      closedSign.visible = false;
+      this.scene.add(closedSign);
+
+      // Red floor no-entry glow under closed bays (phone-readable).
+      const closedFloor = new THREE.Mesh(
+        new THREE.PlaneGeometry(TUNING.car.winDepth + 0.2, dh * 2 - 0.2),
+        this.closedFloorMat!,
+      );
+      closedFloor.rotation.x = -Math.PI / 2;
+      closedFloor.position.set(wall - TUNING.car.winDepth / 2 - 0.02, 0.014, bz);
+      closedFloor.visible = false;
+      this.scene.add(closedFloor);
+
+      // Bobbing arrow above open bays (shared geo/mat).
+      const guide = new THREE.Group();
+      const tip = new THREE.Mesh(this.guideGeo!, this.guideMat!);
+      tip.rotation.x = Math.PI; // point down
+      tip.position.y = 0;
+      guide.add(tip);
+      guide.position.set(wall + 0.28, 2.4, bz);
+      this.scene.add(guide);
+
+      this.doorBays.push({
+        z: bz,
+        leafNeg,
+        leafPos,
+        psdNeg,
+        psdPos,
+        open: true,
+        exitZone: exit,
+        stripMat,
+        lampMats,
+        closedSign,
+        closedFloor,
+        guide,
+        flashT: 0,
+      });
     }
   }
 
@@ -756,32 +907,68 @@ export class TrainScene {
     this.doorOpen += (this.targetOpen - this.doorOpen) * Math.min(1, dt * 6);
     const half = TUNING.car.doorHalf;
     const wall = doorWallX();
+    const t = this.time;
+    const warnFlash = this.warn > 0 && Math.sin(t * (2 + this.warn * 7) * Math.PI * 2) > 0;
+
     for (const d of this.doorBays) {
-      if (!d.open) continue;
-      // Leaves slide along ±Z away from the bay centre when open.
-      d.leafNeg.position.set(wall - 0.04, 0, d.z - (0.48 + half * this.doorOpen));
-      d.leafPos.position.set(wall - 0.04, 0, d.z + (0.48 + half * this.doorOpen));
-      d.psdNeg.position.set(wall - 0.22, 0, d.z - (0.48 + 0.9 * this.doorOpen));
-      d.psdPos.position.set(wall - 0.22, 0, d.z + (0.48 + 0.9 * this.doorOpen));
+      if (d.flashT > 0) d.flashT = Math.max(0, d.flashT - dt);
+
+      if (d.open) {
+        // Leaves slide along ±Z away from the bay centre when open.
+        d.leafNeg.position.set(wall - 0.04, 0, d.z - (0.48 + half * this.doorOpen));
+        d.leafPos.position.set(wall - 0.04, 0, d.z + (0.48 + half * this.doorOpen));
+        d.psdNeg.position.set(wall - 0.22, 0, d.z - (0.48 + 0.9 * this.doorOpen));
+        d.psdPos.position.set(wall - 0.22, 0, d.z + (0.48 + 0.9 * this.doorOpen));
+        d.guide.visible = true;
+        d.guide.position.y = 2.4 + Math.sin(t * 3.6 + d.z) * 0.14;
+        if (this.guideMat) this.guideMat.opacity = 0.75 + 0.2 * Math.sin(t * 4);
+
+        if (this.warn > 0) {
+          // Closing: flashing amber on open bays.
+          const on = warnFlash;
+          this.setBayLight(d, on ? 0xffa000 : 0xffcc44, on ? 2.0 : 0.55, on ? 0xff8800 : 0xffb000);
+        } else {
+          // Open & safe: green indicator.
+          this.setBayLight(d, 0x22ee66, 0.85 + 0.15 * Math.sin(t * 2.5), 0x1a8f4a);
+        }
+      } else {
+        // Stay shut.
+        d.leafNeg.position.set(wall - 0.04, 0, d.z - 0.48);
+        d.leafPos.position.set(wall - 0.04, 0, d.z + 0.48);
+        d.psdNeg.position.set(wall - 0.22, 0, d.z - 0.48);
+        d.psdPos.position.set(wall - 0.22, 0, d.z + 0.48);
+        d.guide.visible = false;
+        const pushFlash = d.flashT > 0 && Math.sin(t * 18) > 0;
+        if (pushFlash) this.setBayLight(d, 0xff2020, 2.4, 0xff0000);
+        else this.setBayLight(d, 0xff3030, 0.95, 0x661010);
+        if (this.closedFloorMat) {
+          this.closedFloorMat.opacity = pushFlash ? 0.55 : 0.28 + 0.1 * Math.sin(t * 2.2);
+        }
+      }
     }
 
-    const t = this.time;
     if (this.warn > 0) {
-      const hz = 2 + this.warn * 7;
-      const on = Math.sin(t * hz * Math.PI * 2) > 0;
-      for (const m of this.warnMats) {
-        m.emissive.setHex(on ? 0xff2020 : 0xffa000);
-        m.emissiveIntensity = on ? 2.2 : 0.5;
-      }
-      this.exitMat.color.setHex(on ? 0xff5050 : 0xffcc33);
-      this.exitMat.opacity = on ? 0.45 : 0.2;
+      this.exitMat.color.setHex(warnFlash ? 0xff5050 : 0xffcc33);
+      this.exitMat.opacity = warnFlash ? 0.45 : 0.2;
     } else {
-      this.warnMats.forEach((m, i) => {
-        m.emissive.setHex(i % 3 === 0 ? HCR_RED : 0xff3030);
-        m.emissiveIntensity = i % 3 === 0 ? 0.45 : 0.1;
-      });
       this.exitMat.color.setHex(0x66ff99);
-      this.exitMat.opacity = 0.18 + 0.12 * Math.sin(t * 3);
+      this.exitMat.opacity = 0.22 + 0.14 * Math.sin(t * 3);
+    }
+  }
+
+  private setBayLight(
+    d: { stripMat: THREE.MeshStandardMaterial; lampMats: THREE.MeshStandardMaterial[] },
+    emissive: number,
+    intensity: number,
+    color: number,
+  ): void {
+    d.stripMat.color.setHex(color);
+    d.stripMat.emissive.setHex(emissive);
+    d.stripMat.emissiveIntensity = intensity;
+    for (const m of d.lampMats) {
+      m.color.setHex(color);
+      m.emissive.setHex(emissive);
+      m.emissiveIntensity = intensity * 0.85;
     }
   }
 

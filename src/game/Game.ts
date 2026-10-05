@@ -69,6 +69,12 @@ export class Game {
   showFtueGhost = false;
   /** Seconds remaining for FTUE ghost (visual only). */
   ftueGhostT = 0;
+  /** Level-start door-count banner countdown (seconds). 0 = hidden. */
+  doorBannerT = 0;
+  /** Open-door count shown on the level-start banner. */
+  doorBannerOpen = 0;
+  /** Rate-limit closed-door toast (sim time of last toast). */
+  private closedDoorToastAt = -99;
   /** Resolved render tier currently applied. */
   quality: QualityLevel = 'high';
   /** Whether the WebGL context was created with antialias (fixed for its lifetime). */
@@ -382,6 +388,11 @@ export class Game {
     this.autoPaused = false;
     this.pendingIntro = null;
     this.activeTip = level.tipKind ?? null;
+    const openN = openDoorBays(level.id).length;
+    // Banner when fewer than 3 doors open (L8–15: 2, L16+: 1).
+    this.doorBannerOpen = openN;
+    this.doorBannerT = openN < 3 ? 3.6 : 0;
+    this.closedDoorToastAt = -99;
     this.runSkills = { ...this.save.skills };
     const sim = new Sim(level, modifiersFromSkills(this.runSkills), Math.random);
     this.bindSim(sim);
@@ -847,6 +858,23 @@ export class Game {
       }
     } else {
       this.train.setWarning(0);
+    }
+
+    // Closed-door push feedback (toast + flash + buzz), rate-limited ~2s.
+    if (!sim.result) {
+      const d = this.input.drag;
+      const bay = sim.closedBayPush(d.intentX, d.magnitude);
+      if (bay !== null && now - this.closedDoorToastAt >= 2) {
+        this.closedDoorToastAt = now;
+        this.train.flashClosedBay(bay);
+        this.audio.deny();
+        haptic(10, 30);
+        this.hooks.onToast?.(t().doorClosedToast);
+      }
+    }
+
+    if (this.doorBannerT > 0) {
+      this.doorBannerT = Math.max(0, this.doorBannerT - dt);
     }
 
     // SPD afterimages.
