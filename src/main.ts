@@ -1,5 +1,8 @@
 import { Game } from './game/Game';
 import { renderUI } from './ui/renderUI';
+import { loadGameFonts } from './game/fonts';
+
+void loadGameFonts();
 
 const canvas = document.getElementById('game-canvas') as HTMLCanvasElement;
 const uiRoot = document.getElementById('ui-root') as HTMLElement;

@@ -1,6 +1,6 @@
 {
   "name": "hk-mtr-exit-rush",
-  "version": "0.3.0",
+  "version": "0.4.0",
   "description": "逼落車 — HK MTR Exit Rush: push through crowds to exit the train",
   "type": "module",
   "scripts": {
