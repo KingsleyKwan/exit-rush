@@ -1,1 +1,1 @@
-PLACEHOLDER_LOAD_FROM_FILE
+@file:///workspace/hk-mtr-exit-rush/src/ui/renderUI.ts
