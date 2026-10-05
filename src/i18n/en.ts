@@ -25,6 +25,7 @@ export interface Dict {
   ultSpd: string;
   ultWis: string;
   door: string;
+  shove: string;
   stamina: string;
   time: string;
   level: string;
@@ -71,11 +72,12 @@ export const en: Dict = {
   ultSpd: 'Slip-Off Dash',
   ultWis: 'Crowd Sense',
   door: 'Door',
+  shove: 'Hold to shove',
   stamina: 'Stamina',
   time: 'Time',
   level: 'Level',
   density: 'Crowd',
-  howTo: 'Swipe toward the door. Push through. Exit before doors close.',
+  howTo: 'Drag anywhere to steer · hold ✊ to shove · get out before the doors close.',
   language: 'Language',
   clearBonus: '+1 skill point',
   passenger: {

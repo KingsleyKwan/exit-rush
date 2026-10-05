@@ -27,11 +27,12 @@ export const zhHK: Dict = {
   ultSpd: '閃身落車',
   ultWis: '人潮預測',
   door: '車門',
+  shove: '按住推人',
   stamina: '體力',
   time: '時間',
   level: '關卡',
   density: '人潮',
-  howTo: '向車門滑動推開人群，關門前走出去。',
+  howTo: '拖動任何位置控制方向 · 按住✊推開人群 · 趕喔關門前落車。',
   language: '語言',
   clearBonus: '+1 技能點',
   passenger: {

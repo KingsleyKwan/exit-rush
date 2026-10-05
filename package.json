@@ -1,12 +1,13 @@
 {
   "name": "hk-mtr-exit-rush",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "逼落車 — HK MTR Exit Rush: push through crowds to exit the train",
   "type": "module",
   "scripts": {
     "dev": "vite",
     "build": "tsc && vite build",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "test:sim": "esbuild scripts/simTest.ts --bundle --platform=node --format=esm --log-level=warning --outfile=.cache/simTest.mjs && node .cache/simTest.mjs"
   },
   "dependencies": {
     "three": "^0.169.0"
