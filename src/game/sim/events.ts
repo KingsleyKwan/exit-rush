@@ -1,4 +1,4 @@
-export type UltKind = 'str' | 'spd' | 'wis';
+export type UltKind = 'str' | 'spd' | 'sta';
 
 /** Gameplay events emitted by the sim; the view layer turns them into juice. */
 export type SimEvent =
