@@ -1,4 +1,5 @@
 import type { Lang } from '../i18n';
+import { DEFAULT_AUDIO } from './Audio';
 
 export interface SkillState {
   str: number; // 0–60 filled, then ultimate via flag
@@ -29,6 +30,11 @@ export interface SaveData {
   autoQuality: QualityLevel | null;
   /** v0.3: floating passenger-type icons above special passengers (default on). */
   typeIcons: boolean;
+  /** v0.4: mixer — master / music / sfx volumes 0–1 and mute toggle. */
+  masterVol: number;
+  musicVol: number;
+  sfxVol: number;
+  muted: boolean;
 }
 
 const KEY = 'hk-mtr-exit-rush-v1';
@@ -62,10 +68,18 @@ export function defaultSave(): SaveData {
     quality: 'auto',
     autoQuality: null,
     typeIcons: true,
+    masterVol: DEFAULT_AUDIO.master,
+    musicVol: DEFAULT_AUDIO.music,
+    sfxVol: DEFAULT_AUDIO.sfx,
+    muted: DEFAULT_AUDIO.muted,
   };
 }
 
 const num = (v: unknown, d: number): number => (typeof v === 'number' && Number.isFinite(v) && v >= 0 ? v : d);
+const vol = (v: unknown, d: number): number => {
+  if (typeof v !== 'number' || !Number.isFinite(v)) return d;
+  return Math.min(1, Math.max(0, v));
+};
 const bool = (v: unknown): boolean => v === true;
 
 /** Merge a parsed (possibly old / partial / corrupted) save over defaults. */
@@ -103,6 +117,10 @@ export function normalizeSave(parsed: Partial<SaveData> | null | undefined): Sav
     quality: q === 'low' || q === 'high' || q === 'auto' ? q : 'auto',
     autoQuality: aq === 'low' || aq === 'high' ? aq : null,
     typeIcons: typeof parsed.typeIcons === 'boolean' ? parsed.typeIcons : true,
+    masterVol: vol(parsed.masterVol, d.masterVol),
+    musicVol: vol(parsed.musicVol, d.musicVol),
+    sfxVol: vol(parsed.sfxVol, d.sfxVol),
+    muted: typeof parsed.muted === 'boolean' ? parsed.muted : false,
   };
 }
 
