@@ -1,8 +1,8 @@
-# Balance — v0.5.0
+# Balance — v0.6.0
 
 Short-session retune: timers ≈ **12–18 s** (L100 **24 s**), staged specials, first-clear SP economy. Physics knobs in `src/game/sim/tuning.ts` are largely unchanged from v0.2.1; **level table** and **points** changed.
 
-## Skill points (v0.5 rule)
+## Skill points (v0.5–v0.6 rule)
 
 | Rule | Value |
 |------|-------|
@@ -40,3 +40,18 @@ RUNS=40 LEVEL=1,5,6,12,21,30,100 LOADOUTS=none,earned,ult-spd npm run test:sim
 - L1–5 normals only; intros at 6/9/12/15/18/21.
 - SP: 3 on first clear, no replay farm.
 - L100 gated behind clear of L30.
+
+
+## Skill tree (v0.6)
+
+Constellation redesign: see [`SKILL_TREE.md`](SKILL_TREE.md). Wisdom → **Stamina**. Continuous fill still scales soft stats; major nodes unlock at 10/20/30/40/50/60. Tier 3 numbers are **TBD placeholders**.
+
+L8 introduces **踎低 / squat** (hard shove, lateral weave). Bot win-rate on L8 may sit below the L6–15 band until further tuning.
+
+
+## Crowd density (v0.6)
+
+- `crowdCount` ≈ `7 + density·3.6` (was `6 + density·3.2`).
+- Level densities +1 in most bands; L1–5 stay teachable (~6–7).
+- Boarding: higher `boardRate*` / `boardQueue*` / `boardBudget*`; `maxBodies` 96.
+- Benches: margin 0.06, fill 96% of between-bay segment (sim + TrainScene matched).

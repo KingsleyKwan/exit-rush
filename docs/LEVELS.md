@@ -1,6 +1,6 @@
-# Levels — stations & difficulty (v0.5.0)
+# Levels — stations & difficulty (v0.6.0)
 
-Difficulty is a composite of **density** (0–10), **pressure** (boarding), **special mix**, and **timer seconds**. v0.5 retunes for **~10–15 s** exits with a **complexity staircase**: L1–5 normals only; one special introduced every three levels from L6; mixes on L24–30; L100 finale.
+Difficulty is a composite of **density** (0–10), **pressure** (boarding), **special mix**, and **timer seconds**. v0.6 retunes for **~10–15 s** exits with a **complexity staircase**: L1–5 normals only; one special introduced every three levels from L6; mixes on L24–30; L100 finale.
 
 Station names are **parody display names** (香城鐵路 fiction). Real→parody mapping: [`STATIONS.md`](STATIONS.md).
 
@@ -8,13 +8,14 @@ Station names are **parody display names** (香城鐵路 fiction). Real→parody
 
 | Lv | Station EN | 站名 | Sec | Dens | Press | Special / role |
 |----|------------|------|-----|------|-------|----------------|
-| 1 | Sheung Yuen | 上圓 | 14 | 5 | 0.08 | Normals — teach drag |
-| 2 | Bastion Hill | 堡壘山 | 13 | 5 | 0.1 | Normals — shove |
-| 3 | Gu Ching | 古城 | 13 | 5 | 0.15 | Normals — boarders |
-| 4 | Koi Stream | 鯉魚涌 | 12 | 6 | 0.2 | Normals — stamina |
-| 5 | North Spot | 北點 | 12 | 6 | 0.25 | Normals — door warning |
+| 1 | Sheung Yuen | 上圓 | 14 | 6 | 0.08 | Normals — teach drag |
+| 2 | Bastion Hill | 堡壘山 | 13 | 6 | 0.1 | Normals — shove |
+| 3 | Gu Ching | 古城 | 13 | 6 | 0.15 | Normals — boarders |
+| 4 | Koi Stream | 鯉魚涌 | 12 | 7 | 0.2 | Normals — stamina |
+| 5 | North Spot | 北點 | 12 | 7 | 0.25 | Normals — door warning |
 | 6 ★ | Causeway Bay Village | 銅鑼灣村 | 14 | 5 | 0.25 | **Intro luggage** |
-| 7–8 | Tin Wong / Wan Neoi | 天王 / 灣女 | 13 | 5–6 | 0.3–0.35 | Reinforce luggage |
+| 7 | Tin Wong | 天王 | 13 | 6 | 0.34 | Reinforce luggage |
+| 8 ★ | Wan Neoi | 灣女 | 15 | 6 | 0.32 | **Intro squat / 踎低** |
 | 9 ★ | Silver Bell | 銀鐘 | 14 | 5 | 0.3 | **Intro stench** |
 | 10–11 | Central Yuen / Hong City | 中圓 / 香城 | 13–14 | 6 | 0.25–0.35 | Reinforce / soft combine |
 | 12 ★ | Nine-Head Dragon | 九頭龍 | 14 | 5 | 0.35 | **Intro family** |
@@ -30,7 +31,22 @@ Station names are **parody display names** (香城鐵路 fiction). Real→parody
 
 ★ = intro card before timer. Full copy: design plan in repo review docs / `src/game/intros.ts`.
 
-## Skill points (v0.5)
+## Skill points (v0.6)
 
 First clear of each playable level awards **3** skill points. Replays award **0**.  
 31 playable levels × 3 = **93** SP reachable — enough for one full branch + ultimate (70) and a strong L100 loadout. See [`BALANCE.md`](BALANCE.md).
+
+
+## Teach order (v0.6)
+
+| Level | Intro |
+|------:|-------|
+| 6 | luggage |
+| **8** | **squat / 踎低** |
+| 9 | stench |
+| 12 | family |
+| 15 | brat |
+| 18 | couple |
+| 21 | angry |
+
+L24 tip reinforces squat in a mix exam.
