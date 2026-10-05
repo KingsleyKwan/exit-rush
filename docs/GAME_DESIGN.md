@@ -84,7 +84,7 @@ All gameplay physics runs in a **pure-TypeScript sim** (`src/game/sim/`, no thre
 | Static | Walls, longitudinal bench seats, grab pole, end wall with doorway, platform bounds, and door leaves that **slide shut physically** in the last `door.closeTime` seconds. |
 | Riders | Spring to a standing spot (`anchorK`, capped at `anchorMax` × mass). Displaced too long → adopt a new spot (the crowd re-settles). Near the door they feel an inward **pressure field** while boarders stream in. They sidestep a little for the player (more with WIS). |
 | Boarders (逼上車) | Spawn on the platform (a queue is waiting when the doors open), **funnel through the doorway**, then drive to a spot deep in the car with a desired-velocity controller capped at `boardMaxDrive` × mass — they push *against* you. Rate & total scale with level `pressure`. |
-| Player | Desired-velocity drive (`accel`) capped at `maxDrive × pushForce × mass` — that cap **is** push-vs-resistance. Mass grows with STR `resist`. In contact you **shoulder** through: radius shrinks to `shoulderRadius` and a tangential **slip** force slides you along whoever blocks you. Stamina drains with contact pressure; 0 → winded. |
+| Player | Desired-velocity drive (`accel`) capped at `maxDrive × pushForce × mass` — that cap **is** push-vs-resistance. Mass grows with STR `resist`. **Crowd drag** (v0.2.1): top speed shrinks with nearby bodies (`player.crowdDrag`, max −65%; WIS cuts it) so packed cars are a shuffle, not a sprint. In contact you **shoulder** through: radius shrinks to `shoulderRadius` and a tangential **slip** force slides you along whoever blocks you. Stamina drains with contact pressure; 0 → winded. |
 | Aim assist | 9-ray fan (±0.95 rad) scored by mass-weighted bodies & walls in each corridor; the stick direction blends toward the clearest one by `aim.base + gapSense × aim.perGapSense`. |
 | Shove | Hold to charge (0.45 s), release for a cone burst: impulse to each body (radial + forward mix) scaled by charge × STR, a forward lunge, small recoil. Cost 9–20 stamina, 0.7 s cooldown. |
 
@@ -104,9 +104,9 @@ All gameplay physics runs in a **pure-TypeScript sim** (`src/game/sim/`, no thre
 
 | Ult | Effect |
 |-----|--------|
-| STR 鐵牛撞門 | Radial **shockwave** impulse (r 2.9 m, falls off, ÷ mass) + 2.2 s charge (mass ×3, drive ×2.2, immune to angry). Ring FX, big shake, hit-stop, white flash. |
-| SPD 閃身落車 | **Dash** burst 6.2 m/s (toward the door if no stick), 1.1 s of speed ×2.1, mass ×3, slim radius. Afterimages + FOV punch. |
-| WIS 人潮預測 | 3.5 s: crowd **hesitates** (AI forces −75%, no angry wind-ups), aim assist maxed, **gap path highlighted** through the crowd. |
+| STR 鐵牛撞門 | Radial **shockwave** impulse (r 2.9 m, 5.5, falls off, ÷ mass) + 1.6 s charge (mass ×2.2, drive ×1.8, immune to angry). Ring FX, big shake, hit-stop, white flash. |
+| SPD 閃身落車 | **Dash** burst 5.5 m/s (toward the door if no stick), 1.0 s of speed ×1.7, mass ×2.2, slim radius, keeps half the crowd drag. Afterimages + FOV punch. (v0.2.1: toned down from 6.2 m/s / 1.1 s / ×2.1 / ×3 / no drag.) |
+| WIS 人潮預測 | 3.0 s: crowd **hesitates** (AI forces −65%, no angry wind-ups), aim assist maxed, **gap path highlighted** through the crowd. |
 
 ### Juice
 
@@ -114,7 +114,7 @@ Camera: critically-damped follow with lag, trauma² shake, directional kicks, FO
 
 ### Tuning knobs
 
-Everything lives in **`src/game/sim/tuning.ts`** (`TUNING`), grouped as `physics`, `car`, `player` (+ `stamina`, `shove`, `aim`), `crowd`, `types`, `ult`, `door`. Per-kind mass / radius / damping / anchor / drive / speed are in **`src/game/PassengerTypes.ts`**. In dev builds (or with `?debug`) `window.TUNING` is live-editable from the console. Re-run `npm run test:sim` after changes (`SEEDS=8`, `LEVEL=100` env vars).
+Everything lives in **`src/game/sim/tuning.ts`** (`TUNING`), grouped as `physics`, `car`, `player` (+ `stamina`, `shove`, `aim`, `crowdDrag`), `crowd`, `types`, `skills` (skill-tree passive coefficients), `ult`, `door`. Per-kind mass / radius / damping / anchor / drive / speed are in **`src/game/PassengerTypes.ts`**. In dev builds (or with `?debug`) `window.TUNING` is live-editable from the console. Re-run `npm run test:sim` after changes (`RUNS=40`, `LEVEL=1,100`, `LOADOUTS=earned,ult-spd`, `TUNE='{…}'`, `PATCH='{…}'` env vars — see [`BALANCE.md`](BALANCE.md)).
 
 ## Presentation
 
