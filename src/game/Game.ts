@@ -7,9 +7,10 @@ import { InputController } from './Input';
 import { GameAudio } from './Audio';
 import { haptic } from './haptics';
 import { getLevel, type LevelDef } from './levels';
-import { modifiersFromSkills } from './SkillTree';
-import { loadSave, writeSave, type SaveData } from './storage';
-import { setLang, getLang } from '../i18n';
+import { MAX_POINTS_PER_LEVEL, modifiersFromSkills } from './SkillTree';
+import { loadSave, writeSave, type QualityLevel, type QualitySetting, type SaveData, type SkillState } from './storage';
+import { FpsProbe, PROBE_MIN_FPS, pixelRatioFor, resolveQuality } from './quality';
+import { setLang, getLang, t } from '../i18n';
 import { Sim } from './sim/Sim';
 import { TUNING } from './sim/tuning';
 import type { SimEvent, UltKind } from './sim/events';
@@ -19,6 +20,16 @@ export type GameScreen = 'menu' | 'playing' | 'paused' | 'skills' | 'win' | 'los
 
 export interface GameHooks {
   onState: () => void;
+  /** Transient notice (e.g. storage unavailable). */
+  onToast?: (msg: string) => void;
+}
+
+/** Result of the last clear, for the win overlay. */
+export interface ClearResult {
+  /** How many times this level has now been cleared. */
+  count: number;
+  /** Whether this clear awarded a skill point. */
+  awarded: boolean;
 }
 
 const NO_INPUT: PlayerInput = { x: 0, z: 0, mag: 0, shoveHeld: false };
@@ -37,6 +48,19 @@ export class Game {
   sim: Sim | null = null;
   /** Real time of the last milestone (for HUD pulse). */
   milestoneAt = -10;
+  /** Screen to return to when the skill tree closes (menu, or a paused / finished run). */
+  skillsReturn: GameScreen = 'menu';
+  /** True when the current pause was triggered by backgrounding / blur. */
+  autoPaused = false;
+  /** Skills the current run was started with (spending mid-run applies on the next run). */
+  runSkills: SkillState;
+  lastClear: ClearResult | null = null;
+  /** Resolved render tier currently applied. */
+  quality: QualityLevel = 'high';
+  /** Whether the WebGL context was created with antialias (fixed for its lifetime). */
+  readonly antialias: boolean;
+  private probe = new FpsProbe();
+  private saveWarned = false;
   private shoveBtn = false;
   private acc = 0;
   private hitStop = 0;
@@ -59,12 +83,13 @@ export class Game {
     this.canvas = canvas;
     this.hooks = hooks;
     this.save = loadSave();
+    this.runSkills = { ...this.save.skills };
     setLang(this.save.lang);
 
-    this.renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: false, powerPreference: 'high-performance' });
-    this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    const q = resolveQuality(this.save.quality, this.save.autoQuality);
+    this.antialias = q === 'high';
+    this.renderer = new THREE.WebGLRenderer({ canvas, antialias: this.antialias, alpha: false, powerPreference: 'high-performance' });
     this.renderer.setSize(window.innerWidth, window.innerHeight);
-    this.renderer.shadowMap.enabled = true;
     this.renderer.shadowMap.type = THREE.PCFShadowMap;
 
     this.train = new TrainScene(window.innerWidth / window.innerHeight);
@@ -74,6 +99,8 @@ export class Game {
     this.train.scene.add(this.crowd.group);
     this.effects = new Effects();
     this.train.scene.add(this.effects.group);
+    this.applyQuality(q);
+    this.probe.done = !this.probeWanted();
 
     const app = canvas.parentElement ?? document.body;
     this.vignette = document.createElement('div');
@@ -83,7 +110,8 @@ export class Game {
     this.input.cb = {
       onUlt: (k) => this.tryUltimate(k),
       onPause: () => {
-        if (this.screen === 'playing' || this.screen === 'paused') this.togglePause();
+        if (this.screen === 'skills') this.closeSkills();
+        else if (this.screen === 'playing' || this.screen === 'paused') this.togglePause();
       },
     };
 
@@ -97,6 +125,11 @@ export class Game {
     }
 
     window.addEventListener('resize', this.onResize);
+    // Mobile lifecycle: never let the door timer run while the player can't see it.
+    document.addEventListener('visibilitychange', this.onVisibility);
+    window.addEventListener('pagehide', this.onBackground);
+    window.addEventListener('pageshow', this.onForeground);
+    window.addEventListener('blur', this.onWindowBlur);
     this.lastT = performance.now();
     this.loop = this.loop.bind(this);
     this.raf = requestAnimationFrame(this.loop);
@@ -125,9 +158,93 @@ export class Game {
     this.train.setAspect(w / h);
   };
 
+  private onVisibility = (): void => {
+    if (document.hidden) this.onBackground();
+    else this.onForeground();
+  };
+
+  /** Tab hidden / app backgrounded / page unloading: pause the run and silence audio. */
+  private onBackground = (): void => {
+    this.pause(true);
+    this.input.reset();
+    this.shoveBtn = false;
+    this.audio.suspend();
+  };
+
+  /** Back in view: resume audio, but the run stays paused until the player taps Resume. */
+  private onForeground = (): void => {
+    if (document.hidden) return;
+    this.lastT = performance.now();
+    this.acc = 0;
+    this.probe.restart();
+    this.audio.resume();
+  };
+
+  private onWindowBlur = (): void => {
+    this.pause(true);
+  };
+
   persist(): void {
     this.save.lang = getLang();
-    writeSave(this.save);
+    const ok = writeSave(this.save);
+    if (!ok && !this.saveWarned) {
+      this.saveWarned = true;
+      this.hooks.onToast?.(t().saveFailed);
+    }
+  }
+
+  // ----------------------------------------------------------------- quality
+
+  /** Apply a render tier live. Antialias is fixed per WebGL context (see `antialias`). */
+  private applyQuality(q: QualityLevel): void {
+    this.quality = q;
+    this.renderer.setPixelRatio(pixelRatioFor(q));
+    this.renderer.setSize(window.innerWidth, window.innerHeight);
+    const shadows = q === 'high';
+    this.train.setShadows(shadows);
+    if (this.renderer.shadowMap.enabled !== shadows) {
+      this.renderer.shadowMap.enabled = shadows;
+      // Shadow defines are baked into shader programs — force a recompile.
+      this.train.scene.traverse((o) => {
+        const m = (o as THREE.Mesh).material as THREE.Material | THREE.Material[] | undefined;
+        if (Array.isArray(m)) m.forEach((x) => (x.needsUpdate = true));
+        else if (m) m.needsUpdate = true;
+      });
+    }
+  }
+
+  private probeWanted(): boolean {
+    return this.save.quality === 'auto' && this.save.autoQuality === null;
+  }
+
+  /** User setting: auto → low → high. Re-runs the probe when switching back to auto. */
+  setQuality(setting: QualitySetting): void {
+    this.save.quality = setting;
+    if (setting === 'auto') {
+      this.save.autoQuality = null;
+      this.probe.reset();
+    } else {
+      this.probe.done = true;
+    }
+    this.applyQuality(resolveQuality(setting, this.save.autoQuality));
+    this.persist();
+    this.hooks.onState();
+  }
+
+  /** True when the chosen tier wants a different antialias than the live context has. */
+  needsReloadForAA(): boolean {
+    return (this.quality === 'high') !== this.antialias;
+  }
+
+  private tickProbe(rawDt: number): void {
+    if (this.probe.done || document.hidden) return;
+    const fps = this.probe.sample(rawDt);
+    if (fps === null) return;
+    const result: QualityLevel = this.quality === 'high' && fps < PROBE_MIN_FPS ? 'low' : this.quality;
+    this.save.autoQuality = result;
+    if (result !== this.quality) this.applyQuality(result);
+    this.persist();
+    if (this.screen !== 'playing') this.hooks.onState();
   }
 
   // ------------------------------------------------------------------ HUD API
@@ -183,7 +300,10 @@ export class Game {
     this.audio.unlock();
     this.audio.arrival();
     this.level = level;
-    const sim = new Sim(level, modifiersFromSkills(this.save.skills), Math.random);
+    this.lastClear = null;
+    this.autoPaused = false;
+    this.runSkills = { ...this.save.skills };
+    const sim = new Sim(level, modifiersFromSkills(this.runSkills), Math.random);
     this.bindSim(sim);
     this.player.mesh.visible = true;
     this.resultDelay = -1;
@@ -197,20 +317,35 @@ export class Game {
     this.hooks.onState();
   }
 
-  togglePause(): void {
-    if (this.screen === 'playing') {
-      this.screen = 'paused';
-      this.input.reset();
-      this.shoveBtn = false;
-    } else if (this.screen === 'paused') {
-      this.screen = 'playing';
-      this.lastT = performance.now();
-    }
+  /** Pause a running level (no-op otherwise). `auto` = backgrounded / blurred. */
+  pause(auto = false): void {
+    if (this.screen !== 'playing') return;
+    this.screen = 'paused';
+    this.autoPaused = auto;
+    this.input.reset();
+    this.shoveBtn = false;
     this.hooks.onState();
   }
 
+  resume(): void {
+    if (this.screen !== 'paused') return;
+    this.screen = 'playing';
+    this.autoPaused = false;
+    this.lastT = performance.now();
+    this.audio.unlock();
+    this.hooks.onState();
+  }
+
+  togglePause(): void {
+    if (this.screen === 'playing') this.pause();
+    else if (this.screen === 'paused') this.resume();
+  }
+
+  /** Explicitly abandon the run (if any) and return to the main menu. */
   goMenu(): void {
     this.screen = 'menu';
+    this.skillsReturn = 'menu';
+    this.autoPaused = false;
     this.level = null;
     this.input.reset();
     this.train.setWarning(0);
@@ -218,19 +353,34 @@ export class Game {
     this.hooks.onState();
   }
 
+  /**
+   * Open the skill tree as an overlay. From a run it pauses first and remembers
+   * where to go back to; the run itself is untouched.
+   */
   openSkills(): void {
+    if (this.screen === 'skills') return;
+    if (this.screen === 'playing') this.pause();
+    this.skillsReturn = this.screen;
     this.screen = 'skills';
     this.hooks.onState();
   }
 
-  closeSkillsToMenu(): void {
-    this.screen = 'menu';
+  /** True while the skill tree is open on top of a (paused or finished) run. */
+  get skillsOverRun(): boolean {
+    return this.screen === 'skills' && this.skillsReturn !== 'menu' && !!this.level;
+  }
+
+  /** Close the skill tree and return to wherever it was opened from. */
+  closeSkills(): void {
+    if (this.screen !== 'skills') return;
+    this.screen = this.level ? this.skillsReturn : 'menu';
+    this.skillsReturn = 'menu';
     this.persist();
     this.hooks.onState();
   }
 
   tryUltimate(kind: UltKind): void {
-    const s = this.save.skills;
+    const s = this.runSkills;
     const ok = (kind === 'str' && s.ultStr) || (kind === 'spd' && s.ultSpd) || (kind === 'wis' && s.ultWis);
     if (!ok || this.screen !== 'playing' || !this.sim || this.sim.ambient) return;
     if (this.sim.tryUltimate(kind)) {
@@ -247,11 +397,14 @@ export class Game {
     haptic([20, 40, 20, 40, 80], 0);
     this.train.addTrauma(0.2);
     const id = this.level.id;
-    if (!this.save.cleared.includes(id)) {
-      this.save.cleared.push(id);
-      this.save.skills.points += 1;
-      this.save.highestCleared = Math.max(this.save.highestCleared, id);
-    }
+    const count = (this.save.clears[id] ?? 0) + 1;
+    this.save.clears[id] = count;
+    if (!this.save.cleared.includes(id)) this.save.cleared.push(id);
+    this.save.highestCleared = Math.max(this.save.highestCleared, id);
+    // First clear + capped replays award points (see MAX_POINTS_PER_LEVEL).
+    const awarded = count <= MAX_POINTS_PER_LEVEL;
+    if (awarded) this.save.skills.points += 1;
+    this.lastClear = { count, awarded };
     this.persist();
     this.screen = 'win';
     this.hooks.onState();
@@ -402,8 +555,10 @@ export class Game {
 
   private loop(now: number): void {
     this.raf = requestAnimationFrame(this.loop);
-    const dt = Math.min(0.1, Math.max(0, (now - this.lastT) / 1000));
+    const rawDt = (now - this.lastT) / 1000;
+    const dt = Math.min(0.1, Math.max(0, rawDt));
     this.lastT = now;
+    this.tickProbe(rawDt);
     this.clock += dt;
 
     const playing = this.screen === 'playing';
@@ -543,6 +698,11 @@ export class Game {
   dispose(): void {
     cancelAnimationFrame(this.raf);
     window.removeEventListener('resize', this.onResize);
+    document.removeEventListener('visibilitychange', this.onVisibility);
+    window.removeEventListener('pagehide', this.onBackground);
+    window.removeEventListener('pageshow', this.onForeground);
+    window.removeEventListener('blur', this.onWindowBlur);
+    this.crowd.dispose();
     this.input.dispose();
     this.renderer.dispose();
   }

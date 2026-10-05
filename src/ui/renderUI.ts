@@ -1,8 +1,10 @@
-import { t, toggleLang, getLang } from '../i18n';
+import { t, toggleLang, getLang, fmt } from '../i18n';
 import type { Game } from '../game/Game';
 import { playableLevels } from '../game/levels';
+import type { QualitySetting } from '../game/storage';
 import {
   BRANCH_FILL,
+  MAX_POINTS_PER_LEVEL,
   ULTIMATE_COST,
   branchProgressLabel,
   canSpend,
@@ -20,8 +22,31 @@ let lastKey = '';
 
 /** Key that forces a full rebuild when it changes; otherwise the play HUD is patched in place. */
 function uiKey(game: Game): string {
-  return `${game.screen}|${getLang()}|${game.level?.id ?? ''}`;
+  return `${game.screen}|${getLang()}|${game.level?.id ?? ''}|${game.skillsReturn}`;
 }
+
+/** Wire every `[data-act=lang]` / `[data-act=skills]` button inside `scope`. */
+function wireCommon(scope: ParentNode, root: HTMLElement, game: Game): void {
+  scope.querySelectorAll('[data-act="lang"]').forEach((b) =>
+    b.addEventListener('click', () => {
+      game.audio.unlock();
+      game.audio.ui();
+      toggleLang();
+      game.persist();
+      renderUI(root, game);
+    }),
+  );
+  scope.querySelectorAll('[data-act="skills"]').forEach((b) =>
+    b.addEventListener('click', () => {
+      game.audio.unlock();
+      game.audio.ui();
+      game.openSkills(); // pauses a running level first; never abandons it
+      renderUI(root, game);
+    }),
+  );
+}
+
+const langLabel = () => `🌐 ${getLang() === 'en' ? '粵' : 'EN'}`;
 
 export function renderUI(root: HTMLElement, game: Game): void {
   const key = uiKey(game);
@@ -37,23 +62,34 @@ export function renderUI(root: HTMLElement, game: Game): void {
   wrap.id = 'hud';
   wrap.dataset.ui = '1';
 
-  // Top bar always
-  const top = el(`
-    <div class="top-bar" data-ui="1">
-      <button type="button" class="icon-btn" id="btn-lang" title="${dict.language}">🌐 ${getLang() === 'en' ? '粵' : 'EN'}</button>
-      <div class="brand">
-        <span class="brand-mark">🚇</span>
-        <span class="brand-title">${dict.title}</span>
+  // Brand top bar only outside a run (frees the notch area for the play HUD).
+  const overRun = game.skillsOverRun;
+  if (game.screen === 'menu' || (game.screen === 'skills' && !overRun)) {
+    const top = el(`
+      <div class="top-bar" data-ui="1">
+        <button type="button" class="icon-btn" data-act="lang" title="${dict.language}" aria-label="${dict.language}">${langLabel()}</button>
+        <div class="brand">
+          <span class="brand-mark" aria-hidden="true">🚇</span>
+          <span class="brand-title">${dict.title}</span>
+        </div>
+        <button type="button" class="icon-btn" data-act="skills" title="${dict.skills}" aria-label="${dict.skills}">🌳</button>
       </div>
-      <button type="button" class="icon-btn" id="btn-skills" title="${dict.skills}">🌳</button>
-    </div>
-  `);
-  wrap.appendChild(top);
+    `);
+    wrap.appendChild(top);
+  }
 
   if (game.screen === 'menu') {
     wrap.appendChild(renderMenu(game));
   } else if (game.screen === 'skills') {
-    wrap.appendChild(renderSkills(game));
+    if (overRun) {
+      // Overlay on top of the paused / finished run.
+      wrap.appendChild(renderPlayHud(game));
+      const ov = el(`<div class="overlay" data-ui="1"></div>`);
+      ov.appendChild(renderSkills(game));
+      wrap.appendChild(ov);
+    } else {
+      wrap.appendChild(renderSkills(game));
+    }
   } else if (game.screen === 'playing' || game.screen === 'paused') {
     wrap.appendChild(renderPlayHud(game));
     if (game.screen === 'paused') wrap.appendChild(renderPause(game));
@@ -68,20 +104,16 @@ export function renderUI(root: HTMLElement, game: Game): void {
   root.appendChild(wrap);
   if (root.querySelector('.play-hud')) updatePlayHud(root, game);
 
-  root.querySelector('#btn-lang')?.addEventListener('click', () => {
-    game.audio.unlock();
-    game.audio.ui();
-    toggleLang();
-    game.persist();
-    renderUI(root, game);
-  });
-  root.querySelector('#btn-skills')?.addEventListener('click', () => {
-    game.audio.unlock();
-    game.audio.ui();
-    if (game.screen === 'playing') game.togglePause();
-    game.openSkills();
-    renderUI(root, game);
-  });
+  wireCommon(root, root, game);
+}
+
+const QUALITY_CYCLE: QualitySetting[] = ['auto', 'low', 'high'];
+
+function qualityLabel(game: Game): string {
+  const dict = t();
+  const name = (q: 'low' | 'high') => (q === 'low' ? dict.qualityLow : dict.qualityHigh);
+  const setting = game.save.quality;
+  return setting === 'auto' ? `${dict.qualityAuto} · ${name(game.quality)}` : name(setting);
 }
 
 function renderMenu(game: Game): HTMLElement {
@@ -94,9 +126,20 @@ function renderMenu(game: Game): HTMLElement {
       <p class="howto">${dict.howTo}</p>
       <p class="points">⭐ ${dict.skillPoints}: <strong>${game.save.skills.points}</strong></p>
       <div class="level-list" id="level-list"></div>
+      <div class="settings-row">
+        <span>⚙️ ${dict.quality}</span>
+        <button type="button" class="icon-btn" id="btn-quality" aria-label="${dict.quality}: ${qualityLabel(game)}">${qualityLabel(game)}</button>
+      </div>
+      ${game.needsReloadForAA() ? `<p class="sfx-note">${dict.qualityNote}</p>` : ''}
       <p class="sfx-note">${dict.sfxNote}</p>
     </div>
   `);
+  panel.querySelector('#btn-quality')?.addEventListener('click', () => {
+    game.audio.unlock();
+    game.audio.ui();
+    const i = QUALITY_CYCLE.indexOf(game.save.quality);
+    game.setQuality(QUALITY_CYCLE[(i + 1) % QUALITY_CYCLE.length]);
+  });
   const list = panel.querySelector('#level-list')!;
   for (const lv of levels) {
     const name = getLang() === 'en' ? lv.stationEn : lv.stationZh;
@@ -107,7 +150,7 @@ function renderMenu(game: Game): HTMLElement {
         <span class="lv-num">${dict.level} ${lv.id}</span>
         <span class="lv-name">${name}</span>
         <span class="lv-flav">${flav}</span>
-        <span class="lv-meta">👥${lv.density} · ⏱${lv.timer}s ${cleared}</span>
+        <span class="lv-meta">👥${lv.density} · ⏱${lv.timer}${dict.secShort} ${cleared}</span>
       </button>
     `);
     btn.addEventListener('click', () => {
@@ -116,7 +159,7 @@ function renderMenu(game: Game): HTMLElement {
     });
     list.appendChild(btn);
   }
-  const note = el(`<div class="level-teaser">${getLang() === 'en' ? 'Levels 21–99 TBD · Lv100 is the finale' : '21–99 關待補 · 第100關為終極挑戰'}</div>`);
+  const note = el(`<div class="level-teaser">${dict.levelsTeaser}</div>`);
   list.appendChild(note);
   return panel;
 }
@@ -125,16 +168,17 @@ function renderPlayHud(game: Game): HTMLElement {
   const dict = t();
   const lv = game.level!;
   const name = getLang() === 'en' ? lv.stationEn : lv.stationZh;
-  const s = game.save.skills;
+  // Ults available in this run = skills the run started with.
+  const s = game.runSkills;
   const ult = (k: 'str' | 'spd' | 'wis', icon: string, title: string, on: boolean) =>
-    `<button type="button" class="skill-use ${on ? '' : 'dim'}" data-ult="${k}" title="${title}" ${on ? '' : 'disabled'}>${icon}</button>`;
+    `<button type="button" class="skill-use ${on ? '' : 'dim'}" data-ult="${k}" title="${title}" aria-label="${title}" ${on ? '' : 'disabled'}>${icon}</button>`;
 
   const hud = el(`
     <div class="play-hud" data-ui="1">
       <div class="hud-top">
         <div class="hud-row">
           <div class="station-chip"><span>📍 ${lv.id} · ${name}</span></div>
-          <button type="button" class="icon-btn pause-btn" id="btn-pause" title="${dict.pause}">⏸️</button>
+          <button type="button" class="icon-btn pause-btn" id="btn-pause" title="${dict.pause}" aria-label="${dict.pause}">⏸️</button>
         </div>
         <div class="meters">
           <div class="meter door-meter">
@@ -158,7 +202,7 @@ function renderPlayHud(game: Game): HTMLElement {
           ${ult('spd', '💨', dict.ultSpd, s.ultSpd)}
           ${ult('wis', '🧠', dict.ultWis, s.ultWis)}
         </div>
-        <button type="button" class="shove-btn" id="btn-shove" title="${dict.shove}">✊</button>
+        <button type="button" class="shove-btn" id="btn-shove" title="${dict.shove}" aria-label="${dict.shove}">✊</button>
       </div>
     </div>
   `);
@@ -235,12 +279,17 @@ function renderPause(game: Game): HTMLElement {
     <div class="overlay" data-ui="1">
       <div class="panel">
         <h2>${dict.pause}</h2>
+        ${game.autoPaused ? `<p class="howto">${dict.autoPaused}</p>` : ''}
         <button type="button" class="primary" id="btn-resume">${dict.resume}</button>
+        <div class="btn-row">
+          <button type="button" class="ghost" data-act="skills">🌳 ${dict.skills}</button>
+          <button type="button" class="ghost" data-act="lang" aria-label="${dict.language}">${langLabel()}</button>
+        </div>
         <button type="button" class="ghost" id="btn-menu">${dict.menu}</button>
       </div>
     </div>
   `);
-  p.querySelector('#btn-resume')?.addEventListener('click', () => game.togglePause());
+  p.querySelector('#btn-resume')?.addEventListener('click', () => game.resume());
   p.querySelector('#btn-menu')?.addEventListener('click', () => game.goMenu());
   return p;
 }
@@ -251,14 +300,17 @@ function renderEnd(game: Game, win: boolean): HTMLElement {
     <div class="overlay" data-ui="1">
       <div class="panel">
         <h2>${win ? dict.win : dict.lose}</h2>
-        ${win ? `<p class="bonus">${dict.clearBonus}</p>` : `<p>${dict.loseHint}</p>`}
+        ${win ? endBonus(game) : `<p>${dict.loseHint}</p>`}
         <button type="button" class="primary" id="btn-retry">${dict.retry}</button>
         ${
           win && game.level && game.level.id !== 100
             ? `<button type="button" class="primary" id="btn-next">${dict.next}</button>`
             : ''
         }
-        <button type="button" class="ghost" id="btn-menu">${dict.menu}</button>
+        <div class="btn-row">
+          <button type="button" class="ghost" data-act="skills">🌳 ${dict.skills}</button>
+          <button type="button" class="ghost" id="btn-menu">${dict.menu}</button>
+        </div>
       </div>
     </div>
   `);
@@ -276,6 +328,14 @@ function renderEnd(game: Game, win: boolean): HTMLElement {
   return p;
 }
 
+function endBonus(game: Game): string {
+  const dict = t();
+  const c = game.lastClear;
+  if (!c || (c.awarded && c.count === 1)) return `<p class="bonus">${dict.clearBonus}</p>`;
+  if (c.awarded) return `<p class="bonus">${fmt(dict.replayBonus, { n: c.count, max: MAX_POINTS_PER_LEVEL })}</p>`;
+  return `<p class="howto">${dict.clearNoBonus}</p>`;
+}
+
 function renderSkills(game: Game): HTMLElement {
   const dict = t();
   const s = game.save.skills;
@@ -290,9 +350,9 @@ function renderSkills(game: Game): HTMLElement {
           <span class="skill-ico">${icon}</span>
           <div>
             <strong>${label}</strong>
-            <div class="skill-prog">${branchProgressLabel(s, branch)}</div>
+            <div class="skill-prog">${branchProgressLabel(s, branch, dict.ultShort)}</div>
           </div>
-          <button type="button" class="spend-btn" data-spend="${branch}" ${can ? '' : 'disabled'}>
+          <button type="button" class="spend-btn" data-spend="${branch}" aria-label="${dict.spend}: ${label}" title="${can ? dict.spend : filled >= BRANCH_FILL && ult ? dict.branchFull : dict.notEnough}" ${can ? '' : 'disabled'}>
             ${filled >= BRANCH_FILL && !ult ? `⚡${ULTIMATE_COST}` : `＋`}
           </button>
         </div>
@@ -306,11 +366,12 @@ function renderSkills(game: Game): HTMLElement {
     <div class="panel skills-panel" data-ui="1">
       <h2>🌳 ${dict.skills}</h2>
       <p class="points">⭐ ${dict.skillPoints}: <strong id="pts">${s.points}</strong></p>
-      <p class="howto">60 ${getLang() === 'en' ? 'to fill a branch' : '點滿一枝'} · +10 ${dict.ultimate}</p>
+      <p class="howto">${fmt(dict.skillHowto, { fill: BRANCH_FILL, ult: ULTIMATE_COST })}</p>
+      ${game.skillsOverRun ? `<p class="howto">${dict.skillsApplyNext}</p>` : ''}
       ${branchRow('str', '🐂', dict.strength, dict.ultStr)}
       ${branchRow('spd', '💨', dict.speed, dict.ultSpd)}
       ${branchRow('wis', '🧠', dict.wisdom, dict.ultWis)}
-      <button type="button" class="primary" id="btn-back">${dict.menu}</button>
+      <button type="button" class="primary" id="btn-back">${dict.back}</button>
     </div>
   `);
 
@@ -325,7 +386,8 @@ function renderSkills(game: Game): HTMLElement {
     });
   });
   panel.querySelector('#btn-back')?.addEventListener('click', () => {
-    game.closeSkillsToMenu();
+    game.audio.ui();
+    game.closeSkills(); // back to the menu, or to the paused / finished run
   });
   return panel;
 }
