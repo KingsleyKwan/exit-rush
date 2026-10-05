@@ -1,4 +1,5 @@
-<!-- v0.5.1: benches on both walls only in between-bay segs (skip end stubs; no seats in doorways) -->
+<!-- v0.6.0: constellation skill tree (STA replaces WIS); 踎低 squat; longer between-bay benches; denser car/platform -->
+<!-- v0.5.1: benches between door bays only (no seats in doorways) -->
 <!-- v0.5.0: short levels, intro cards, FTUE, L100 gated behind L30 -->
 <!-- v0.4.1: side-wall sliding doors; car ends = gangway -->
 # Game Design — 逼落車 (Exit Rush)
@@ -55,24 +56,28 @@ Colour-coded low-poly (box body + capsule/sphere head). Behaviours differ:
 | `couple` | Couple | 情侶 | Magenta pair | Occupies ~2 tiles; linked |
 | `angry` | Angry man | 暴躁男 | Red | Periodic shove impulse on player |
 | `luggage` | Luggage | 拉行李喼 | Brown + dark case | High mass; slows push heavily |
+| `squat` | Squatter | 踎低客 | Indigo crouched | Hard to shove over; lateral weave |
 
 Future: tourist with map, influencer filming, elderly with cane, etc.
 
 ## Skill tree
 
-- **+3 skill points** on the **first** clear of each playable level (v0.5). Replays award **0**. 31 clears → 93 SP (full branch+ult = 70).
-- Three branches: **Strength (STR)** · **Speed (SPD)** · **Wisdom (WIS / INT)**.
-- **60 points** to fill one branch (tiers), then **+10** to unlock that branch’s **ultimate** → **70** for full branch + ultimate.
+See **[`SKILL_TREE.md`](SKILL_TREE.md)** for the full v0.6 constellation node map.
+
+- **+3 skill points** on the **first** clear of each playable level. Replays award **0**. 31 clears → 93 SP (full branch+ult = 70).
+- Three branches: **Strength (STR)** · **Speed (SPD)** · **Stamina (STA)** — STA replaces Wisdom; old `wis` saves migrate.
+- **Constellation UI:** 3 coloured arms from centre; major skill icons every ~10 points; Tier 3 marked 「第三層暫定」.
+- Per branch: **4 passive + 2 active + 1 ultimate**. **60** to fill, **+10** ultimate → **70**.
 
 ### Branch fantasy
 
 | Branch | Passive / actives | Ultimate (10 pts after fill) |
 |--------|-------------------|------------------------------|
-| STR | Push force, shove resist, stamina pool | **鐵牛撞門** — brief unstoppable charge |
-| SPD | Move speed, stamina regen, dodge window | **閃身落車** — short dash through crowd |
-| WIS | Read gaps, reduce aura/slow, tip icons | **人潮預測** — slow-mo path highlight |
+| STR | Push, front shove, charged shove, wider cone / knockback (T3 TBD) | **鐵牛撞門** — shockwave charge |
+| SPD | Speed, clear-lane, blocked-drag cut, brief dash (T3 TBD) | **閃身落車** — burst dash |
+| STA | Pool / regen / buffer, aura shrug, second wind (T3 TBD) | **鐵馬企穩** — burst regen + iron stance |
 
-v0.2: data-driven nodes; spending persisted in `localStorage`. Ultimates have real physical effects (see below), 10 s cooldown each.
+Spending persisted in `localStorage`. Ultimates 10 s cooldown each.
 
 ## Physics & feel
 
@@ -84,10 +89,10 @@ All gameplay physics runs in a **pure-TypeScript sim** (`src/game/sim/`, no thre
 |-------|--------------|
 | Bodies | Circles in the XZ plane with **mass**, velocity, linear **damping**, restitution, max speed. Cap **80 bodies** (player + passengers + suitcases). |
 | Contacts | **Spatial hash grid** (0.9 m cells) → pairwise circle tests. **Soft positional correction** (fraction `contactBeta` per iteration, 3 iterations) lets the crowd **compress** under load and spring back; overlap past `hardOverlapFrac` is corrected rigidly (no tunnelling). A velocity **impulse** along the normal transfers momentum by inverse mass (light brats bounce off, luggage barely moves). |
-| Static | Walls, longitudinal benches between door bays, grab poles, **left-wall side-door gaps** (open bays from `openDoorBays`), gangway end walls (not exits), platform on −X, and door leaves that **slide shut along Z** in the last `door.closeTime` seconds. |
-| Riders | Spring to a standing spot (`anchorK`, capped at `anchorMax` × mass). Displaced too long → adopt a new spot (the crowd re-settles). Near the door they feel an inward **pressure field** while boarders stream in. They sidestep a little for the player (more with WIS). |
+| Static | Walls, long between-bay benches (fill ~96% of each vestibule-cleared segment), grab poles, **left-wall side-door gaps** (open bays from `openDoorBays`), gangway end walls (not exits), platform on −X, and door leaves that **slide shut along Z** in the last `door.closeTime` seconds. |
+| Riders | Spring to a standing spot (`anchorK`, capped at `anchorMax` × mass). Displaced too long → adopt a new spot (the crowd re-settles). Near the door they feel an inward **pressure field** while boarders stream in. They sidestep a little for the player (more with SPD gapSense). |
 | Boarders (逼上車) | Spawn on the platform beyond the left wall, **funnel through open side doors**, then drive toward the far (+X) side with a desired-velocity controller capped at `boardMaxDrive` × mass — they push *against* you. Rate & total scale with level `pressure`. |
-| Player | Desired-velocity drive (`accel`) capped at `maxDrive × pushForce × mass` — that cap **is** push-vs-resistance. Mass grows with STR `resist`. **Crowd drag** (v0.2.1): top speed shrinks with nearby bodies (`player.crowdDrag`, max −65%; WIS cuts it) so packed cars are a shuffle, not a sprint. In contact you **shoulder** through: radius shrinks to `shoulderRadius` and a tangential **slip** force slides you along whoever blocks you. Stamina drains with contact pressure; 0 → winded. |
+| Player | Desired-velocity drive (`accel`) capped at `maxDrive × pushForce × mass` — that cap **is** push-vs-resistance. Mass grows with STR `resist`. **Crowd drag** (v0.2.1): top speed shrinks with nearby bodies (`player.crowdDrag`, max −65%; SPD gapSense cuts it) so packed cars are a shuffle, not a sprint. In contact you **shoulder** through: radius shrinks to `shoulderRadius` and a tangential **slip** force slides you along whoever blocks you. Stamina drains with contact pressure; 0 → winded. |
 | Aim assist | 9-ray fan (±0.95 rad) scored by mass-weighted bodies & walls in each corridor; the stick direction blends toward the clearest one by `aim.base + gapSense × aim.perGapSense`. |
 | Shove | Hold to charge (0.45 s), release for a cone burst: impulse to each body (radial + forward mix) scaled by charge × STR, a forward lunge, small recoil. Cost 9–20 stamina, 0.7 s cooldown. |
 
@@ -101,6 +106,7 @@ All gameplay physics runs in a **pure-TypeScript sim** (`src/game/sim/`, no thre
 | family | Adult + 2 kids; **cohesion force** toward the cluster centroid — hard to split, closes back up. |
 | couple | Two bodies on a **damped spring** ("holding hands" link reddens under tension) — push between them and they pull back together. |
 | angry | Heavy (1.6), strong drive. When you're close: 0.32 s wind-up (swell + red glow + grunt) → **knockback impulse** + short stun, barges neighbours. Shoving him makes him retaliate fast. 1 s i-frames after a hit. |
+| squat | Heavy, high damping, `hardToShove` (shove ×0.35); lateral weave drag near them.
 | stench | Aura slows you (green vignette, scaled by WIS `auraResist`) and **repels other passengers** — an obvious gap you pay for in speed. |
 
 ### Ultimates
@@ -109,11 +115,11 @@ All gameplay physics runs in a **pure-TypeScript sim** (`src/game/sim/`, no thre
 |-----|--------|
 | STR 鐵牛撞門 | Radial **shockwave** impulse (r 2.9 m, 5.5, falls off, ÷ mass) + 1.6 s charge (mass ×2.2, drive ×1.8, immune to angry). Ring FX, big shake, hit-stop, white flash. |
 | SPD 閃身落車 | **Dash** burst 5.5 m/s (toward the door if no stick), 1.0 s of speed ×1.7, mass ×2.2, slim radius, keeps half the crowd drag. Afterimages + FOV punch. (v0.2.1: toned down from 6.2 m/s / 1.1 s / ×2.1 / ×3 / no drag.) |
-| WIS 人潮預測 | 3.0 s: crowd **hesitates** (AI forces −65%, no angry wind-ups), aim assist maxed, **gap path highlighted** through the crowd. |
+| STA 鐵馬企穩 | 2.8 s: **burst regen**, mass ×2.4, strong aura resist, light crowd calm (replaces WIS path highlight). |
 
 ### Juice
 
-Camera (v0.4.1): ¾ view from the far (+X) side looking at the left door wall so side exits read on portrait phones; critically-damped follow with lag, trauma² shake, directional kicks, FOV punch (all ×0.3 under `prefers-reduced-motion`). Characters: squash/stretch springs on bumps, steady squish from contact pressure, lean into velocity, walk bob, hit flashes. Particles: pooled single-draw-call puffs (bumps, shove spray, stench clouds, sweat when winded, confetti on win). Hit-stop on big impacts. Vignettes: green (stench), red (door warning / angry hit), cyan (WIS). Door warning: last 5 s lights flash faster, beeps accelerate, exit marker flashes, leaves slide shut. Haptics: `navigator.vibrate` (guarded + throttled) on bumps, shoves, hits, ults, milestones.
+Camera (v0.4.1): ¾ view from the far (+X) side looking at the left door wall so side exits read on portrait phones; critically-damped follow with lag, trauma² shake, directional kicks, FOV punch (all ×0.3 under `prefers-reduced-motion`). Characters: squash/stretch springs on bumps, steady squish from contact pressure, lean into velocity, walk bob, hit flashes. Particles: pooled single-draw-call puffs (bumps, shove spray, stench clouds, sweat when winded, confetti on win). Hit-stop on big impacts. Vignettes: green (stench), red (door warning / angry hit), gold (Iron Stance). Door warning: last 5 s lights flash faster, beeps accelerate, exit marker flashes, leaves slide shut. Haptics: `navigator.vibrate` (guarded + throttled) on bumps, shoves, hits, ults, milestones.
 
 ### Tuning knobs
 
@@ -143,7 +149,7 @@ Everything lives in **`src/game/sim/tuning.ts`** (`TUNING`), grouped as `physics
 | Tourist | teal shirt, sun hat | camera, big brown suitcase |
 
 - **Type icons:** small round billboards (same glyphs as the legend) over special passengers within ~3.4 m of the player, plus any angry man winding up; toggle in settings.
-- **Car (v0.5.1):** white walls, red stripe, stainless longitudinal benches on **both walls only in between-bay segments** (skip short end stubs at door Z; flush to ±halfWidth; vestibules `[bayZ ± doorHalf]` + aisle clear), glass partitions, poles + overhead rails with red grips. **Side-wall sliding doors** on the left (−X) platform wall (red frames + indicator lights); **gangway ends are not exits**. Line-map strip above the door wall, yellow edge line, PSDs, **per-station coloured** tiled pillars + back wall, navy bilingual station sign (OFL fonts; level `stationEn` / `stationZh`, with an "inspired look · not affiliated" note). Static meshes merged per material.
+- **Car (v0.5.1):** white walls, red stripe, stainless longitudinal benches **only in wall segments between side-door bays** (flush to ±halfWidth; door vestibules + aisle clear), glass partitions, poles + overhead rails with red grips. **Side-wall sliding doors** on the left (−X) platform wall (red frames + indicator lights); **gangway ends are not exits**. Line-map strip above the door wall, yellow edge line, PSDs, **per-station coloured** tiled pillars + back wall, navy bilingual station sign (OFL fonts; level `stationEn` / `stationZh`, with an "inspired look · not affiliated" note). Static meshes merged per material.
 - **UI:** authored SVG icon set (`src/ui/icons.ts`), bold rounded filled glyphs; title over key art; level cards = number badge + line dots + station 中/EN + density/timer icons; passenger legend with concept portraits.
 - **Quality:** Low drops stink lines/flies/most puffs and the shadow map; High keeps everything.
 
