@@ -1,6 +1,6 @@
 {
   "name": "hk-mtr-exit-rush",
-  "version": "0.5.1",
+  "version": "0.6.0",
   "description": "逼落車 — Exit Rush on 香城鐵路 / Hong City Rail: push through crowds to exit the train",
   "type": "module",
   "scripts": {
