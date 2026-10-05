@@ -13,6 +13,10 @@ Mobile-first 3D crowd-exit game set on the fictional **香城鐵路 / Hong City 
 
 <p align="center"><em>v0.4.1 — exits on the <strong>side wall</strong> (left); car ends are gangways. Screenshots: mid-run crowds boarding through open doors.</em></p>
 
+## v0.6.1 — closed-door communication
+
+Closed door bays stay visibly shut with a red indicator + 「此門不開」 / “Door not in use” glass sign; open bays get a green (amber-when-closing) light and a bobbing exit arrow. Pushing a closed door flashes red and toasts 「呢道門不開！」. Levels with fewer than 3 open doors show a short start banner (「只開N道門」).
+
 ## v0.6.0 — constellation skills + 踎低
 
 - **Skill tree:** Assassin’s Creed Valhalla–style constellation — **力量 / 速度 / 體力** (Stamina replaces Stamina). Major icons every ~10 points; 4 passive + 2 active + ultimate per branch. Tier 3 marked 「第三層暫定」 — see [`docs/SKILL_TREE.md`](docs/SKILL_TREE.md).
