@@ -6,7 +6,7 @@ import { Effects } from './Effects';
 import { InputController } from './Input';
 import { GameAudio } from './Audio';
 import { haptic } from './haptics';
-import { getLevel, type LevelDef } from './levels';
+import { getLevel, playableLevels, type LevelDef } from './levels';
 import { MAX_POINTS_PER_LEVEL, modifiersFromSkills } from './SkillTree';
 import { loadSave, writeSave, type QualityLevel, type QualitySetting, type SaveData, type SkillState } from './storage';
 import { FpsProbe, PROBE_MIN_FPS, pixelRatioFor, resolveQuality } from './quality';
@@ -16,7 +16,10 @@ import { TUNING } from './sim/tuning';
 import type { SimEvent, UltKind } from './sim/events';
 import type { PlayerInput } from './sim/PlayerSim';
 
-export type GameScreen = 'menu' | 'playing' | 'paused' | 'skills' | 'win' | 'lose';
+export type GameScreen = 'menu' | 'levels' | 'legend' | 'playing' | 'paused' | 'skills' | 'win' | 'lose';
+
+/** Screens drawn over the full-bleed key art (the 3D view is hidden, so skip rendering it). */
+const BACKDROP_SCREENS: GameScreen[] = ['menu', 'levels', 'legend'];
 
 export interface GameHooks {
   onState: () => void;
@@ -99,6 +102,7 @@ export class Game {
     this.train.scene.add(this.crowd.group);
     this.effects = new Effects();
     this.train.scene.add(this.effects.group);
+    this.crowd.setIcons(this.save.typeIcons);
     this.applyQuality(q);
     this.probe.done = !this.probeWanted();
 
@@ -142,6 +146,15 @@ export class Game {
     sim.ambient = true;
     sim.player.body.enabled = false;
     this.bindSim(sim);
+    this.setStationFor(lv);
+  }
+
+  /** Platform sign + strip map: this level's station with its neighbours in the level list. */
+  private setStationFor(lv: LevelDef): void {
+    const list = playableLevels();
+    const i = Math.max(0, list.findIndex((l) => l.id === lv.id));
+    const lo = Math.max(0, Math.min(i - 2, list.length - 5));
+    this.train.setStation(lv, list.slice(lo, lo + 5));
   }
 
   private bindSim(sim: Sim): void {
@@ -202,6 +215,7 @@ export class Game {
     this.renderer.setSize(window.innerWidth, window.innerHeight);
     const shadows = q === 'high';
     this.train.setShadows(shadows);
+    this.crowd.setDetail(q);
     if (this.renderer.shadowMap.enabled !== shadows) {
       this.renderer.shadowMap.enabled = shadows;
       // Shadow defines are baked into shader programs — force a recompile.
@@ -227,6 +241,14 @@ export class Game {
       this.probe.done = true;
     }
     this.applyQuality(resolveQuality(setting, this.save.autoQuality));
+    this.persist();
+    this.hooks.onState();
+  }
+
+  /** Settings toggle: floating passenger-type icons. */
+  setTypeIcons(on: boolean): void {
+    this.save.typeIcons = on;
+    this.crowd.setIcons(on);
     this.persist();
     this.hooks.onState();
   }
@@ -300,6 +322,7 @@ export class Game {
     this.audio.unlock();
     this.audio.arrival();
     this.level = level;
+    this.setStationFor(level);
     this.lastClear = null;
     this.autoPaused = false;
     this.runSkills = { ...this.save.skills };
@@ -339,6 +362,18 @@ export class Game {
   togglePause(): void {
     if (this.screen === 'playing') this.pause();
     else if (this.screen === 'paused') this.resume();
+  }
+
+  /** Menu sub-screens (level select, passenger legend). Only from outside a run. */
+  openScreen(screen: 'levels' | 'legend' | 'menu'): void {
+    if (this.level) return this.goMenu();
+    this.screen = screen;
+    this.hooks.onState();
+  }
+
+  /** True while a full-screen menu backdrop hides the 3D view. */
+  get backdrop(): boolean {
+    return BACKDROP_SCREENS.includes(this.screen) || (this.screen === 'skills' && !this.skillsOverRun);
   }
 
   /** Explicitly abandon the run (if any) and return to the main menu. */
@@ -570,7 +605,7 @@ export class Game {
 
     if (sim) {
       const active = this.screen === 'playing' || ((this.screen === 'win' || this.screen === 'lose') && !sim.ambient);
-      const runAmbient = sim.ambient && (this.screen === 'menu' || this.screen === 'skills');
+      const runAmbient = sim.ambient && (this.screen === 'skills' || BACKDROP_SCREENS.includes(this.screen));
       if (active || runAmbient) {
         const fixed = 1 / TUNING.physics.hz;
         if (this.hitStop > 0) {
@@ -597,7 +632,8 @@ export class Game {
 
       if (!sim.ambient) this.updatePlayFrame(sim, dt);
       this.train.setDoorOpenValue(sim.doorOpen);
-      this.crowd.update(alpha, dt, this.clock);
+      const pb = sim.player.body;
+      this.crowd.update(alpha, dt, this.clock, this.train.camera, sim.ambient ? null : { x: pb.x, z: pb.z });
       this.player.mesh.visible = !sim.ambient;
       this.player.update(sim.player, alpha, dt, sim.time, this.clock);
       const b = sim.player.body;
@@ -610,7 +646,8 @@ export class Game {
     this.train.update(dt);
     this.effects.update(dt);
     this.updateVignette(dt);
-    this.renderer.render(this.train.scene, this.train.camera);
+    // Menus cover the canvas with key art: don't burn GPU / battery drawing under it.
+    if (!this.backdrop) this.renderer.render(this.train.scene, this.train.camera);
   }
 
   private updatePlayFrame(sim: Sim, dt: number): void {
@@ -671,13 +708,17 @@ export class Game {
     }
     // WIS path highlight.
     this.effects.setPath(p.isSensing(now) ? p.path : [], this.clock);
-    // Stench clouds.
+    // Stench clouds (Low quality stand-in for the wavy lines + flies) and angry steam.
     this.stinkT -= dt;
     if (this.stinkT <= 0) {
       this.stinkT = 0.18;
+      const low = this.quality === 'low';
       for (const a of sim.crowd.agents) {
-        if (a.kind === 'stench' && Math.random() < 0.5) {
+        if (a.kind === 'stench' && Math.random() < (low ? 0.5 : 0.15)) {
           this.effects.puff(a.body.x, 1.0, a.body.z, 1, 0x9ccc65, 0.25, 1.3, 1.1, 0.5, 0.2);
+        } else if (a.kind === 'angry' && a.windup >= 0) {
+          const side = Math.random() < 0.5 ? -1 : 1;
+          this.effects.puff(a.body.x + side * 0.2, 1.35, a.body.z, 2, 0xf4f4f4, 0.5, 1.1, 0.55, 1.6, 0.4);
         }
       }
     }
