@@ -4,8 +4,11 @@
  * on Island / Tsuen Wan / etc. — approximate hex values only; no logos or
  * official artwork. Stations marked `approx: true` use a plausible colour
  * when published references were unclear or the real finish is mostly grey.
+ * Keys are REAL English names (dev); `themeFor()` accepts parody display names
+ * via `themeKeyFor`.
  */
 import { LINE_COLORS, linesFor, type LineId } from './lines';
+import { themeKeyFor } from './stations';
 
 export type LetteringStyle = 'sans' | 'serif';
 
@@ -14,7 +17,7 @@ export interface StationTheme {
   wall: string;
   /** Secondary / accent band colour (hex). */
   accent: string;
-  /** Primary MTR line colour for this station. */
+  /** Primary HCR line colour for this station. */
   line: string;
   lineId: LineId;
   /** Sign lettering: serif ≈ calligraphic / older stations; sans ≈ modern lines. */
@@ -64,9 +67,8 @@ function theme(
 }
 
 /**
- * Keyed by English station name (matches `LevelDef.stationEn`).
- * Wall colours drawn from public fan colour charts (metrocolor / wiki colour
- * tables) — approximate only.
+ * Keyed by REAL English station name (dev). Look up with `themeFor(displayEn)`.
+ * Wall colours from public fan colour charts — approximate only.
  */
 export const STATION_THEMES: Record<string, StationTheme> = {
   // Island Line (classic mosaic)
@@ -109,7 +111,8 @@ const FALLBACK: StationTheme = {
 };
 
 export function themeFor(stationEn: string): StationTheme {
-  return STATION_THEMES[stationEn] ?? { ...FALLBACK, line: LINE_COLORS[linesFor(stationEn)[0]], lineId: linesFor(stationEn)[0] };
+  const key = themeKeyFor(stationEn);
+  return STATION_THEMES[key] ?? { ...FALLBACK, line: LINE_COLORS[linesFor(stationEn)[0]], lineId: linesFor(stationEn)[0] };
 }
 
 /** CSS font-family stack once the subset woff2 files are loaded. */
