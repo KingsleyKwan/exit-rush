@@ -97,6 +97,10 @@ export const STATION_THEMES: Record<string, StationTheme> = {
   // East Rail / Tuen Ma
   'Hung Hom': theme('#f45f7c', '#b03050', 'sans', 'Hung Hom', true),
   'East Tsim Sha Tsui': theme('#ffe901', '#c4b200', 'sans', 'East Tsim Sha Tsui'),
+
+  // West / Tuen Ma corridor (v0.5)
+  'Yuen Long': theme('#9a3b26', '#6b2818', 'sans', 'Yuen Long'),
+  'Long Ping': theme('#c4783a', '#8a5020', 'sans', 'Long Ping'),
 };
 
 const FALLBACK: StationTheme = {
