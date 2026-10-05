@@ -1,1 +1,298 @@
-@/workspace/hk-mtr-exit-rush/src/game/sim/Sim.ts
+import { World, type Body, type Box } from './Physics';
+import { CrowdSim } from './CrowdSim';
+import { PlayerSim, type PlayerInput } from './PlayerSim';
+import {
+  CAR_Z_MAX,
+  CAR_Z_MIN,
+  DOOR_Z,
+  PLAYER_START_X,
+  TUNING,
+  doorWallX,
+  nearestDoorBay,
+  openDoorBays,
+} from './tuning';
+import type { SimEvent, UltKind } from './events';
+import type { LevelDef } from '../levels';
+import type { SkillModifiers } from '../SkillTree';
+import type { Rng } from './rng';
+
+export type SimResult = 'win' | 'lose' | null;
+
+interface DoorLeafPair {
+  bayZ: number;
+  /** Leaf that slides toward −Z. */
+  leafNeg: Box;
+  /** Leaf that slides toward +Z. */
+  leafPos: Box;
+  open: boolean;
+}
+
+/**
+ * One level run: physics world + crowd AI + player controller + door timer.
+ * Step it at a fixed rate (TUNING.physics.hz); it never touches the DOM or three.js.
+ *
+ * v0.4.1: exits are sliding doors on the left (−X) long wall; car ends are gangways.
+ */
+export class Sim {
+  readonly world: World;
+  readonly crowd: CrowdSim;
+  readonly player: PlayerSim;
+  readonly level: LevelDef;
+  readonly events: SimEvent[] = [];
+  readonly openBays: number[];
+  time = 0;
+  timeLeft: number;
+  /** 0 closed … 1 fully open (shared across open bays). */
+  doorOpen = 1;
+  result: SimResult = null;
+  /** Ambient mode (menu backdrop): no timer, no boarding, no win/lose. */
+  ambient = false;
+  private progressBest = 0;
+  private lastAngryHit = -99;
+  private doors: DoorLeafPair[] = [];
+  private emit = (e: SimEvent): void => {
+    this.events.push(e);
+  };
+
+  constructor(level: LevelDef, mods: SkillModifiers, rng: Rng) {
+    const P = TUNING.physics;
+    this.level = level;
+    this.timeLeft = level.timer;
+    this.openBays = openDoorBays(level.id);
+    this.world = new World({
+      iterations: P.iterations,
+      beta: P.contactBeta,
+      slop: P.contactSlop,
+      hardFrac: P.hardOverlapFrac,
+      restitution: P.restitution,
+      wallRestitution: P.wallRestitution,
+      cellSize: P.cellSize,
+      impactThreshold: P.impactEvent,
+    });
+    this.doors = this.buildStatic();
+    this.player = new PlayerSim(mods);
+    this.world.add(this.player.body);
+    this.crowd = new CrowdSim(this.world, rng);
+    this.crowd.spawnInitial(level, this.openBays, this.player.body.x, this.player.body.z);
+    this.world.rebuildGrid();
+    this.world.onImpact = (a, b, j, x, z) => this.onImpact(a, b, j, x, z);
+  }
+
+  /** Build car walls with gaps at open door bays on the left (−X) wall. */
+  private buildStatic(): DoorLeafPair[] {
+    const w = this.world;
+    const C = TUNING.car;
+    const hw = C.halfWidth;
+    const dh = C.doorHalf;
+    const open = new Set(this.openBays);
+    const wallX = -hw;
+
+    // Right (+X) wall — solid (far from platform).
+    w.addBox(hw, hw + 1, CAR_Z_MIN - 0.5, CAR_Z_MAX + 0.5);
+    // Gangway end walls (no exit).
+    w.addBox(-hw - 0.2, hw + 0.2, CAR_Z_MIN - 1, CAR_Z_MIN);
+    w.addBox(-hw - 0.2, hw + 0.2, CAR_Z_MAX, CAR_Z_MAX + 1);
+
+    // Left (−X) wall segments between door bays.
+    const bays = [...C.doorBays].sort((a, b) => a - b);
+    const edges: number[] = [CAR_Z_MIN];
+    for (const bz of bays) {
+      edges.push(bz - dh, bz + dh);
+    }
+    edges.push(CAR_Z_MAX);
+    for (let i = 0; i + 1 < edges.length; i += 2) {
+      const z0 = edges[i];
+      const z1 = edges[i + 1];
+      if (z1 - z0 > 0.05) w.addBox(wallX - 1, wallX, z0, z1);
+    }
+    // Closed door bays: fill the gap with a solid wall (no leaf).
+    for (const bz of bays) {
+      if (!open.has(bz)) w.addBox(wallX - 1, wallX, bz - dh, bz + dh);
+    }
+
+    // Longitudinal benches (matches TrainScene v0.5.1):
+    // BOTH walls: only long between-bay segments (skip short end stubs at door Z).
+    // Never overlap a door vestibule [bayZ ± doorHalf].
+    const benchMargin = 0.12;
+    const betweenBaySegs: [number, number][] = [];
+    for (let i = 0; i < bays.length - 1; i++) betweenBaySegs.push([bays[i] + dh, bays[i + 1] - dh]);
+    const aislePoleZs: number[] = [];
+    const seatInset = 0.1;
+    const seatW = 0.62;
+    const addBench = (sx: -1 | 1, z0: number, z1: number, opts: { minAvail?: number; margin?: number } = {}): boolean => {
+      const margin = opts.margin ?? benchMargin;
+      const minAvail = opts.minAvail ?? 0.85;
+      const avail = z1 - z0 - 2 * margin;
+      if (avail < minAvail) return false;
+      const halfLen = Math.min(0.95, avail) / 2;
+      const cz = (z0 + z1) / 2;
+      // Keep colliders inside the car (do not cross doorWallX / +halfWidth).
+      const outer = sx * (hw - seatInset);
+      const inner = sx * (hw - seatInset - seatW);
+      w.addBox(Math.min(inner, outer), Math.max(inner, outer), cz - halfLen, cz + halfLen);
+      return true;
+    };
+    for (const [z0, z1] of betweenBaySegs) {
+      if (addBench(-1, z0, z1, { margin: 0.28, minAvail: 0.5 })) aislePoleZs.push((z0 + z1) / 2);
+    }
+    for (const [z0, z1] of betweenBaySegs) {
+      addBench(1, z0, z1, { margin: 0.28, minAvail: 0.5 });
+    }
+    // Grab poles in the aisle at between-door centres (never in a doorway).
+    for (const pz of aislePoleZs.slice(0, 2)) {
+      w.circles.push({ x: 0.35, z: pz, r: 0.05 });
+    }
+
+    // Platform bounds (−X of the door wall).
+    const px0 = wallX - C.platformDepth;
+    const pl = C.platformHalfLen;
+    w.addBox(px0 - 1, px0, -pl - 1, pl + 1); // far platform edge
+    w.addBox(px0 - 1, wallX + 0.5, -pl - 1, -pl); // −Z lip
+    w.addBox(px0 - 1, wallX + 0.5, pl, pl + 1); // +Z lip
+
+    // Door leaves for open bays (slide along Z into the opening as they close).
+    const pairs: DoorLeafPair[] = [];
+    for (const bz of bays) {
+      if (!open.has(bz)) continue;
+      const leafNeg = w.addBox(wallX - 0.08, wallX + 0.08, bz, bz); // zero-height while open
+      const leafPos = w.addBox(wallX - 0.08, wallX + 0.08, bz, bz);
+      leafNeg.enabled = false;
+      leafPos.enabled = false;
+      pairs.push({ bayZ: bz, leafNeg, leafPos, open: true });
+    }
+    return pairs;
+  }
+
+  private onImpact(a: Body, b: Body | null, j: number, x: number, z: number): void {
+    const pl = this.player.body;
+    const isPlayer = a === pl || b === pl;
+    if (!isPlayer && j < TUNING.physics.impactEvent * 2.2) return;
+    this.events.push({ t: 'bump', x, z, power: j, player: isPlayer });
+    const ag = this.crowd.byBody.get(a.id);
+    if (ag) ag.bumpAcc = Math.max(ag.bumpAcc, Math.min(1, j * 0.35));
+    if (b) {
+      const bg = this.crowd.byBody.get(b.id);
+      if (bg) bg.bumpAcc = Math.max(bg.bumpAcc, Math.min(1, j * 0.35));
+    }
+  }
+
+  get finished(): boolean {
+    return this.result !== null;
+  }
+
+  /** 0 at start (+X / deep) → 1 at the nearest open door on the platform side. */
+  doorProgress(): number {
+    const b = this.player.body;
+    const wall = doorWallX();
+    const bay = nearestDoorBay(b.z, this.openBays);
+    const spanX = PLAYER_START_X - (wall - TUNING.car.winDepth);
+    const tX = (PLAYER_START_X - b.x) / Math.max(0.5, spanX);
+    const tZ = 1 - Math.min(1, Math.abs(b.z - bay) / 3.5);
+    return Math.max(0, Math.min(1, tX * 0.75 + tZ * 0.25 * Math.max(0, tX)));
+  }
+
+  reachedDoor(): boolean {
+    const b = this.player.body;
+    const C = TUNING.car;
+    const wall = doorWallX();
+    if (b.x > wall - C.winDepth) return false;
+    if (this.doorOpen < 0.15) return false;
+    return this.openBays.some((bay) => Math.abs(b.z - bay) < C.winHalf);
+  }
+
+  tryUltimate(kind: UltKind): boolean {
+    if (this.result) return false;
+    return this.player.activateUltimate(kind, this.time, this.world, this.crowd, this.emit);
+  }
+
+  /** Advance one fixed step. After a result, keeps simulating for ambience (player walks out on win). */
+  step(dt: number, input: PlayerInput): void {
+    const D = TUNING.door;
+    const C = TUNING.car;
+    const pl = this.player;
+    const now = this.time;
+    const wall = doorWallX();
+
+    if (this.ambient) {
+      this.doorOpen = 1;
+    } else if (!this.result) {
+      this.timeLeft = Math.max(0, this.timeLeft - dt);
+      this.doorOpen = Math.min(1, this.timeLeft / D.closeTime);
+    } else if (this.result === 'lose') {
+      this.doorOpen = Math.max(0, this.doorOpen - dt * 3);
+    } else {
+      this.doorOpen = 1;
+      // Victory walk out onto the platform (−X).
+      const bay = nearestDoorBay(pl.body.z, this.openBays);
+      const tx = wall - 1.8 - pl.body.x;
+      const tz = bay - pl.body.z;
+      const l = Math.hypot(tx, tz);
+      input = l > 0.2 ? { x: tx / l, z: -tz / l, mag: 0.8, shoveHeld: false } : { x: 0, z: 0, mag: 0, shoveHeld: false };
+    }
+
+    // Door leaves narrow each open bay along Z while closing.
+    const half = C.doorHalf * this.doorOpen;
+    for (const d of this.doors) {
+      d.leafNeg.maxZ = d.bayZ - half;
+      d.leafNeg.minZ = d.bayZ - C.doorHalf;
+      d.leafPos.minZ = d.bayZ + half;
+      d.leafPos.maxZ = d.bayZ + C.doorHalf;
+      d.leafNeg.enabled = d.leafPos.enabled = this.doorOpen < 0.999;
+    }
+
+    const sensing = pl.isSensing(now);
+    const boardingActive = !this.ambient && now >= TUNING.crowd.boardDelay && this.doorOpen > 0.5;
+    const nearDoor = this.crowd.activeBoardersNearDoor(wall, this.openBays);
+    const pressureField = boardingActive ? this.level.pressure * Math.min(1, nearDoor / 4) : 0;
+
+    if (!this.ambient && (!this.result || this.result === 'win')) {
+      this.crowd.tickBoarding(dt, this.level, this.openBays, now, this.doorOpen);
+    }
+    const C2 = TUNING.crowd;
+    this.crowd.update(dt, {
+      time: now,
+      doorWallX: wall,
+      openBays: this.openBays,
+      doorZ: DOOR_Z,
+      pressure: this.level.pressure,
+      boardingActive,
+      pressureField,
+      calm: sensing ? TUNING.ult.wis.calm : 0,
+      player: pl.body,
+      playerDirX: pl.aimX,
+      playerDirZ: pl.aimZ,
+      playerMoving: pl.moving,
+      yieldK: C2.yieldBase + pl.mods.gapSense * C2.yieldPerGapSense,
+      angryImmune:
+        pl.isCharging(now) ||
+        pl.isDashing(now) ||
+        this.result !== null ||
+        now - this.lastAngryHit < TUNING.player.hitIFrames,
+      angryResist: Math.min(0.85, pl.mods.resist * 1.2),
+      emit: this.emit,
+      onPlayerShoved: () => {
+        this.lastAngryHit = now;
+        pl.stunT = TUNING.player.stunTime * (1 - pl.mods.resist);
+      },
+    });
+    // Tell the player which bay to aim for (WIS path / dash).
+    pl.targetDoorZ = nearestDoorBay(pl.body.z, this.openBays);
+    pl.step(dt, now, input, this.world, this.crowd, this.emit);
+    this.world.step(dt);
+    this.time += dt;
+
+    if (this.result || this.ambient) return;
+    const prog = this.doorProgress();
+    for (const m of [0.25, 0.5, 0.75]) {
+      if (this.progressBest < m && prog >= m) this.emit({ t: 'milestone', pct: m });
+    }
+    this.progressBest = Math.max(this.progressBest, prog);
+    if (this.reachedDoor()) {
+      this.result = 'win';
+      this.emit({ t: 'win' });
+    } else if (this.timeLeft <= 0) {
+      this.result = 'lose';
+      this.emit({ t: 'lose' });
+    }
+  }
+}
