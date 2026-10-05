@@ -1,1 +1,1 @@
-test
+@/workspace/hk-mtr-exit-rush/src/game/sim/Sim.ts
