@@ -1,6 +1,8 @@
 import { t, toggleLang, getLang, fmt } from '../i18n';
 import type { Game } from '../game/Game';
-import { playableLevels, type LevelDef } from '../game/levels';
+import { playableLevels, isFinaleUnlocked, type LevelDef } from '../game/levels';
+import { INTROS, type IntroKind } from '../game/intros';
+import { POINTS_PER_FIRST_CLEAR } from '../game/SkillTree';
 import type { QualitySetting } from '../game/storage';
 import { LINE_COLORS, linesFor, lineColor } from '../game/lines';
 import { themeFor } from '../game/stationThemes';
@@ -22,7 +24,7 @@ function el(html: string): HTMLElement {
   return d.firstElementChild as HTMLElement;
 }
 
-/** Absolute URL for a file in /public (works for dev, `base: './'` builds and subpaths). */
+/** Absolute URL for a file in /public (resolves against the page URL — works under /hk-mtr-exit-rush/). */
 const asset = (f: string): string => new URL(f, document.baseURI).href;
 
 type PortraitKind = 'hero' | PassengerKind;
@@ -40,7 +42,7 @@ let lastKey = '';
 
 /** Key that forces a full rebuild when it changes; otherwise the play HUD is patched in place. */
 function uiKey(game: Game): string {
-  return `${game.screen}|${getLang()}|${game.level?.id ?? ''}|${game.skillsReturn}`;
+  return `${game.screen}|${getLang()}|${game.level?.id ?? ''}|${game.skillsReturn}|${game.pendingIntro ?? ''}|${game.showFtueGhost ? 1 : 0}`;
 }
 
 function rerender(game: Game): void {
@@ -111,6 +113,12 @@ export function renderUI(root: HTMLElement, game: Game): void {
     wrap.appendChild(renderLevels(game));
   } else if (game.screen === 'legend') {
     wrap.appendChild(renderLegend(game));
+  } else if (game.screen === 'intro') {
+    if (game.level) wrap.appendChild(renderPlayHud(game));
+    else wrap.insertAdjacentHTML('afterbegin', backdrop());
+    const ov = el(`<div class="overlay intro-overlay" data-ui="1"></div>`);
+    ov.appendChild(renderIntroCard(game));
+    wrap.appendChild(ov);
   } else if (game.screen === 'skills') {
     if (overRun) {
       // Overlay on top of the paused / finished run.
@@ -229,10 +237,11 @@ function renderLevels(game: Game): HTMLElement {
   for (const lv of levels) {
     const done = game.save.cleared.includes(lv.id);
     const finale = lv.id === 100;
+    const locked = finale && !isFinaleUnlocked(game.save.cleared, game.save.highestCleared);
     const lines = linesFor(lv.stationEn);
     const flav = getLang() === 'en' ? lv.flavourEn : lv.flavourZh;
     const btn = el(`
-      <button type="button" class="lv-card ${done ? 'done' : ''} ${finale ? 'finale' : ''}" data-id="${lv.id}" style="--line:${LINE_COLORS[lines[0]]};--station:${themeFor(lv.stationEn).wall}${finale ? `;background-image:linear-gradient(90deg,rgba(14,18,28,.92),rgba(14,18,28,.35)),url('${asset('art/key-art.webp')}')` : ''}" title="${flav}" aria-label="${dict.level} ${lv.id} ${stationName(lv)}${done ? ` · ${dict.cleared}` : ''}">
+      <button type="button" class="lv-card ${done ? 'done' : ''} ${finale ? 'finale' : ''} ${locked ? 'locked' : ''}" data-id="${lv.id}" ${locked ? 'disabled' : ''} style="--line:${LINE_COLORS[lines[0]]};--station:${themeFor(lv.stationEn).wall}${finale ? `;background-image:linear-gradient(90deg,rgba(14,18,28,.92),rgba(14,18,28,.35)),url('${asset('art/key-art.webp')}')` : ''}" title="${locked ? dict.finaleLocked : flav}" aria-label="${dict.level} ${lv.id} ${stationName(lv)}${done ? ` · ${dict.cleared}` : ''}${locked ? ` · ${dict.locked}` : ''}">
         <span class="lv-swatch" aria-hidden="true"></span>
         <span class="lv-badge">${lv.id}<span class="lv-lines">${lines.map((l) => `<i style="background:${LINE_COLORS[l]}"></i>`).join('')}</span></span>
         <span class="lv-station"><b>${stationName(lv)}</b><small>${stationAlt(lv)}</small></span>
@@ -241,7 +250,7 @@ function renderLevels(game: Game): HTMLElement {
         ${finale ? `<span class="lv-finale">${dict.finale}</span>` : ''}
       </button>
     `);
-    btn.addEventListener('click', () => game.startLevel(lv.id));
+    btn.addEventListener('click', () => { if (!(btn as HTMLButtonElement).disabled) game.startLevel(lv.id); });
     list.appendChild(btn);
   }
   return page;
@@ -252,13 +261,20 @@ function renderLegend(game: Game): HTMLElement {
   const kinds: PortraitKind[] = PORTRAITS;
   const cards = kinds
     .map((k) => {
-      const name = k === 'hero' ? dict.you : dict.passenger[k];
+      const name = k === 'hero' ? dict.you : dict.passenger[k as PassengerKind] ?? k;
+      const hint = dict.passengerHint[k];
+      const special = k !== 'hero' && k !== 'normal';
+      const seen = special && game.save.seenIntros.includes(k);
+      const review = special
+        ? `<button type="button" class="linkish" data-review="${k}">${icon('kind_' + k, 'xs')} ${dict.reviewIntro}${seen ? '' : ' · !'}</button>`
+        : '';
       return `
         <div class="legend-card k-${k}">
           ${portrait(k)}
           <div class="legend-txt">
-            <b>${k !== 'hero' && k !== 'normal' ? icon(`kind_${k}`, `xs kind-${k}`) : ''}${name}</b>
-            <small>${dict.passengerHint[k]}</small>
+            <b>${special ? icon(`kind_${k}`, `xs kind-${k}`) : ''}${name}</b>
+            <span>${hint}</span>
+            ${review}
           </div>
         </div>`;
     })
@@ -307,7 +323,10 @@ function renderPlayHud(game: Game): HTMLElement {
           </div>
         </div>
       </div>
-      <div class="drag-hint" aria-hidden="true">${icon('drag')}</div>
+      ${game.activeTip ? `<div class="tip-chip" id="tip-chip">${icon(`kind_${game.activeTip}`, 'xs')}<span>${dict.tipChip}: ${getLang() === 'en' ? (INTROS[game.activeTip as IntroKind]?.tipEn ?? '') : (INTROS[game.activeTip as IntroKind]?.tipZh ?? '')}</span></div>` : ''}
+      <div class="drag-hint ${game.showFtueGhost ? 'ftue-ghost' : ''}" aria-hidden="true">
+        ${game.showFtueGhost ? `<span class="ghost-hand"></span><span class="ghost-label">${dict.hintDrag}</span>` : icon('drag')}
+      </div>
       <div class="hud-actions">
         <div class="ult-col">
           ${ult('str', dict.ultStr, s.ultStr)}
@@ -382,7 +401,7 @@ function updatePlayHud(root: HTMLElement, game: Game): void {
     b.classList.toggle('active', game.ultActive(k));
     b.classList.toggle('cooling', game.ultCooldown(k) > 0);
   });
-  root.querySelector('.drag-hint')?.classList.toggle('gone', game.doorProgress() > 0.05 || (game.sim?.time ?? 0) > 4);
+  root.querySelector('.drag-hint')?.classList.toggle('gone', !game.showFtueGhost && (game.doorProgress() > 0.05 || (game.sim?.time ?? 0) > 4));
 }
 
 /** Round icon button with a tiny caption (pause / end overlays). */
@@ -462,7 +481,7 @@ function endBonus(game: Game): string {
   const dict = t();
   const c = game.lastClear;
   const star = icon('star', 'sm');
-  if (!c || (c.awarded && c.count === 1)) return `<p class="bonus">${star}${dict.clearBonus}</p>`;
+  if (!c || (c.awarded && c.count === 1)) return `<p class="bonus">${star}${fmt(dict.clearBonusN, { n: POINTS_PER_FIRST_CLEAR })}</p>`;
   if (c.awarded) return `<p class="bonus">${star}${fmt(dict.replayBonus, { n: c.count, max: MAX_POINTS_PER_LEVEL })}</p>`;
   return `<p class="howto">${dict.clearNoBonus}</p>`;
 }
@@ -530,5 +549,50 @@ function renderSkills(game: Game): HTMLElement {
     barBack.removeAttribute('data-act');
     barBack.addEventListener('click', back);
   }
+  return panel;
+}
+
+
+/** Full-screen intro / review card for a special passenger. */
+function renderIntroCard(game: Game): HTMLElement {
+  const dict = t();
+  const kind = game.pendingIntro;
+  if (!kind) return el(`<div class="panel"></div>`);
+  const copy = INTROS[kind];
+  const en = getLang() === 'en';
+  const nameEn = en ? dict.passenger[kind] : dict.passenger[kind];
+  // Always show both names on the card
+  const titleEn = dict.passenger[kind]; // will swap via two dicts
+  const namePrimary = en ? dict.passenger[kind] : dict.passenger[kind];
+  // Bilingual title: current lang big, other small — fetch both from i18n modules is awkward;
+  // passenger names are already localised; show icon + localised name + other lang via hardcoded pair from INTROS tips.
+  const what = en ? copy.whatEn : copy.whatZh;
+  const block = en ? copy.blockEn : copy.blockZh;
+  const tip = en ? copy.tipEn : copy.tipZh;
+  const otherName = en
+    ? ({ luggage: '拉行李喼', stench: '惡臭人', family: '一家大細', brat: '百厭仔', couple: '情侶', angry: '暴躁男' } as Record<string, string>)[kind]
+    : ({ luggage: 'Luggage', stench: 'Stench', family: 'Family', brat: 'Brat', couple: 'Couple', angry: 'Angry man' } as Record<string, string>)[kind];
+
+  const inLevel = !!game.level;
+  const panel = el(`
+    <div class="panel intro-card" data-ui="1" role="dialog" aria-label="${dict.introTitle}">
+      <p class="intro-kicker">${icon(`kind_${kind}`, 'sm')}${dict.introTitle}</p>
+      <div class="intro-hero">${portrait(kind, 'lg')}</div>
+      <h2 class="panel-title">${dict.passenger[kind]}</h2>
+      <p class="intro-other">${otherName}</p>
+      <ul class="intro-beats">
+        <li><strong>${what}</strong></li>
+        <li>${block}</li>
+        <li class="intro-tip">${icon('star', 'xs')}<span>${tip}</span></li>
+      </ul>
+      <button type="button" class="primary" id="btn-intro-go">${icon('play', 'sm')}<span>${inLevel ? dict.introTap : dict.back}</span></button>
+    </div>
+  `);
+  panel.querySelector('#btn-intro-go')?.addEventListener('click', () => {
+    game.audio.ui();
+    if (inLevel) game.dismissIntro(true);
+    else game.closeIntroReview();
+  });
+  // Also tap overlay backdrop
   return panel;
 }
