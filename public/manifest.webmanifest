@@ -4,7 +4,7 @@
   "description": "逼落車 on 香城鐵路 / Hong City Rail — get off before the doors close. Fiction; not affiliated with any real railway.",
   "start_url": "./",
   "scope": "./",
-  "display": "fullscreen",
+  "display": "standalone",
   "orientation": "portrait",
   "background_color": "#141820",
   "theme_color": "#B01C2E",
