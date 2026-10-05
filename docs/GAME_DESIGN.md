@@ -1,4 +1,4 @@
-<!-- v0.5.1: benches between door bays only (no seats in doorways) -->
+<!-- v0.5.1: benches on both walls only in between-bay segs (skip end stubs; no seats in doorways) -->
 <!-- v0.5.0: short levels, intro cards, FTUE, L100 gated behind L30 -->
 <!-- v0.4.1: side-wall sliding doors; car ends = gangway -->
 # Game Design — 逼落車 (Exit Rush)
@@ -143,7 +143,7 @@ Everything lives in **`src/game/sim/tuning.ts`** (`TUNING`), grouped as `physics
 | Tourist | teal shirt, sun hat | camera, big brown suitcase |
 
 - **Type icons:** small round billboards (same glyphs as the legend) over special passengers within ~3.4 m of the player, plus any angry man winding up; toggle in settings.
-- **Car (v0.5.1):** white walls, red stripe, stainless longitudinal benches **only in wall segments between side-door bays** (flush to ±halfWidth; door vestibules + aisle clear), glass partitions, poles + overhead rails with red grips. **Side-wall sliding doors** on the left (−X) platform wall (red frames + indicator lights); **gangway ends are not exits**. Line-map strip above the door wall, yellow edge line, PSDs, **per-station coloured** tiled pillars + back wall, navy bilingual station sign (OFL fonts; level `stationEn` / `stationZh`, with an "inspired look · not affiliated" note). Static meshes merged per material.
+- **Car (v0.5.1):** white walls, red stripe, stainless longitudinal benches on **both walls only in between-bay segments** (skip short end stubs at door Z; flush to ±halfWidth; vestibules `[bayZ ± doorHalf]` + aisle clear), glass partitions, poles + overhead rails with red grips. **Side-wall sliding doors** on the left (−X) platform wall (red frames + indicator lights); **gangway ends are not exits**. Line-map strip above the door wall, yellow edge line, PSDs, **per-station coloured** tiled pillars + back wall, navy bilingual station sign (OFL fonts; level `stationEn` / `stationZh`, with an "inspired look · not affiliated" note). Static meshes merged per material.
 - **UI:** authored SVG icon set (`src/ui/icons.ts`), bold rounded filled glyphs; title over key art; level cards = number badge + line dots + station 中/EN + density/timer icons; passenger legend with concept portraits.
 - **Quality:** Low drops stink lines/flies/most puffs and the shadow map; High keeps everything.
 
