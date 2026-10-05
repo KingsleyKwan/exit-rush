@@ -41,6 +41,8 @@ export function doorWallX(): number {
 export function openDoorBays(levelId: number): number[] {
   const all = [...DOOR_BAYS];
   if (levelId >= 100) return [all[1]];
+  // v0.5: fewer open bays as the 1–30 curve tightens
+  if (levelId >= 24) return [all[1]];
   if (levelId >= 16) return [all[1]];
   if (levelId >= 8) return [all[1], all[2]];
   return all;
