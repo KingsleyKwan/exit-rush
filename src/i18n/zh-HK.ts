@@ -59,7 +59,7 @@ export const zhHK: Dict = {
     angry: '暴躁男',
     luggage: '拉行李喼',
   },
-  sfxNote: '全部音效都係原創合成（唔係港鐵官方錄音）。',
+  sfxNote: '全部音效都係原創。虛構世界：香城鐵路 — 同任何真實鐵路無關。',
   mute: '靜音',
   unmute: '取消靜音',
   sound: '聲音',
@@ -87,5 +87,5 @@ export const zhHK: Dict = {
   hintExit: '落車',
   finale: '終極關',
   cleared: '已過關',
-  artCredit: '概念美術由 Grok Image 生成。',
+  artCredit: '概念美術：Grok Image。香城鐵路係虛構，靈感來自香港地鐵，並無隸屬關係。',
 };
