@@ -1,0 +1,17 @@
+{
+  "name": "逼落車 · Exit Rush",
+  "short_name": "逼落車",
+  "description": "Push through the Hong Kong rush-hour crowd and get off before the doors close.",
+  "start_url": "./",
+  "scope": "./",
+  "display": "fullscreen",
+  "orientation": "portrait",
+  "background_color": "#141820",
+  "theme_color": "#B01C2E",
+  "lang": "zh-HK",
+  "icons": [
+    { "src": "icons/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}
