@@ -1,146 +1,138 @@
 import * as THREE from 'three';
-import type { SkillModifiers } from './SkillTree';
-import { PLAYER_START } from './TrainScene';
+import type { PlayerSim } from './sim/PlayerSim';
+import { TUNING } from './sim/tuning';
 
+/**
+ * Player visual. Physics/state live in sim/PlayerSim; this reads it each frame
+ * and adds squash/stretch, lean, a stamina/charge ring and ult tints.
+ */
 export class Player {
-  readonly mesh: THREE.Group;
-  position = PLAYER_START.clone();
-  velocity = new THREE.Vector3();
-  stamina: number;
-  staminaMax: number;
-  chargeUntil = 0;
-  dashUntil = 0;
-  senseUntil = 0;
+  readonly mesh = new THREE.Group();
+  private lean = new THREE.Group();
+  private rig = new THREE.Group();
+  private bodyMat: THREE.MeshStandardMaterial;
+  private ring: THREE.Mesh;
+  private ringMat: THREE.MeshBasicMaterial;
+  private aim: THREE.Mesh;
+  private aimMat: THREE.MeshBasicMaterial;
+  private squash = 0;
+  private squashV = 0;
   private bob = 0;
+  private yaw = Math.PI;
+  private lastImpact = 0;
 
   constructor() {
-    this.mesh = new THREE.Group();
-    const body = new THREE.Mesh(
-      new THREE.CapsuleGeometry(0.28, 0.55, 4, 10),
-      new THREE.MeshStandardMaterial({ color: 0x2196f3, roughness: 0.5 }),
-    );
-    body.position.y = 0.7;
+    this.bodyMat = new THREE.MeshStandardMaterial({ color: 0x2196f3, roughness: 0.5 });
+    const body = new THREE.Mesh(new THREE.CapsuleGeometry(0.26, 0.5, 4, 10), this.bodyMat);
+    body.position.y = 0.66;
     body.castShadow = true;
-    this.mesh.add(body);
     const head = new THREE.Mesh(
-      new THREE.SphereGeometry(0.2, 12, 12),
+      new THREE.SphereGeometry(0.19, 12, 12),
       new THREE.MeshStandardMaterial({ color: 0xf1c27d }),
     );
-    head.position.y = 1.25;
-    this.mesh.add(head);
-    const ring = new THREE.Mesh(
-      new THREE.RingGeometry(0.35, 0.45, 24),
-      new THREE.MeshBasicMaterial({ color: 0x4fc3f7, side: THREE.DoubleSide }),
+    head.position.y = 1.2;
+    head.castShadow = true;
+    // Little backpack so facing reads.
+    const pack = new THREE.Mesh(
+      new THREE.BoxGeometry(0.3, 0.34, 0.14),
+      new THREE.MeshStandardMaterial({ color: 0x0d47a1, roughness: 0.6 }),
     );
-    ring.rotation.x = -Math.PI / 2;
-    ring.position.y = 0.03;
-    this.mesh.add(ring);
+    pack.position.set(0, 0.72, -0.27);
+    this.rig.add(body, head, pack);
+    this.lean.add(this.rig);
+    this.mesh.add(this.lean);
 
-    this.staminaMax = 100;
-    this.stamina = 100;
-    this.sync();
+    this.ringMat = new THREE.MeshBasicMaterial({ color: 0x4fc3f7, side: THREE.DoubleSide, transparent: true, opacity: 0.9, depthWrite: false });
+    this.ring = new THREE.Mesh(new THREE.RingGeometry(0.34, 0.44, 32), this.ringMat);
+    this.ring.rotation.x = -Math.PI / 2;
+    this.ring.position.y = 0.03;
+    this.mesh.add(this.ring);
+
+    // Direction chevron on the floor (shows assisted aim).
+    const tri = new THREE.Shape();
+    tri.moveTo(0, 0.22);
+    tri.lineTo(0.12, 0);
+    tri.lineTo(-0.12, 0);
+    tri.closePath();
+    this.aimMat = new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0, depthWrite: false, side: THREE.DoubleSide });
+    this.aim = new THREE.Mesh(new THREE.ShapeGeometry(tri), this.aimMat);
+    this.aim.rotation.x = -Math.PI / 2;
+    this.aim.position.y = 0.035;
+    this.mesh.add(this.aim);
   }
 
-  reset(mods: SkillModifiers): void {
-    this.position.copy(PLAYER_START);
-    this.velocity.set(0, 0, 0);
-    this.staminaMax = mods.staminaMax;
-    this.stamina = this.staminaMax;
-    this.chargeUntil = 0;
-    this.dashUntil = 0;
-    this.senseUntil = 0;
-    this.sync();
+  /** Kick squash externally (e.g. angry hit). */
+  punch(amount: number): void {
+    this.squashV += amount;
   }
 
-  sync(): void {
-    this.mesh.position.set(this.position.x, 0, this.position.z);
-  }
+  update(p: PlayerSim, alpha: number, dt: number, now: number, time: number): void {
+    const b = p.body;
+    const x = b.px + (b.x - b.px) * alpha;
+    const z = b.pz + (b.z - b.pz) * alpha;
+    const speed = Math.hypot(b.vx, b.vz);
 
-  activateUltimate(kind: 'str' | 'spd' | 'wis', now: number): boolean {
-    if (kind === 'str') {
-      this.chargeUntil = now + 2.2;
-      return true;
-    }
-    if (kind === 'spd') {
-      this.dashUntil = now + 1.1;
-      return true;
-    }
-    if (kind === 'wis') {
-      this.senseUntil = now + 3.5;
-      return true;
-    }
-    return false;
-  }
+    if (b.impact > this.lastImpact + 0.4) this.squashV += Math.min(3, b.impact * 1.2);
+    this.lastImpact = b.impact;
+    this.squashV += (-260 * this.squash - 16 * this.squashV) * dt;
+    this.squash = Math.max(-0.3, Math.min(0.32, this.squash + this.squashV * dt));
+    const squeeze = Math.min(0.14, b.pressure * 0.8);
+    const charge = p.shoveCharge;
+    // Wind up for a shove: crouch + widen.
+    const sy = (1 - this.squash) * (1 - squeeze) * (1 - charge * 0.12);
+    const sxz = (1 + this.squash * 0.5) * (1 + squeeze * 0.7) * (1 + charge * 0.1);
+    this.rig.scale.set(sxz, sy, sxz);
 
-  update(
-    dt: number,
-    now: number,
-    intentX: number,
-    intentZ: number,
-    magnitude: number,
-    mods: SkillModifiers,
-    crowdBlock: number,
-    crowdSlow: number,
-    doorZ: number,
-  ): { pushing: boolean } {
-    const charging = now < this.chargeUntil;
-    const dashing = now < this.dashUntil;
-    const sensing = now < this.senseUntil;
+    this.bob += dt * (4 + speed * 6);
+    const bobY = Math.abs(Math.sin(this.bob)) * 0.04 * Math.min(1, speed);
+    let wob = 0;
+    if (p.stunT > 0) wob = Math.sin(time * 40) * 0.12 * (p.stunT / TUNING.player.stunTime);
+    this.mesh.position.set(x, bobY, z);
 
-    let speed = 2.4 * mods.moveSpeed * (1 - crowdSlow);
-    let pushMul = mods.pushForce;
-    if (charging) {
-      speed *= 1.8;
-      pushMul *= 2.5;
-      crowdBlock *= 0.15;
-    }
-    if (dashing) {
-      speed *= 2.6;
-      crowdBlock *= 0.35;
-    }
-    if (sensing) {
-      crowdBlock *= 1 - mods.gapSense * 0.5;
-      intentZ = Math.max(intentZ, 0.35);
-      magnitude = Math.max(magnitude, 0.35);
-    }
+    const tgtYaw = Math.atan2(p.faceX, p.faceZ);
+    let d = tgtYaw - this.yaw;
+    while (d > Math.PI) d -= Math.PI * 2;
+    while (d < -Math.PI) d += Math.PI * 2;
+    this.yaw += d * (1 - Math.exp(-12 * dt));
+    this.rig.rotation.y = this.yaw;
+    const lx = Math.max(-0.3, Math.min(0.3, b.vz * 0.08 + (p.pushing ? p.faceZ * 0.12 : 0)));
+    const lz = Math.max(-0.3, Math.min(0.3, -b.vx * 0.08 - (p.pushing ? p.faceX * 0.12 : 0) + wob));
+    this.lean.rotation.x += (lx - this.lean.rotation.x) * Math.min(1, dt * 12);
+    this.lean.rotation.z += (lz - this.lean.rotation.z) * Math.min(1, dt * 12);
 
-    const pushing = magnitude > 0.12;
-    // Swipe up → intentZ > 0 → move toward door (−Z)
-    const dir = new THREE.Vector3(intentX, 0, -Math.max(0.2, intentZ));
-    if (dir.lengthSq() > 0) dir.normalize();
+    // Ring: stamina colour, shove charge growth, cooldown dim.
+    const st = p.stamina / p.staminaMax;
+    const c = this.ringMat.color;
+    if (p.winded) c.setRGB(0.9, 0.2, 0.2);
+    else if (charge > 0) c.setRGB(1, 0.6 - charge * 0.3, 0.1);
+    else if (p.isSensing(now)) c.setRGB(0.3, 1, 0.85);
+    else c.setRGB(0.3 + (1 - st) * 0.6, 0.76 * st + 0.2, 0.97 * st);
+    this.ring.scale.setScalar(1 + charge * 0.6 + (p.isSensing(now) ? Math.sin(time * 8) * 0.08 : 0));
+    this.ringMat.opacity = p.shoveCd > 0 ? 0.45 : 0.9;
 
-    const effectiveBlock = Math.max(0, crowdBlock * (1 - mods.resist * 0.5));
-    const drain = pushing ? (8 + effectiveBlock * 6) * dt : 0;
-    if (pushing && this.stamina > 0) {
-      this.stamina = Math.max(0, this.stamina - drain);
-      const staminaFactor = this.stamina > 0 ? 1 : 0.15;
-      const move = speed * magnitude * pushMul * staminaFactor;
-      const resist = 1 / (1 + effectiveBlock);
-      this.velocity.addScaledVector(dir, move * resist);
-    } else if (!pushing) {
-      this.stamina = Math.min(this.staminaMax, this.stamina + mods.staminaRegen * dt);
+    // Ult tints.
+    if (p.isCharging(now)) {
+      this.bodyMat.emissive.setRGB(1, 0.45, 0.05);
+      this.bodyMat.emissiveIntensity = 0.6 + Math.sin(time * 20) * 0.25;
+    } else if (p.isDashing(now)) {
+      this.bodyMat.emissive.setRGB(0.2, 0.9, 1);
+      this.bodyMat.emissiveIntensity = 0.8;
+    } else if (p.winded) {
+      this.bodyMat.emissive.setRGB(0.4, 0, 0);
+      this.bodyMat.emissiveIntensity = 0.25 + Math.sin(time * 6) * 0.15;
     } else {
-      // pinned with no stamina — tiny crawl + slow regen
-      this.stamina = Math.min(this.staminaMax, this.stamina + mods.staminaRegen * 0.25 * dt);
-      this.velocity.addScaledVector(dir, 0.3 * magnitude * dt);
+      this.bodyMat.emissiveIntensity = 0;
     }
 
-    this.velocity.multiplyScalar(Math.exp(-5 * dt));
-    this.position.addScaledVector(this.velocity, dt);
-    this.position.x = THREE.MathUtils.clamp(this.position.x, -1.7, 1.7);
-    this.position.z = THREE.MathUtils.clamp(this.position.z, doorZ - 0.15, 4.5);
-
-    this.bob += dt * (pushing ? 12 : 4);
-    this.mesh.position.set(this.position.x, Math.sin(this.bob) * 0.03, this.position.z);
-    return { pushing };
+    // Aim chevron in front of the player while steering.
+    const show = p.moving > 0.15 ? 0.55 : 0;
+    this.aimMat.opacity += (show - this.aimMat.opacity) * Math.min(1, dt * 10);
+    this.aim.position.set(p.aimX * 0.62, 0.035, p.aimZ * 0.62);
+    this.aim.rotation.z = Math.atan2(-p.aimX, -p.aimZ);
   }
 
-  reachedDoor(doorZ: number): boolean {
-    return this.position.z <= doorZ + 0.55 && Math.abs(this.position.x) < 0.95;
-  }
-
-  doorProgress(doorZ: number, startZ: number): number {
-    const t = (startZ - this.position.z) / (startZ - doorZ);
-    return THREE.MathUtils.clamp(t, 0, 1);
+  /** Simple pose for menus (no sim). */
+  idle(x: number, z: number): void {
+    this.mesh.position.set(x, 0, z);
   }
 }

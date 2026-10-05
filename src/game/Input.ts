@@ -1,15 +1,23 @@
 export interface DragState {
   active: boolean;
-  /** Normalized push intent in XZ plane: x = left/right, z = toward door (negative z in our scene) */
+  /** Stick x: + = right. */
   intentX: number;
+  /** Stick forward: + = up on screen = toward the door. */
   intentZ: number;
-  /** 0–1 strength of current drag */
+  /** 0–1 deflection. */
   magnitude: number;
 }
 
+export interface InputCallbacks {
+  onUlt?: (k: 'str' | 'spd' | 'wis') => void;
+  onPause?: () => void;
+}
+
 /**
- * Unified mouse + touch swipe/drag toward door.
- * Screen: up / forward swipe → toward door (−Z).
+ * Floating virtual joystick: touch/click anywhere on the play area, drag to
+ * steer. The base trails the finger if you overshoot, so reversing direction is
+ * instant. Keyboard (WASD / arrows, Space = shove, 1-2-3 = ults, P/Esc = pause)
+ * for desktop testing.
  */
 export class InputController {
   readonly drag: DragState = {
@@ -18,20 +26,40 @@ export class InputController {
     intentZ: 0,
     magnitude: 0,
   };
+  /** Space held (desktop shove). */
+  shoveKey = false;
+  /** Steering only while a level is being played. */
+  enabled = false;
+  cb: InputCallbacks = {};
 
-  private startX = 0;
-  private startY = 0;
-  private lastX = 0;
-  private lastY = 0;
   private el: HTMLElement;
+  private pointerId: number | null = null;
+  private baseX = 0;
+  private baseY = 0;
+  private radius = 60;
+  private joy: HTMLDivElement;
+  private knob: HTMLDivElement;
+  private keys = new Set<string>();
+  private keyX = 0;
+  private keyZ = 0;
 
-  constructor(el: HTMLElement) {
+  constructor(el: HTMLElement, overlayParent: HTMLElement) {
     this.el = el;
+    this.joy = document.createElement('div');
+    this.joy.className = 'joy';
+    this.knob = document.createElement('div');
+    this.knob.className = 'joy-knob';
+    this.joy.appendChild(this.knob);
+    overlayParent.appendChild(this.joy);
+
     el.addEventListener('pointerdown', this.onDown);
     el.addEventListener('pointermove', this.onMove);
     el.addEventListener('pointerup', this.onUp);
     el.addEventListener('pointercancel', this.onUp);
-    el.addEventListener('contextmenu', (e) => e.preventDefault());
+    el.addEventListener('contextmenu', this.onContext);
+    window.addEventListener('keydown', this.onKeyDown);
+    window.addEventListener('keyup', this.onKeyUp);
+    window.addEventListener('blur', this.onBlur);
   }
 
   dispose(): void {
@@ -39,50 +67,135 @@ export class InputController {
     this.el.removeEventListener('pointermove', this.onMove);
     this.el.removeEventListener('pointerup', this.onUp);
     this.el.removeEventListener('pointercancel', this.onUp);
+    this.el.removeEventListener('contextmenu', this.onContext);
+    window.removeEventListener('keydown', this.onKeyDown);
+    window.removeEventListener('keyup', this.onKeyUp);
+    window.removeEventListener('blur', this.onBlur);
+    this.joy.remove();
   }
+
+  /** Drop any held input (e.g. on pause / screen change). */
+  reset(): void {
+    this.pointerId = null;
+    this.drag.active = false;
+    this.drag.intentX = this.drag.intentZ = this.drag.magnitude = 0;
+    this.keys.clear();
+    this.shoveKey = false;
+    this.keyX = this.keyZ = 0;
+    this.joy.classList.remove('on');
+  }
+
+  private onContext = (e: Event): void => e.preventDefault();
 
   private onDown = (e: PointerEvent): void => {
     if ((e.target as HTMLElement).closest('[data-ui]')) return;
-    this.el.setPointerCapture(e.pointerId);
+    if (!this.enabled || this.pointerId !== null) return; // one steering finger
+    this.pointerId = e.pointerId;
+    try {
+      this.el.setPointerCapture(e.pointerId);
+    } catch {
+      /* ignore */
+    }
+    this.radius = Math.max(44, Math.min(80, Math.min(window.innerWidth, window.innerHeight) * 0.14));
+    this.baseX = e.clientX;
+    this.baseY = e.clientY;
     this.drag.active = true;
-    this.startX = e.clientX;
-    this.startY = e.clientY;
-    this.lastX = e.clientX;
-    this.lastY = e.clientY;
     this.drag.magnitude = 0;
+    this.joy.style.setProperty('--r', `${this.radius}px`);
+    this.place(0, 0);
+    this.joy.classList.add('on');
   };
 
   private onMove = (e: PointerEvent): void => {
-    if (!this.drag.active) return;
-    this.lastX = e.clientX;
-    this.lastY = e.clientY;
-    const dx = this.lastX - this.startX;
-    const dy = this.lastY - this.startY;
-    // Screen Y down positive; swipe up (negative dy) → toward door
-    const len = Math.hypot(dx, dy);
-    const max = Math.min(window.innerWidth, window.innerHeight) * 0.28;
-    const mag = Math.min(1, len / max);
+    if (e.pointerId !== this.pointerId) return;
+    let dx = e.clientX - this.baseX;
+    let dy = e.clientY - this.baseY;
+    let len = Math.hypot(dx, dy);
+    const follow = this.radius * 1.25;
+    if (len > follow) {
+      // Drag the base along so the stick never "bottoms out".
+      const k = (len - follow) / len;
+      this.baseX += dx * k;
+      this.baseY += dy * k;
+      dx = e.clientX - this.baseX;
+      dy = e.clientY - this.baseY;
+      len = follow;
+    }
+    const raw = Math.min(1, len / this.radius);
+    const dz = 0.1;
+    const mag = raw <= dz ? 0 : Math.pow((raw - dz) / (1 - dz), 0.85);
     this.drag.magnitude = mag;
-    if (len > 1) {
+    if (len > 0.5) {
       this.drag.intentX = (dx / len) * mag;
-      this.drag.intentZ = (-dy / len) * mag; // up → +intentZ toward door in our mapping
+      this.drag.intentZ = (-dy / len) * mag;
     }
+    this.place(dx, dy);
   };
 
-  private onUp = (): void => {
+  private onUp = (e: PointerEvent): void => {
+    if (e.pointerId !== this.pointerId) return;
+    this.pointerId = null;
     this.drag.active = false;
-    this.drag.intentX *= 0.3;
-    this.drag.intentZ *= 0.3;
-    this.drag.magnitude *= 0.3;
+    this.drag.intentX = 0;
+    this.drag.intentZ = 0;
+    this.drag.magnitude = 0;
+    this.joy.classList.remove('on');
   };
 
-  /** Decay when not dragging */
-  tick(dt: number): void {
-    if (!this.drag.active) {
-      const k = Math.exp(-6 * dt);
-      this.drag.intentX *= k;
-      this.drag.intentZ *= k;
-      this.drag.magnitude *= k;
+  private place(dx: number, dy: number): void {
+    const r = this.radius;
+    const l = Math.hypot(dx, dy);
+    const k = l > r ? r / l : 1;
+    this.joy.style.transform = `translate(${this.baseX}px, ${this.baseY}px)`;
+    this.knob.style.transform = `translate(${dx * k}px, ${dy * k}px)`;
+  }
+
+  private onKeyDown = (e: KeyboardEvent): void => {
+    const k = e.key.toLowerCase();
+    if (k === ' ' || k === 'shift') {
+      this.shoveKey = true;
+      e.preventDefault();
+      return;
     }
+    if (k === '1') this.cb.onUlt?.('str');
+    else if (k === '2') this.cb.onUlt?.('spd');
+    else if (k === '3') this.cb.onUlt?.('wis');
+    else if (k === 'p' || k === 'escape') this.cb.onPause?.();
+    this.keys.add(k);
+  };
+
+  private onKeyUp = (e: KeyboardEvent): void => {
+    const k = e.key.toLowerCase();
+    if (k === ' ' || k === 'shift') this.shoveKey = false;
+    this.keys.delete(k);
+  };
+
+  private onBlur = (): void => {
+    this.keys.clear();
+    this.shoveKey = false;
+  };
+
+  /** Keyboard smoothing; pointer input is applied immediately in handlers. */
+  tick(dt: number): void {
+    if (this.pointerId !== null) return;
+    if (!this.enabled) {
+      this.drag.intentX = this.drag.intentZ = this.drag.magnitude = 0;
+      return;
+    }
+    const has = (a: string, b: string) => this.keys.has(a) || this.keys.has(b);
+    let tx = (has('d', 'arrowright') ? 1 : 0) - (has('a', 'arrowleft') ? 1 : 0);
+    let tz = (has('w', 'arrowup') ? 1 : 0) - (has('s', 'arrowdown') ? 1 : 0);
+    const l = Math.hypot(tx, tz);
+    if (l > 0) {
+      tx /= l;
+      tz /= l;
+    }
+    const s = 1 - Math.exp(-16 * dt);
+    this.keyX += (tx - this.keyX) * s;
+    this.keyZ += (tz - this.keyZ) * s;
+    const m = Math.min(1, Math.hypot(this.keyX, this.keyZ));
+    this.drag.intentX = this.keyX;
+    this.drag.intentZ = this.keyZ;
+    this.drag.magnitude = m < 0.02 ? 0 : m;
   }
 }

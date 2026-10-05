@@ -16,7 +16,21 @@ function el(html: string): HTMLElement {
   return d.firstElementChild as HTMLElement;
 }
 
+let lastKey = '';
+
+/** Key that forces a full rebuild when it changes; otherwise the play HUD is patched in place. */
+function uiKey(game: Game): string {
+  return `${game.screen}|${getLang()}|${game.level?.id ?? ''}`;
+}
+
 export function renderUI(root: HTMLElement, game: Game): void {
+  const key = uiKey(game);
+  if (key === lastKey && game.screen === 'playing' && root.querySelector('.play-hud')) {
+    updatePlayHud(root, game);
+    return;
+  }
+  lastKey = key;
+  game.setShoveHeld(false);
   const dict = t();
   root.innerHTML = '';
   const wrap = document.createElement('div');
@@ -52,6 +66,7 @@ export function renderUI(root: HTMLElement, game: Game): void {
   }
 
   root.appendChild(wrap);
+  if (root.querySelector('.play-hud')) updatePlayHud(root, game);
 
   root.querySelector('#btn-lang')?.addEventListener('click', () => {
     game.audio.unlock();
@@ -110,41 +125,47 @@ function renderPlayHud(game: Game): HTMLElement {
   const dict = t();
   const lv = game.level!;
   const name = getLang() === 'en' ? lv.stationEn : lv.stationZh;
-  const progress = Math.round(game.doorProgress() * 100);
-  const stam = Math.round((game.player.stamina / game.player.staminaMax) * 100);
-  const time = Math.max(0, game.timeLeft);
   const s = game.save.skills;
+  const ult = (k: 'str' | 'spd' | 'wis', icon: string, title: string, on: boolean) =>
+    `<button type="button" class="skill-use ${on ? '' : 'dim'}" data-ult="${k}" title="${title}" ${on ? '' : 'disabled'}>${icon}</button>`;
 
   const hud = el(`
     <div class="play-hud" data-ui="1">
-      <div class="station-chip">
-        <span>📍 ${dict.level} ${lv.id} · ${name}</span>
+      <div class="hud-top">
+        <div class="hud-row">
+          <div class="station-chip"><span>📍 ${lv.id} · ${name}</span></div>
+          <button type="button" class="icon-btn pause-btn" id="btn-pause" title="${dict.pause}">⏸️</button>
+        </div>
+        <div class="meters">
+          <div class="meter door-meter">
+            <span class="meter-icon" title="${dict.door}">🚪</span>
+            <div class="meter-bar"><i id="m-door"></i><b class="tick" style="left:25%"></b><b class="tick" style="left:50%"></b><b class="tick" style="left:75%"></b></div>
+          </div>
+          <div class="meter stam-meter">
+            <span class="meter-icon" title="${dict.stamina}">💪</span>
+            <div class="meter-bar stamina"><i id="m-stam"></i></div>
+          </div>
+          <div class="meter timer" id="m-timer">
+            <span class="meter-icon" title="${dict.time}">⏱️</span>
+            <span class="timer-val" id="m-time"></span>
+          </div>
+        </div>
       </div>
-      <div class="meters">
-        <div class="meter">
-          <span class="meter-icon" title="${dict.door}">🚪</span>
-          <div class="meter-bar"><i style="width:${progress}%"></i></div>
+      <div class="drag-hint" aria-hidden="true">👆</div>
+      <div class="hud-actions">
+        <div class="ult-col">
+          ${ult('str', '🐂', dict.ultStr, s.ultStr)}
+          ${ult('spd', '💨', dict.ultSpd, s.ultSpd)}
+          ${ult('wis', '🧠', dict.ultWis, s.ultWis)}
         </div>
-        <div class="meter">
-          <span class="meter-icon" title="${dict.stamina}">💪</span>
-          <div class="meter-bar stamina"><i style="width:${stam}%"></i></div>
-        </div>
-        <div class="meter timer ${time < 10 ? 'urgent' : ''}">
-          <span class="meter-icon" title="${dict.time}">⏱️</span>
-          <span class="timer-val">${time.toFixed(1)}</span>
-        </div>
-      </div>
-      <div class="skill-rail">
-        <button type="button" class="skill-use ${s.ultStr ? '' : 'dim'}" data-ult="str" title="${dict.ultStr}">🐂</button>
-        <button type="button" class="skill-use ${s.ultSpd ? '' : 'dim'}" data-ult="spd" title="${dict.ultSpd}">💨</button>
-        <button type="button" class="skill-use ${s.ultWis ? '' : 'dim'}" data-ult="wis" title="${dict.ultWis}">🧠</button>
-        <button type="button" class="icon-btn" id="btn-pause">⏸️</button>
+        <button type="button" class="shove-btn" id="btn-shove" title="${dict.shove}">✊</button>
       </div>
     </div>
   `);
 
   hud.querySelectorAll('[data-ult]').forEach((b) => {
-    b.addEventListener('click', () => {
+    b.addEventListener('pointerdown', (e) => {
+      e.preventDefault();
       const k = (b as HTMLElement).dataset.ult as 'str' | 'spd' | 'wis';
       game.tryUltimate(k);
     });
@@ -152,7 +173,60 @@ function renderPlayHud(game: Game): HTMLElement {
   hud.querySelector('#btn-pause')?.addEventListener('click', () => {
     game.togglePause();
   });
+  const shove = hud.querySelector('#btn-shove') as HTMLElement | null;
+  if (shove) {
+    const down = (e: PointerEvent) => {
+      e.preventDefault();
+      try {
+        shove.setPointerCapture(e.pointerId);
+      } catch {
+        /* ignore */
+      }
+      game.audio.unlock();
+      game.setShoveHeld(true);
+    };
+    const up = () => game.setShoveHeld(false);
+    shove.addEventListener('pointerdown', down);
+    shove.addEventListener('pointerup', up);
+    shove.addEventListener('pointercancel', up);
+    shove.addEventListener('lostpointercapture', up);
+    shove.addEventListener('contextmenu', (e) => e.preventDefault());
+  }
   return hud;
+}
+
+/** Patch dynamic HUD values in place (cheap; no DOM rebuild). */
+function updatePlayHud(root: HTMLElement, game: Game): void {
+  const q = (id: string) => root.querySelector<HTMLElement>(id);
+  const progress = Math.round(game.doorProgress() * 100);
+  const stam = Math.round(game.staminaFrac() * 100);
+  const time = Math.max(0, game.timeLeft);
+  const door = q('#m-door');
+  if (door) door.style.width = `${progress}%`;
+  const doorMeter = root.querySelector('.door-meter');
+  doorMeter?.classList.toggle('pulse', game.clock - game.milestoneAt < 0.45);
+  const st = q('#m-stam');
+  if (st) st.style.width = `${stam}%`;
+  root.querySelector('.stam-meter')?.classList.toggle('winded', game.isWinded());
+  root.querySelector('.stam-meter')?.classList.toggle('low', stam < 25);
+  const tv = q('#m-time');
+  if (tv) tv.textContent = time.toFixed(1);
+  q('#m-timer')?.classList.toggle('urgent', time < 10);
+  q('#m-timer')?.classList.toggle('critical', time < 5);
+  const shove = q('#btn-shove');
+  if (shove) {
+    shove.style.setProperty('--cd', game.shoveCooldown().toFixed(3));
+    shove.style.setProperty('--charge', game.shoveCharge().toFixed(3));
+    shove.classList.toggle('cooling', game.shoveCooldown() > 0);
+    shove.classList.toggle('charging', game.shoveCharge() > 0);
+  }
+  root.querySelectorAll<HTMLElement>('[data-ult]').forEach((b) => {
+    const k = b.dataset.ult as 'str' | 'spd' | 'wis';
+    b.style.setProperty('--cd', game.ultCooldown(k).toFixed(3));
+    b.classList.toggle('active', game.ultActive(k));
+    b.classList.toggle('cooling', game.ultCooldown(k) > 0);
+  });
+  root.querySelector('.drag-hint')?.classList.toggle('gone', game.doorProgress() > 0.05 || (game.sim?.time ?? 0) > 4);
 }
 
 function renderPause(game: Game): HTMLElement {
