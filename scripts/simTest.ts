@@ -297,7 +297,60 @@ function target(level: number, loadout: string): [number, number] | null {
   return [0.55, 0.75];
 }
 
+/** Fail hard if any seat AABB overlaps a door vestibule [bayZ ± doorHalf] or crosses onto the platform. */
+function assertNoSeatInDoorway(): void {
+  const level = LEVELS.find((l) => l.id === 1);
+  if (!level) throw new Error('level 1 missing');
+  const sim = new Sim(level, modifiersFromSkills(defaultSkills()), mulberry32(1));
+  const C = TUNING.car;
+  const hw = C.halfWidth;
+  const dh = C.doorHalf;
+  const bays = [...C.doorBays];
+  const seatInset = 0.1;
+  const seatW = 0.62;
+  let bad = 0;
+  let seatCount = 0;
+  for (const bx of sim.world.boxes) {
+    // Seat-like boxes: depth ≈ seatW, flush to either longitudinal wall (inside car).
+    const dx = bx.maxX - bx.minX;
+    const dz = bx.maxZ - bx.minZ;
+    if (dx < seatW - 0.05 || dx > seatW + 0.15) continue;
+    if (dz < 0.4 || dz > 1.2) continue;
+    const onDoorSide = bx.maxX < -1.0 && bx.minX > -hw + 0.02;
+    const onFarSide = bx.minX > 1.0 && bx.maxX < hw - 0.02;
+    if (!onDoorSide && !onFarSide) continue;
+    seatCount++;
+    if (onDoorSide && bx.minX < -hw - 0.001) {
+      console.error('seat crosses doorWallX onto platform', bx);
+      bad++;
+    }
+    if (onFarSide && bx.maxX > hw + 0.001) {
+      console.error('seat crosses +halfWidth past far wall', bx);
+      bad++;
+    }
+    // Outer face should sit near |hw| − seatInset (not the solid wall slab itself).
+    const outer = onDoorSide ? -bx.minX : bx.maxX;
+    if (Math.abs(outer - (hw - seatInset)) > 0.08) continue;
+    for (const bay of bays) {
+      const o0 = Math.max(bx.minZ, bay - dh);
+      const o1 = Math.min(bx.maxZ, bay + dh);
+      if (o1 > o0 + 0.01) {
+        console.error(`seat AABB intersects vestibule bay=${bay} side=${onDoorSide ? 'door' : 'far'}`, {
+          minX: bx.minX, maxX: bx.maxX, minZ: bx.minZ, maxZ: bx.maxZ,
+        });
+        bad++;
+      }
+    }
+  }
+  if (seatCount < 2) {
+    throw new Error(`seat layout: expected ≥2 seat colliders, found ${seatCount}`);
+  }
+  if (bad) throw new Error(`seat layout: ${bad} vestibule/platform violation(s)`);
+  console.log(`seat layout: ${seatCount} benches clear of vestibules [bayZ ± doorHalf] ✓`);
+}
+
 async function main(): Promise<void> {
+  assertNoSeatInDoorway();
   const RUNS = Number(process.env.RUNS ?? process.env.SEEDS ?? 6);
   const SEED = Number(process.env.SEED ?? 0);
   const levelFilter = process.env.LEVEL ? process.env.LEVEL.split(',').map(Number) : null;
