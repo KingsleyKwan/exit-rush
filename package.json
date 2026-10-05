@@ -1,6 +1,6 @@
 {
   "name": "hk-mtr-exit-rush",
-  "version": "0.4.0",
+  "version": "0.4.1",
   "description": "逼落車 — Exit Rush on 香城鐵路 / Hong City Rail: push through crowds to exit the train",
   "type": "module",
   "scripts": {
@@ -8,13 +8,5 @@
     "build": "tsc && vite build",
     "preview": "vite preview",
     "test:sim": "esbuild scripts/simTest.ts --bundle --platform=node --format=esm --log-level=warning --outfile=.cache/simTest.mjs && node .cache/simTest.mjs"
-  },
-  "dependencies": {
-    "three": "^0.169.0"
-  },
-  "devDependencies": {
-    "@types/three": "^0.169.0",
-    "typescript": "^5.6.3",
-    "vite": "^5.4.10"
   }
 }
