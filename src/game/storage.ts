@@ -4,13 +4,18 @@ import { DEFAULT_AUDIO } from './Audio';
 export interface SkillState {
   str: number; // 0–60 filled, then ultimate via flag
   spd: number;
+  /** Stamina branch (v0.6). Old saves used `wis` — migrated in normalizeSave. */
   sta: number;
   ultStr: boolean;
   ultSpd: boolean;
+  /** Stamina ultimate (v0.6). Old `ultWis` migrates here. */
   ultSta: boolean;
   points: number;
 }
+
+/** User-facing graphics setting. `auto` picks low/high from device hints + an FPS probe. */
 export type QualitySetting = 'auto' | 'low' | 'high';
+/** Resolved render tier. */
 export type QualityLevel = 'low' | 'high';
 
 export interface SaveData {
@@ -19,19 +24,31 @@ export interface SaveData {
   skills: SkillState;
   highestCleared: number;
   cleared: number[];
+  /** v0.2.2: clears per level id (for the capped replay bonus). Old saves: derived from `cleared`. */
   clears: Record<string, number>;
+  /** v0.2.2: graphics setting (default `auto`). */
   quality: QualitySetting;
+  /** v0.2.2: cached result of the auto-quality probe (null = not probed yet). */
   autoQuality: QualityLevel | null;
+  /** v0.3: floating passenger-type icons above special passengers (default on). */
   typeIcons: boolean;
+  /** v0.4: mixer — master / music / sfx volumes 0–1 and mute toggle. */
   masterVol: number;
   musicVol: number;
   sfxVol: number;
   muted: boolean;
+  /** v0.5: passenger kinds whose intro card has been shown (or re-viewed from legend). */
   seenIntros: string[];
+  /** v0.5: first-run FTUE (auto L1 + ghost hand) completed. */
   ftueDone: boolean;
 }
 
 const KEY = 'hk-mtr-exit-rush-v1';
+
+/**
+ * In-memory fallback used when localStorage is unavailable (Safari private mode,
+ * quota exceeded, storage blocked). Progress then lasts for the session only.
+ */
 let memory: string | null = null;
 
 export function defaultSkills(): SkillState {
@@ -72,6 +89,8 @@ const vol = (v: unknown, d: number): number => {
   return Math.min(1, Math.max(0, v));
 };
 const bool = (v: unknown): boolean => v === true;
+
+/** Merge a parsed (possibly old / partial / corrupted) save over defaults. */
 export function normalizeSave(parsed: Partial<SaveData> | null | undefined): SaveData {
   const d = defaultSave();
   if (!parsed || typeof parsed !== 'object' || parsed.version !== 1) return d;
@@ -88,6 +107,7 @@ export function normalizeSave(parsed: Partial<SaveData> | null | undefined): Sav
   for (const id of cleared) if (!clears[id]) clears[id] = 1;
   const q = parsed.quality;
   const aq = parsed.autoQuality;
+  // v0.6: Wisdom → Stamina. Prefer `sta` / `ultSta`; fall back to old `wis` / `ultWis`.
   const sta = num(sk.sta, num(sk.wis, 0));
   const ultSta = bool(sk.ultSta) || bool(sk.ultWis);
   return {
@@ -138,6 +158,11 @@ export function loadSave(): SaveData {
     return defaultSave();
   }
 }
+
+/**
+ * Persist the save. Never throws: on failure the data is kept in memory for this
+ * session and `false` is returned so the caller can warn the player once.
+ */
 export function writeSave(data: SaveData): boolean {
   let json: string;
   try {

@@ -48,6 +48,8 @@ interface Spec {
   bigEyes?: boolean;
   /** Also build an inflated outline shell (player glow). */
   outline?: boolean;
+  /** Crouched / squatting pose — lowers torso & shortens legs. */
+  crouch?: boolean;
 }
 
 const Y = new THREE.Vector3(0, 1, 0);
@@ -146,15 +148,21 @@ function buildCharacter(s: Spec): { geo: THREE.BufferGeometry; shell: THREE.Buff
   const O = !!s.outline;
   const bw = s.bw ?? 1;
   const hs = s.head ?? 1;
-  const TW = 0.32 * bw;
-  const TD = 0.21;
+  const crouch = !!s.crouch;
+  const TW = 0.32 * bw * (crouch ? 1.12 : 1);
+  const TD = 0.21 * (crouch ? 1.15 : 1);
   const R = 0.215 * hs;
-  const HY = 0.99 + (hs - 1) * 0.12;
+  // Squatting: hips low, head lower — reads as crouched from the ¾ camera.
+  const HY = (crouch ? 0.72 : 0.99) + (hs - 1) * 0.12;
 
   // ---- legs + shoes
   for (const sx of [-1, 1]) {
-    const x = sx * 0.075 * bw;
-    if (s.dress) {
+    const x = sx * 0.075 * bw * (crouch ? 1.25 : 1);
+    if (crouch) {
+      // Folded thighs + shins (knees forward) for a clear squat silhouette.
+      b.add(new THREE.BoxGeometry(0.14, 0.12, 0.22), s.pants, [x, 0.22, 0.06], [0.55, 0, 0], undefined, O);
+      b.add(new THREE.BoxGeometry(0.11, 0.16, 0.12), s.skin, [x, 0.1, 0.12], [-0.35, 0, 0], undefined, O);
+    } else if (s.dress) {
       b.add(new THREE.BoxGeometry(0.1, 0.3, 0.11), s.skin, [x, 0.2, 0], undefined, undefined, O);
     } else if (s.shorts) {
       b.add(new THREE.BoxGeometry(0.125, 0.14, 0.14), s.pants, [x, 0.305, 0], undefined, undefined, O);
@@ -162,17 +170,17 @@ function buildCharacter(s: Spec): { geo: THREE.BufferGeometry; shell: THREE.Buff
     } else {
       b.add(new THREE.BoxGeometry(0.118, 0.34, 0.135), s.pants, [x, 0.205, 0], undefined, undefined, O);
     }
-    b.add(new THREE.BoxGeometry(0.13, 0.068, 0.2), s.shoes, [x, 0.034, 0.028], undefined, undefined, O);
-    b.add(new THREE.BoxGeometry(0.132, 0.02, 0.205), shade(s.shoes, 1.6), [x, 0.008, 0.028]);
+    b.add(new THREE.BoxGeometry(0.13, 0.068, 0.2), s.shoes, [x, 0.034, crouch ? 0.1 : 0.028], undefined, undefined, O);
+    b.add(new THREE.BoxGeometry(0.132, 0.02, 0.205), shade(s.shoes, 1.6), [x, 0.008, crouch ? 0.1 : 0.028]);
   }
   // hips
-  b.add(new THREE.BoxGeometry(TW * 0.94, 0.09, TD * 0.95), s.dress ? s.dress : s.pants, [0, 0.385, 0], undefined, undefined, O);
+  b.add(new THREE.BoxGeometry(TW * 0.94, 0.09, TD * 0.95), s.dress ? s.dress : s.pants, [0, crouch ? 0.28 : 0.385, crouch ? 0.04 : 0], undefined, undefined, O);
 
   // ---- torso (slightly tapered square prism)
   const torsoCol = s.jacket ?? s.dress ?? s.shirt;
   const tor = new THREE.CylinderGeometry(0.5, 0.46, 1, 4, 1);
   tor.rotateY(Math.PI / 4);
-  b.add(tor, torsoCol, [0, 0.57, 0], [0, 0, 0], [TW * 1.414, 0.4, TD * 1.414], O);
+  b.add(tor, torsoCol, [0, crouch ? 0.42 : 0.57, crouch ? 0.02 : 0], [0, 0, 0], [TW * 1.414, crouch ? 0.32 : 0.4, TD * 1.414], O);
   if (s.belly) {
     b.add(new THREE.IcosahedronGeometry(0.15, 1), s.shirt, [0, 0.5, 0.06], undefined, [1.15 * bw, 1, 0.75], O);
   }
@@ -208,8 +216,8 @@ function buildCharacter(s: Spec): { geo: THREE.BufferGeometry; shell: THREE.Buff
   // ---- arms + hands
   const longCol = s.jacket ?? s.shirt;
   for (const sx of [-1, 1]) {
-    const pivot: V3 = [sx * (TW / 2 + 0.05), 0.75, 0];
-    let rot: V3 = [0, 0, sx * 0.12];
+    const pivot: V3 = [sx * (TW / 2 + 0.05), crouch ? 0.55 : 0.75, crouch ? 0.08 : 0];
+    let rot: V3 = crouch ? [1.05, 0, sx * 0.35] : [0, 0, sx * 0.12];
     const phoneHand = s.phone && sx === 1;
     if (phoneHand) rot = [-1.15, 0, 0.28];
     if (s.armUp && sx === 1) rot = [0.15, 0, 2.55];
@@ -364,7 +372,8 @@ export type Look =
   | 'coupleF'
   | 'coupleM'
   | 'angry'
-  | 'luggage';
+  | 'luggage'
+  | 'squat';
 
 const SKIN = 0xf2c6a0;
 const DARK_HAIR = 0x2a2830;
@@ -387,6 +396,7 @@ const SPECS: Record<Look | 'hero', Spec> = {
   coupleM: { skin: 0xeebd96, hair: 0x6e1d45, style: 'short', shirt: 0xc8307f, sleeves: 'short', pants: 0x2d3d63, shoes: 0xc8307f, blush: true },
   angry: { skin: 0xe7a07c, hair: DARK_HAIR, style: 'short', shirt: 0xd32f2f, sleeves: 'short', pants: 0x2b2b2e, shoes: 0x1a1a1a, collar: 0xb71c1c, bw: 1.14, brows: 'angry', mouth: 'frown', belt: true },
   luggage: { skin: 0xf0c49c, hair: 0x3a302a, style: 'short', hat: 0xcfae7a, shirt: 0x26a69a, sleeves: 'short', pants: 0xc2a878, shorts: true, shoes: 0x7a5230, camera: true },
+  squat: { skin: SKIN, hair: DARK_HAIR, style: 'short', shirt: 0x5c6bc0, sleeves: 'short', pants: 0x37474f, shoes: 0x263238, crouch: true, bw: 1.1, brows: 'firm', mouth: 'flat', phone: true },
 };
 
 export const LOOKS = Object.keys(SPECS).filter((k) => k !== 'hero') as Look[];

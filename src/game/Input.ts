@@ -9,7 +9,7 @@ export interface DragState {
 }
 
 export interface InputCallbacks {
-  onUlt?: (k: 'str' | 'spd' | 'wis') => void;
+  onUlt?: (k: 'str' | 'spd' | 'sta') => void;
   onPause?: () => void;
 }
 
@@ -159,7 +159,7 @@ export class InputController {
     }
     if (k === '1') this.cb.onUlt?.('str');
     else if (k === '2') this.cb.onUlt?.('spd');
-    else if (k === '3') this.cb.onUlt?.('wis');
+    else if (k === '3') this.cb.onUlt?.('sta');
     else if (k === 'p' || k === 'escape') this.cb.onPause?.();
     this.keys.add(k);
   };

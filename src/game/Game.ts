@@ -542,10 +542,26 @@ export class Game {
 
   tryUltimate(kind: UltKind): void {
     const s = this.runSkills;
-    const ok = (kind === 'str' && s.ultStr) || (kind === 'spd' && s.ultSpd) || (kind === 'wis' && s.ultWis);
+    const ok = (kind === 'str' && s.ultStr) || (kind === 'spd' && s.ultSpd) || (kind === 'sta' && s.ultSta);
     if (!ok || this.screen !== 'playing' || !this.sim || this.sim.ambient) return;
     if (this.sim.tryUltimate(kind)) {
       this.audio.ultimate();
+      this.hooks.onState();
+    }
+  }
+
+  tryBriefDash(): void {
+    if (this.screen !== 'playing' || !this.sim || this.sim.ambient) return;
+    if (this.sim.player.tryBriefDash(this.sim.time)) {
+      this.audio.dash();
+      this.hooks.onState();
+    }
+  }
+
+  trySecondWind(): void {
+    if (this.screen !== 'playing' || !this.sim || this.sim.ambient) return;
+    if (this.sim.player.trySecondWind()) {
+      this.audio.skillPoint();
       this.hooks.onState();
     }
   }
@@ -654,10 +670,12 @@ export class Game {
           this.audio.dash();
           haptic(30, 0);
         } else {
-          fx.shockwave(e.x, e.z, 4.5, 0x64ffda, 0.9);
-          this.vg.b = 1;
+          // STA Iron Stance
+          fx.shockwave(e.x, e.z, 2.8, 0xffd54f, 0.7);
+          fx.puff(e.x, 0.4, e.z, 16, 0xffe082, 2.2, 1.0, 0.5);
+          this.vg.b = 0.85;
           this.audio.sense();
-          haptic([10, 40, 10], 0);
+          haptic([20, 30, 40], 0);
         }
         break;
       case 'milestone': {
@@ -702,7 +720,7 @@ export class Game {
     }
     v.g += (Math.min(1, green) - v.g) * Math.min(1, dt * 5);
     v.r = Math.max(warnPulse, v.r - dt * 2.2);
-    v.b = Math.max(sim?.player.isSensing(sim.time) && !sim.ambient ? 0.45 : 0, v.b - dt * 1.5);
+    v.b = Math.max(sim?.player.isIronStance(sim.time) && !sim.ambient ? 0.45 : 0, v.b - dt * 1.5);
     v.f = Math.max(0, v.f - dt * 3);
     const st = this.vignette.style;
     const ap = this.vgApplied;
@@ -847,7 +865,7 @@ export class Game {
       this.effects.puff(b.x, 0.1, b.z, 1, 0xffcc80, 0.8, 0.9, 0.4, 0.4);
     }
     // WIS path highlight.
-    this.effects.setPath(p.isSensing(now) ? p.path : [], this.clock);
+    this.effects.setPath([], this.clock);
     // Stench clouds (Low quality stand-in for the wavy lines + flies) and angry steam.
     this.stinkT -= dt;
     if (this.stinkT <= 0) {
