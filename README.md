@@ -2,7 +2,7 @@
 
 Mobile-first 3D crowd-exit game set on the fictional **香城鐵路 / Hong City Rail (HCR)**: get **off** the train while rush-hour crowds **force on** (逼上車). **Parody** of Hong Kong metro vibes (coloured stations, bilingual signs) — **original art & audio only**; not affiliated with MTR Corporation or any real railway. Station names are playful parodies (see [`docs/STATIONS.md`](docs/STATIONS.md)).
 
-> Vertical slice (**v0.5.0**). Steam-store polish is the aspiration; v0.2 added real crowd physics, counterflow boarding, joystick + shove controls and a juice pass; v0.2.1 was a balance pass (see [`docs/BALANCE.md`](docs/BALANCE.md)); v0.2.2 was a bug-fix / mobile-robustness pass; **v0.3.0 was the art & icon pass**; **v0.5.0 short levels + special intros**; v0.4.1 added audio, per-station themes, and HK-style side-wall sliding doors** (car ends are gangways only — see below).
+> Vertical slice (**v0.5.1**). Steam-store polish is the aspiration; v0.2 added real crowd physics, counterflow boarding, joystick + shove controls and a juice pass; v0.2.1 was a balance pass (see [`docs/BALANCE.md`](docs/BALANCE.md)); v0.2.2 was a bug-fix / mobile-robustness pass; **v0.3.0 was the art & icon pass**; **v0.5.0 short levels + special intros**; v0.4.1 added audio, per-station themes, and HK-style side-wall sliding doors** (car ends are gangways only — see below).
 
 <p align="center">
   <img src="docs/screens/ingame-l100.jpg" width="240" alt="Level 100 in-game, phone portrait">
@@ -12,6 +12,11 @@ Mobile-first 3D crowd-exit game set on the fictional **香城鐵路 / Hong City 
 <p align="center"><img src="docs/screens/desktop-l100.jpg" width="640" alt="Level 100, landscape"></p>
 
 <p align="center"><em>v0.4.1 — exits on the <strong>side wall</strong> (left); car ends are gangways. Screenshots: mid-run crowds boarding through open doors.</em></p>
+
+## v0.5.1 — seat layout fix
+
+- **Benches between doors only (both walls):** longitudinal seats sit flush to the −X door wall and +X far wall **only** in the long between-bay segments (margin 0.28); short end stubs at door Z are skipped so the ¾ camera never reads a grey block as a seat in a doorway. Door vestibules `[bayZ ± doorHalf]` stay clear (visual + sim colliders + `test:sim` assertion).
+- Screens: [`docs/screens-v05/seat-fix-l1-doors.jpg`](docs/screens-v05/seat-fix-l1-doors.jpg), [`seat-fix-midcar.jpg`](docs/screens-v05/seat-fix-midcar.jpg).
 
 ## v0.5.0 — short exits & teach specials
 
@@ -112,11 +117,11 @@ The Pages deploy builds with `BASE_PATH=/hk-mtr-exit-rush/` so assets resolve un
 - **Skill-point economy (stop-gap):** with only 21 playable levels, a level now awards a point on its first clear **and on replays, up to 5 points per level** (`MAX_POINTS_PER_LEVEL` in `SkillTree.ts`) → 105 points reachable, enough for a full branch + ultimate and the ~99-point L100 loadout. Set it back to 1 when levels 21–99 ship.
 - Mobile polish: brand bar hidden during a run (HUD moves up under the notch), safe-area insets on all sides, every button ≥ 44 px, `prefers-reduced-motion` followed live, three.js split into its own cached chunk.
 
-## Status (v0.5.0)
+## Status (v0.5.1)
 
 | Area | Status |
 |------|--------|
-| Train car + door + platform scene (Three.js) — HCR metro-style interior, PSDs, bilingual station sign | ✅ v0.3 |
+| Train car + door + platform scene (Three.js) — HCR metro-style interior, benches between door bays, PSDs, bilingual station sign | ✅ v0.5.1 |
 | Chibi low-poly characters, 8 passenger types, instanced; type icons | ✅ v0.3 |
 | Authored SVG icon set, title / level select / passenger legend screens, app icon + key art | ✅ v0.3 |
 | Crowd physics: mass, velocity/damping, soft contacts, spatial hash, 60 Hz fixed step | ✅ v0.2 |
