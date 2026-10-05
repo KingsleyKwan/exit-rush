@@ -60,6 +60,29 @@ export interface Dict {
     luggage: string;
   };
   sfxNote: string;
+  // ---- v0.3 icon-first UI
+  levelsTitle: string;
+  legendTitle: string;
+  you: string;
+  passengerHint: {
+    hero: string;
+    normal: string;
+    stench: string;
+    family: string;
+    brat: string;
+    couple: string;
+    angry: string;
+    luggage: string;
+  };
+  typeIcons: string;
+  on: string;
+  off: string;
+  hintDrag: string;
+  hintShove: string;
+  hintExit: string;
+  finale: string;
+  cleared: string;
+  artCredit: string;
 }
 
 export const en: Dict = {
@@ -122,4 +145,26 @@ export const en: Dict = {
     luggage: 'Luggage',
   },
   sfxNote: 'SFX are placeholders (not official MTR audio).',
+  levelsTitle: 'Stations',
+  legendTitle: 'Passengers',
+  you: 'You',
+  passengerHint: {
+    hero: 'Follow the glow and get off!',
+    normal: 'Eyes on the phone. Easy to nudge.',
+    stench: 'The stink cloud slows you down.',
+    family: 'Moves as a group. Hard to split.',
+    brat: 'Small, bouncy, darts everywhere.',
+    couple: 'Holding hands. Go around, not through.',
+    angry: 'Winds up, then shoves hard.',
+    luggage: 'That giant suitcase blocks the aisle.',
+  },
+  typeIcons: 'Type icons',
+  on: 'On',
+  off: 'Off',
+  hintDrag: 'Drag',
+  hintShove: 'Hold',
+  hintExit: 'Get off',
+  finale: 'Finale',
+  cleared: 'Cleared',
+  artCredit: 'Concept art generated with Grok Image.',
 };

@@ -27,6 +27,8 @@ export interface SaveData {
   quality: QualitySetting;
   /** v0.2.2: cached result of the auto-quality probe (null = not probed yet). */
   autoQuality: QualityLevel | null;
+  /** v0.3: floating passenger-type icons above special passengers (default on). */
+  typeIcons: boolean;
 }
 
 const KEY = 'hk-mtr-exit-rush-v1';
@@ -59,6 +61,7 @@ export function defaultSave(): SaveData {
     clears: {},
     quality: 'auto',
     autoQuality: null,
+    typeIcons: true,
   };
 }
 
@@ -99,6 +102,7 @@ export function normalizeSave(parsed: Partial<SaveData> | null | undefined): Sav
     clears,
     quality: q === 'low' || q === 'high' || q === 'auto' ? q : 'auto',
     autoQuality: aq === 'low' || aq === 'high' ? aq : null,
+    typeIcons: typeof parsed.typeIcons === 'boolean' ? parsed.typeIcons : true,
   };
 }
 
