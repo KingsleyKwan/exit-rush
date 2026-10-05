@@ -1,3 +1,4 @@
+<!-- v0.4.1: side-wall sliding doors; car ends = gangway -->
 # Game Design — 逼落車 (Exit Rush)
 
 ## Elevator pitch
@@ -33,7 +34,7 @@ Player reaches the door zone (green floor marker: `z <= DOOR_Z + winDepth`, `|x|
 | Timer | Shorter close window |
 | Car layout | Narrower aisles (future) |
 
-**Level 100 (hardest):** 尖沙嘴 · 十一煙花後 (Tsim Sha Mouth after National Day fireworks) — max density, hostile mix, brutal timer.
+**Level 100 (hardest):** 頓沙嘴 · 十一煙花後 (Dun Sha Mouth after National Day fireworks) — max density, hostile mix, brutal timer.
 
 ## Stations & levels
 
@@ -81,9 +82,9 @@ All gameplay physics runs in a **pure-TypeScript sim** (`src/game/sim/`, no thre
 |-------|--------------|
 | Bodies | Circles in the XZ plane with **mass**, velocity, linear **damping**, restitution, max speed. Cap **80 bodies** (player + passengers + suitcases). |
 | Contacts | **Spatial hash grid** (0.9 m cells) → pairwise circle tests. **Soft positional correction** (fraction `contactBeta` per iteration, 3 iterations) lets the crowd **compress** under load and spring back; overlap past `hardOverlapFrac` is corrected rigidly (no tunnelling). A velocity **impulse** along the normal transfers momentum by inverse mass (light brats bounce off, luggage barely moves). |
-| Static | Walls, longitudinal bench seats, grab pole, end wall with doorway, platform bounds, and door leaves that **slide shut physically** in the last `door.closeTime` seconds. |
+| Static | Walls, longitudinal benches between door bays, grab poles, **left-wall side-door gaps** (open bays from `openDoorBays`), gangway end walls (not exits), platform on −X, and door leaves that **slide shut along Z** in the last `door.closeTime` seconds. |
 | Riders | Spring to a standing spot (`anchorK`, capped at `anchorMax` × mass). Displaced too long → adopt a new spot (the crowd re-settles). Near the door they feel an inward **pressure field** while boarders stream in. They sidestep a little for the player (more with WIS). |
-| Boarders (逼上車) | Spawn on the platform (a queue is waiting when the doors open), **funnel through the doorway**, then drive to a spot deep in the car with a desired-velocity controller capped at `boardMaxDrive` × mass — they push *against* you. Rate & total scale with level `pressure`. |
+| Boarders (逼上車) | Spawn on the platform beyond the left wall, **funnel through open side doors**, then drive toward the far (+X) side with a desired-velocity controller capped at `boardMaxDrive` × mass — they push *against* you. Rate & total scale with level `pressure`. |
 | Player | Desired-velocity drive (`accel`) capped at `maxDrive × pushForce × mass` — that cap **is** push-vs-resistance. Mass grows with STR `resist`. **Crowd drag** (v0.2.1): top speed shrinks with nearby bodies (`player.crowdDrag`, max −65%; WIS cuts it) so packed cars are a shuffle, not a sprint. In contact you **shoulder** through: radius shrinks to `shoulderRadius` and a tangential **slip** force slides you along whoever blocks you. Stamina drains with contact pressure; 0 → winded. |
 | Aim assist | 9-ray fan (±0.95 rad) scored by mass-weighted bodies & walls in each corridor; the stick direction blends toward the clearest one by `aim.base + gapSense × aim.perGapSense`. |
 | Shove | Hold to charge (0.45 s), release for a cone burst: impulse to each body (radial + forward mix) scaled by charge × STR, a forward lunge, small recoil. Cost 9–20 stamina, 0.7 s cooldown. |
@@ -110,7 +111,7 @@ All gameplay physics runs in a **pure-TypeScript sim** (`src/game/sim/`, no thre
 
 ### Juice
 
-Camera: critically-damped follow with lag, trauma² shake, directional kicks, FOV punch (all ×0.3 under `prefers-reduced-motion`). Characters: squash/stretch springs on bumps, steady squish from contact pressure, lean into velocity, walk bob, hit flashes. Particles: pooled single-draw-call puffs (bumps, shove spray, stench clouds, sweat when winded, confetti on win). Hit-stop on big impacts. Vignettes: green (stench), red (door warning / angry hit), cyan (WIS). Door warning: last 5 s lights flash faster, beeps accelerate, exit marker flashes, leaves slide shut. Haptics: `navigator.vibrate` (guarded + throttled) on bumps, shoves, hits, ults, milestones.
+Camera (v0.4.1): ¾ view from the far (+X) side looking at the left door wall so side exits read on portrait phones; critically-damped follow with lag, trauma² shake, directional kicks, FOV punch (all ×0.3 under `prefers-reduced-motion`). Characters: squash/stretch springs on bumps, steady squish from contact pressure, lean into velocity, walk bob, hit flashes. Particles: pooled single-draw-call puffs (bumps, shove spray, stench clouds, sweat when winded, confetti on win). Hit-stop on big impacts. Vignettes: green (stench), red (door warning / angry hit), cyan (WIS). Door warning: last 5 s lights flash faster, beeps accelerate, exit marker flashes, leaves slide shut. Haptics: `navigator.vibrate` (guarded + throttled) on bumps, shoves, hits, ults, milestones.
 
 ### Tuning knobs
 
@@ -167,7 +168,7 @@ All cues are **original Web Audio synthesis** — never ripped or embedded offic
 | UI / skill point / win / lose | Short synthetic stings / buzzer |
 | Ultimates | Existing branch whooshes / boom / shimmer |
 
-**JR-style announce:** original short 発車メロディ-like jingle (Web Audio; not any real JR melody) + on-screen JA/EN/粵 flash with **parody** station names. Scripts e.g. 「まもなく、太仔です。お出口は左側です。」 / “The next station is Tai Jai.”
+**JR-style announce:** original short 発車メロディ-like jingle (Web Audio; not any real JR melody) + on-screen JA/EN/粵 flash with **parody** station names. Scripts e.g. 「まもなく、公主です。お出口は左側です。」 / “The next station is Gong Jyu.”
 
 **TODO (TTS):** ship offline open-licensed Japanese female voice (e.g. Piper / Open JTalk with redistributable voice) for the script above; until then jingle + sign flash only. Never use real JR recordings.
 
