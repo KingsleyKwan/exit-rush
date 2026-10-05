@@ -1,7 +1,10 @@
 import { t, toggleLang, getLang, fmt } from '../i18n';
 import type { Game } from '../game/Game';
-import { playableLevels } from '../game/levels';
+import { playableLevels, type LevelDef } from '../game/levels';
 import type { QualitySetting } from '../game/storage';
+import { LINE_COLORS, linesFor, lineColor } from '../game/lines';
+import type { PassengerKind } from '../game/PassengerTypes';
+import { icon, langIcon } from './icons';
 import {
   BRANCH_FILL,
   MAX_POINTS_PER_LEVEL,
@@ -18,6 +21,20 @@ function el(html: string): HTMLElement {
   return d.firstElementChild as HTMLElement;
 }
 
+/** Absolute URL for a file in /public (works for dev, `base: './'` builds and subpaths). */
+const asset = (f: string): string => new URL(f, document.baseURI).href;
+
+type PortraitKind = 'hero' | PassengerKind;
+const PORTRAITS: PortraitKind[] = ['hero', 'normal', 'stench', 'family', 'brat', 'couple', 'angry', 'luggage'];
+
+/** Character portrait cropped from the concept sheet (public/art/portraits.webp). */
+function portrait(kind: PortraitKind, cls = ''): string {
+  const i = PORTRAITS.indexOf(kind);
+  return `<span class="portrait ${cls}" aria-hidden="true" style="background-image:url('${asset('art/portraits.webp')}');background-position:${(i / (PORTRAITS.length - 1)) * 100}% 0"></span>`;
+}
+
+const backdrop = (): string => `<div class="backdrop" aria-hidden="true" style="background-image:url('${asset('art/key-art.webp')}')"></div>`;
+
 let lastKey = '';
 
 /** Key that forces a full rebuild when it changes; otherwise the play HUD is patched in place. */
@@ -25,28 +42,49 @@ function uiKey(game: Game): string {
   return `${game.screen}|${getLang()}|${game.level?.id ?? ''}|${game.skillsReturn}`;
 }
 
-/** Wire every `[data-act=lang]` / `[data-act=skills]` button inside `scope`. */
-function wireCommon(scope: ParentNode, root: HTMLElement, game: Game): void {
-  scope.querySelectorAll('[data-act="lang"]').forEach((b) =>
-    b.addEventListener('click', () => {
-      game.audio.unlock();
-      game.audio.ui();
-      toggleLang();
-      game.persist();
-      renderUI(root, game);
-    }),
-  );
-  scope.querySelectorAll('[data-act="skills"]').forEach((b) =>
-    b.addEventListener('click', () => {
-      game.audio.unlock();
-      game.audio.ui();
-      game.openSkills(); // pauses a running level first; never abandons it
-      renderUI(root, game);
-    }),
-  );
+function rerender(game: Game): void {
+  const root = document.getElementById('ui-root');
+  if (root) renderUI(root, game);
 }
 
-const langLabel = () => `🌐 ${getLang() === 'en' ? '粵' : 'EN'}`;
+/** Wire common `[data-act]` buttons inside `scope`. */
+function wireCommon(scope: ParentNode, game: Game): void {
+  const on = (act: string, fn: () => void) =>
+    scope.querySelectorAll(`[data-act="${act}"]`).forEach((b) =>
+      b.addEventListener('click', () => {
+        game.audio.unlock();
+        game.audio.ui();
+        fn();
+      }),
+    );
+  on('lang', () => {
+    toggleLang();
+    game.persist();
+    rerender(game);
+  });
+  on('skills', () => {
+    game.openSkills(); // pauses a running level first; never abandons it
+    rerender(game);
+  });
+  on('levels', () => game.openScreen('levels'));
+  on('legend', () => game.openScreen('legend'));
+  on('menu-back', () => game.openScreen('menu'));
+  on('home', () => game.goMenu());
+  on('quality', () => {
+    const i = QUALITY_CYCLE.indexOf(game.save.quality);
+    game.setQuality(QUALITY_CYCLE[(i + 1) % QUALITY_CYCLE.length]);
+  });
+  on('icons', () => game.setTypeIcons(!game.save.typeIcons));
+}
+
+/** Language toggle shows the language you'd switch TO. */
+const langBtn = (cls = 'icon-btn'): string => {
+  const dict = t();
+  return `<button type="button" class="${cls}" data-act="lang" title="${dict.language}" aria-label="${dict.language}">${langIcon(getLang() === 'en' ? '粵' : 'EN')}</button>`;
+};
+
+const iconBtn = (act: string, name: string, label: string, extra = ''): string =>
+  `<button type="button" class="icon-btn" data-act="${act}" title="${label}" aria-label="${label}" ${extra}>${icon(name)}</button>`;
 
 export function renderUI(root: HTMLElement, game: Game): void {
   const key = uiKey(game);
@@ -56,30 +94,21 @@ export function renderUI(root: HTMLElement, game: Game): void {
   }
   lastKey = key;
   game.setShoveHeld(false);
-  const dict = t();
   root.innerHTML = '';
   const wrap = document.createElement('div');
   wrap.id = 'hud';
   wrap.dataset.ui = '1';
+  wrap.dataset.screen = game.screen;
 
-  // Brand top bar only outside a run (frees the notch area for the play HUD).
   const overRun = game.skillsOverRun;
-  if (game.screen === 'menu' || (game.screen === 'skills' && !overRun)) {
-    const top = el(`
-      <div class="top-bar" data-ui="1">
-        <button type="button" class="icon-btn" data-act="lang" title="${dict.language}" aria-label="${dict.language}">${langLabel()}</button>
-        <div class="brand">
-          <span class="brand-mark" aria-hidden="true">🚇</span>
-          <span class="brand-title">${dict.title}</span>
-        </div>
-        <button type="button" class="icon-btn" data-act="skills" title="${dict.skills}" aria-label="${dict.skills}">🌳</button>
-      </div>
-    `);
-    wrap.appendChild(top);
-  }
+  if (game.backdrop) wrap.appendChild(el(backdrop()));
 
   if (game.screen === 'menu') {
     wrap.appendChild(renderMenu(game));
+  } else if (game.screen === 'levels') {
+    wrap.appendChild(renderLevels(game));
+  } else if (game.screen === 'legend') {
+    wrap.appendChild(renderLegend(game));
   } else if (game.screen === 'skills') {
     if (overRun) {
       // Overlay on top of the paused / finished run.
@@ -103,8 +132,7 @@ export function renderUI(root: HTMLElement, game: Game): void {
 
   root.appendChild(wrap);
   if (root.querySelector('.play-hud')) updatePlayHud(root, game);
-
-  wireCommon(root, root, game);
+  wireCommon(root, game);
 }
 
 const QUALITY_CYCLE: QualitySetting[] = ['auto', 'low', 'high'];
@@ -116,93 +144,173 @@ function qualityLabel(game: Game): string {
   return setting === 'auto' ? `${dict.qualityAuto} · ${name(game.quality)}` : name(setting);
 }
 
+const stationName = (lv: Pick<LevelDef, 'stationEn' | 'stationZh'>): string => (getLang() === 'en' ? lv.stationEn : lv.stationZh);
+const stationAlt = (lv: Pick<LevelDef, 'stationEn' | 'stationZh'>): string => (getLang() === 'en' ? lv.stationZh : lv.stationEn);
+
+/** The level the big Play button starts: first uncleared, else the finale. */
+function nextLevel(game: Game): LevelDef {
+  const list = playableLevels();
+  return list.find((l) => !game.save.cleared.includes(l.id)) ?? list[list.length - 1];
+}
+
+function screenBar(title: string, iconName: string, right = ''): string {
+  const dict = t();
+  return `
+    <div class="top-bar" data-ui="1">
+      ${iconBtn('menu-back', 'back', dict.back)}
+      <div class="bar-title">${icon(iconName, 'sm')}<span>${title}</span></div>
+      <div class="bar-right">${right}</div>
+    </div>`;
+}
+
+const pointsChip = (game: Game): string =>
+  `<span class="chip points-chip" title="${t().skillPoints}" aria-label="${t().skillPoints}: ${game.save.skills.points}">${icon('star', 'sm')}<b>${game.save.skills.points}</b></span>`;
+
 function renderMenu(game: Game): HTMLElement {
   const dict = t();
   const levels = playableLevels();
+  const nxt = nextLevel(game);
+  const clearedCount = levels.filter((l) => game.save.cleared.includes(l.id)).length;
   const panel = el(`
-    <div class="panel menu-panel" data-ui="1">
-      <h1>${dict.title} <small>${dict.titleCantonese}</small></h1>
-      <p class="tagline">${dict.tagline}</p>
-      <p class="howto">${dict.howTo}</p>
-      <p class="points">⭐ ${dict.skillPoints}: <strong>${game.save.skills.points}</strong></p>
-      <div class="level-list" id="level-list"></div>
-      <div class="settings-row">
-        <span>⚙️ ${dict.quality}</span>
-        <button type="button" class="icon-btn" id="btn-quality" aria-label="${dict.quality}: ${qualityLabel(game)}">${qualityLabel(game)}</button>
+    <div class="title-screen" data-ui="1">
+      <div class="top-bar">
+        ${langBtn()}
+        <div class="bar-right">
+          ${iconBtn('legend', 'legend', dict.legendTitle)}
+          ${iconBtn('skills', 'skills', dict.skills)}
+        </div>
       </div>
-      ${game.needsReloadForAA() ? `<p class="sfx-note">${dict.qualityNote}</p>` : ''}
-      <p class="sfx-note">${dict.sfxNote}</p>
+      <div class="title-main">
+        <div class="logo">
+          <img class="logo-icon" src="${asset('icons/icon-192.png')}" alt="" width="84" height="84" />
+          <div class="wordmark"><b>${dict.title}</b><span>${dict.titleCantonese}</span></div>
+        </div>
+        <p class="tagline">${dict.tagline}</p>
+        <div class="howto-icons" aria-label="${dict.howTo}">
+          <span>${icon('drag')}<small>${dict.hintDrag}</small></span>
+          <span>${icon('shove')}<small>${dict.hintShove}</small></span>
+          <span>${icon('door')}<small>${dict.hintExit}</small></span>
+        </div>
+        <button type="button" class="play-big" id="btn-play" aria-label="${dict.play}: ${dict.level} ${nxt.id} ${stationName(nxt)}">
+          ${icon('play', 'lg')}
+          <span class="play-txt"><b>${dict.play}</b><small><i class="line-dot" style="background:${lineColor(nxt.stationEn)}"></i>${nxt.id} · ${stationName(nxt)}</small></span>
+        </button>
+        <div class="menu-tiles">
+          <button type="button" class="tile" data-act="levels">${icon('levels')}<span>${dict.levelsTitle}</span><em>${clearedCount}/${levels.length}</em></button>
+          <button type="button" class="tile" data-act="skills">${icon('skills')}<span>${dict.skills}</span><em>${icon('star', 'xs')}${game.save.skills.points}</em></button>
+          <button type="button" class="tile" data-act="legend">${icon('legend')}<span>${dict.legendTitle}</span><em>8</em></button>
+        </div>
+        <div class="settings-row">
+          <button type="button" class="setting" data-act="quality" aria-label="${dict.quality}: ${qualityLabel(game)}">${icon('quality', 'sm')}<span>${qualityLabel(game)}</span></button>
+          <button type="button" class="setting ${game.save.typeIcons ? 'on' : ''}" data-act="icons" aria-pressed="${game.save.typeIcons}" aria-label="${dict.typeIcons}">${icon('tag', 'sm')}<span>${dict.typeIcons} · ${game.save.typeIcons ? dict.on : dict.off}</span></button>
+        </div>
+        ${game.needsReloadForAA() ? `<p class="sfx-note">${dict.qualityNote}</p>` : ''}
+        <p class="sfx-note">${dict.sfxNote}<br />${dict.artCredit}</p>
+      </div>
     </div>
   `);
-  panel.querySelector('#btn-quality')?.addEventListener('click', () => {
-    game.audio.unlock();
-    game.audio.ui();
-    const i = QUALITY_CYCLE.indexOf(game.save.quality);
-    game.setQuality(QUALITY_CYCLE[(i + 1) % QUALITY_CYCLE.length]);
-  });
-  const list = panel.querySelector('#level-list')!;
+  panel.querySelector('#btn-play')?.addEventListener('click', () => game.startLevel(nxt.id));
+  return panel;
+}
+
+function renderLevels(game: Game): HTMLElement {
+  const dict = t();
+  const levels = playableLevels();
+  const page = el(`
+    <div class="sub-screen" data-ui="1">
+      ${screenBar(dict.levelsTitle, 'levels', pointsChip(game))}
+      <div class="sub-body"><div class="level-grid" id="level-list"></div><div class="level-teaser">${dict.levelsTeaser}</div></div>
+    </div>
+  `);
+  const list = page.querySelector('#level-list')!;
   for (const lv of levels) {
-    const name = getLang() === 'en' ? lv.stationEn : lv.stationZh;
+    const done = game.save.cleared.includes(lv.id);
+    const finale = lv.id === 100;
+    const lines = linesFor(lv.stationEn);
     const flav = getLang() === 'en' ? lv.flavourEn : lv.flavourZh;
-    const cleared = game.save.cleared.includes(lv.id) ? '✓' : '';
     const btn = el(`
-      <button type="button" class="level-btn" data-id="${lv.id}">
-        <span class="lv-num">${dict.level} ${lv.id}</span>
-        <span class="lv-name">${name}</span>
-        <span class="lv-flav">${flav}</span>
-        <span class="lv-meta">👥${lv.density} · ⏱${lv.timer}${dict.secShort} ${cleared}</span>
+      <button type="button" class="lv-card ${done ? 'done' : ''} ${finale ? 'finale' : ''}" data-id="${lv.id}" style="--line:${LINE_COLORS[lines[0]]}${finale ? `;background-image:linear-gradient(90deg,rgba(14,18,28,.92),rgba(14,18,28,.35)),url('${asset('art/key-art.webp')}')` : ''}" title="${flav}" aria-label="${dict.level} ${lv.id} ${stationName(lv)}${done ? ` · ${dict.cleared}` : ''}">
+        <span class="lv-badge">${lv.id}<span class="lv-lines">${lines.map((l) => `<i style="background:${LINE_COLORS[l]}"></i>`).join('')}</span></span>
+        <span class="lv-station"><b>${stationName(lv)}</b><small>${stationAlt(lv)}</small></span>
+        <span class="lv-meta"><span>${icon('crowd', 'xs')}${lv.density}</span><span>${icon('timer', 'xs')}${lv.timer}</span></span>
+        <span class="lv-state">${done ? icon('check', 'sm') : finale ? icon('star', 'sm') : ''}</span>
+        ${finale ? `<span class="lv-finale">${dict.finale}</span>` : ''}
       </button>
     `);
-    btn.addEventListener('click', () => {
-      game.startLevel(lv.id);
-      // parent will re-render via onState
-    });
+    btn.addEventListener('click', () => game.startLevel(lv.id));
     list.appendChild(btn);
   }
-  const note = el(`<div class="level-teaser">${dict.levelsTeaser}</div>`);
-  list.appendChild(note);
-  return panel;
+  return page;
+}
+
+function renderLegend(game: Game): HTMLElement {
+  const dict = t();
+  const kinds: PortraitKind[] = PORTRAITS;
+  const cards = kinds
+    .map((k) => {
+      const name = k === 'hero' ? dict.you : dict.passenger[k];
+      return `
+        <div class="legend-card k-${k}">
+          ${portrait(k)}
+          <div class="legend-txt">
+            <b>${k !== 'hero' && k !== 'normal' ? icon(`kind_${k}`, `xs kind-${k}`) : ''}${name}</b>
+            <small>${dict.passengerHint[k]}</small>
+          </div>
+        </div>`;
+    })
+    .join('');
+  return el(`
+    <div class="sub-screen" data-ui="1">
+      ${screenBar(dict.legendTitle, 'legend')}
+      <div class="sub-body">
+        <div class="legend-grid">${cards}</div>
+        <div class="settings-row">
+          <button type="button" class="setting ${game.save.typeIcons ? 'on' : ''}" data-act="icons" aria-pressed="${game.save.typeIcons}" aria-label="${dict.typeIcons}">${icon('tag', 'sm')}<span>${dict.typeIcons} · ${game.save.typeIcons ? dict.on : dict.off}</span></button>
+        </div>
+        <p class="sfx-note">${dict.artCredit}</p>
+      </div>
+    </div>
+  `);
 }
 
 function renderPlayHud(game: Game): HTMLElement {
   const dict = t();
   const lv = game.level!;
-  const name = getLang() === 'en' ? lv.stationEn : lv.stationZh;
   // Ults available in this run = skills the run started with.
   const s = game.runSkills;
-  const ult = (k: 'str' | 'spd' | 'wis', icon: string, title: string, on: boolean) =>
-    `<button type="button" class="skill-use ${on ? '' : 'dim'}" data-ult="${k}" title="${title}" aria-label="${title}" ${on ? '' : 'disabled'}>${icon}</button>`;
+  const ult = (k: 'str' | 'spd' | 'wis', title: string, on: boolean) =>
+    `<button type="button" class="skill-use ult-${k} ${on ? '' : 'dim'}" data-ult="${k}" title="${title}" aria-label="${title}" ${on ? '' : 'disabled'}>${icon(on ? k : 'lock')}</button>`;
 
   const hud = el(`
     <div class="play-hud" data-ui="1">
       <div class="hud-top">
         <div class="hud-row">
-          <div class="station-chip"><span>📍 ${lv.id} · ${name}</span></div>
-          <button type="button" class="icon-btn pause-btn" id="btn-pause" title="${dict.pause}" aria-label="${dict.pause}">⏸️</button>
+          <div class="station-chip" style="--line:${lineColor(lv.stationEn)}"><span class="lv-badge sm">${lv.id}</span><span>${stationName(lv)}</span></div>
+          <button type="button" class="icon-btn pause-btn" id="btn-pause" title="${dict.pause}" aria-label="${dict.pause}">${icon('pause')}</button>
         </div>
         <div class="meters">
           <div class="meter door-meter">
-            <span class="meter-icon" title="${dict.door}">🚪</span>
+            <span class="meter-icon" title="${dict.door}">${icon('door')}</span>
             <div class="meter-bar"><i id="m-door"></i><b class="tick" style="left:25%"></b><b class="tick" style="left:50%"></b><b class="tick" style="left:75%"></b></div>
           </div>
           <div class="meter stam-meter">
-            <span class="meter-icon" title="${dict.stamina}">💪</span>
+            <span class="meter-icon" title="${dict.stamina}">${icon('stamina')}</span>
             <div class="meter-bar stamina"><i id="m-stam"></i></div>
           </div>
           <div class="meter timer" id="m-timer">
-            <span class="meter-icon" title="${dict.time}">⏱️</span>
+            <span class="meter-icon" title="${dict.time}">${icon('timer')}</span>
             <span class="timer-val" id="m-time"></span>
           </div>
         </div>
       </div>
-      <div class="drag-hint" aria-hidden="true">👆</div>
+      <div class="drag-hint" aria-hidden="true">${icon('drag')}</div>
       <div class="hud-actions">
         <div class="ult-col">
-          ${ult('str', '🐂', dict.ultStr, s.ultStr)}
-          ${ult('spd', '💨', dict.ultSpd, s.ultSpd)}
-          ${ult('wis', '🧠', dict.ultWis, s.ultWis)}
+          ${ult('str', dict.ultStr, s.ultStr)}
+          ${ult('spd', dict.ultSpd, s.ultSpd)}
+          ${ult('wis', dict.ultWis, s.ultWis)}
         </div>
-        <button type="button" class="shove-btn" id="btn-shove" title="${dict.shove}" aria-label="${dict.shove}">✊</button>
+        <button type="button" class="shove-btn" id="btn-shove" title="${dict.shove}" aria-label="${dict.shove}">${icon('shove')}</button>
       </div>
     </div>
   `);
@@ -273,50 +381,68 @@ function updatePlayHud(root: HTMLElement, game: Game): void {
   root.querySelector('.drag-hint')?.classList.toggle('gone', game.doorProgress() > 0.05 || (game.sim?.time ?? 0) > 4);
 }
 
+/** Round icon button with a tiny caption (pause / end overlays). */
+const roundBtn = (attrs: string, name: string, label: string, cls = ''): string =>
+  `<button type="button" class="round-btn ${cls}" ${attrs} aria-label="${label}">${icon(name)}<small>${label}</small></button>`;
+
 function renderPause(game: Game): HTMLElement {
   const dict = t();
   const p = el(`
     <div class="overlay" data-ui="1">
-      <div class="panel">
+      <div class="panel end-panel">
+        <div class="end-icon pause-ico">${icon('pause', 'xl')}</div>
         <h2>${dict.pause}</h2>
         ${game.autoPaused ? `<p class="howto">${dict.autoPaused}</p>` : ''}
-        <button type="button" class="primary" id="btn-resume">${dict.resume}</button>
-        <div class="btn-row">
-          <button type="button" class="ghost" data-act="skills">🌳 ${dict.skills}</button>
-          <button type="button" class="ghost" data-act="lang" aria-label="${dict.language}">${langLabel()}</button>
+        <button type="button" class="primary" id="btn-resume">${icon('play', 'sm')}<span>${dict.resume}</span></button>
+        <div class="round-row">
+          ${roundBtn('id="btn-restart"', 'restart', dict.retry)}
+          ${roundBtn('data-act="skills"', 'skills', dict.skills)}
+          <button type="button" class="round-btn" data-act="lang" aria-label="${dict.language}">${langIcon(getLang() === 'en' ? '粵' : 'EN')}<small>${dict.language}</small></button>
+          ${roundBtn('data-act="home"', 'home', dict.menu)}
         </div>
-        <button type="button" class="ghost" id="btn-menu">${dict.menu}</button>
       </div>
     </div>
   `);
   p.querySelector('#btn-resume')?.addEventListener('click', () => game.resume());
-  p.querySelector('#btn-menu')?.addEventListener('click', () => game.goMenu());
+  p.querySelector('#btn-restart')?.addEventListener('click', () => {
+    if (game.level) game.startLevel(game.level.id);
+  });
   return p;
 }
 
 function renderEnd(game: Game, win: boolean): HTMLElement {
   const dict = t();
+  const lv = game.level;
+  const hasNext = win && lv && lv.id !== 100;
   const p = el(`
     <div class="overlay" data-ui="1">
-      <div class="panel">
-        <h2>${win ? dict.win : dict.lose}</h2>
-        ${win ? endBonus(game) : `<p>${dict.loseHint}</p>`}
-        <button type="button" class="primary" id="btn-retry">${dict.retry}</button>
+      <div class="panel end-panel ${win ? 'win' : 'lose'}">
         ${
-          win && game.level && game.level.id !== 100
-            ? `<button type="button" class="primary" id="btn-next">${dict.next}</button>`
-            : ''
+          win
+            ? `<div class="end-hero">${portrait('hero', 'lg')}<span class="burst" aria-hidden="true"></span></div>`
+            : `<div class="end-icon lose-ico">${icon('door', 'xl')}<span class="x">${icon('close')}</span></div>`
         }
-        <div class="btn-row">
-          <button type="button" class="ghost" data-act="skills">🌳 ${dict.skills}</button>
-          <button type="button" class="ghost" id="btn-menu">${dict.menu}</button>
+        <h2>${win ? dict.win : dict.lose}</h2>
+        ${lv ? `<p class="end-station"><span class="lv-badge sm" style="--line:${lineColor(lv.stationEn)}">${lv.id}</span>${stationName(lv)}</p>` : ''}
+        ${win ? endBonus(game) : `<p class="howto">${dict.loseHint}</p>`}
+        ${
+          hasNext
+            ? `<button type="button" class="primary" id="btn-next">${icon('next', 'sm')}<span>${dict.next}</span></button>`
+            : `<button type="button" class="primary" id="btn-retry">${icon('restart', 'sm')}<span>${dict.retry}</span></button>`
+        }
+        <div class="round-row">
+          ${hasNext ? roundBtn('id="btn-retry"', 'restart', dict.retry) : ''}
+          ${roundBtn('data-act="skills"', 'skills', dict.skills)}
+          ${roundBtn('data-act="home"', 'home', dict.menu)}
         </div>
       </div>
     </div>
   `);
-  p.querySelector('#btn-retry')?.addEventListener('click', () => {
-    if (game.level) game.startLevel(game.level.id);
-  });
+  p.querySelectorAll('#btn-retry').forEach((b) =>
+    b.addEventListener('click', () => {
+      if (game.level) game.startLevel(game.level.id);
+    }),
+  );
   p.querySelector('#btn-next')?.addEventListener('click', () => {
     if (!game.level) return;
     const list = playableLevels();
@@ -324,54 +450,58 @@ function renderEnd(game: Game, win: boolean): HTMLElement {
     const next = list[idx + 1];
     if (next) game.startLevel(next.id);
   });
-  p.querySelector('#btn-menu')?.addEventListener('click', () => game.goMenu());
   return p;
 }
 
 function endBonus(game: Game): string {
   const dict = t();
   const c = game.lastClear;
-  if (!c || (c.awarded && c.count === 1)) return `<p class="bonus">${dict.clearBonus}</p>`;
-  if (c.awarded) return `<p class="bonus">${fmt(dict.replayBonus, { n: c.count, max: MAX_POINTS_PER_LEVEL })}</p>`;
+  const star = icon('star', 'sm');
+  if (!c || (c.awarded && c.count === 1)) return `<p class="bonus">${star}${dict.clearBonus}</p>`;
+  if (c.awarded) return `<p class="bonus">${star}${fmt(dict.replayBonus, { n: c.count, max: MAX_POINTS_PER_LEVEL })}</p>`;
   return `<p class="howto">${dict.clearNoBonus}</p>`;
 }
 
 function renderSkills(game: Game): HTMLElement {
   const dict = t();
   const s = game.save.skills;
-  const branchRow = (branch: Branch, icon: string, label: string, ultName: string) => {
+  const overRun = game.skillsOverRun;
+  const branchRow = (branch: Branch, label: string, ultName: string) => {
     const filled = s[branch];
     const ult = branch === 'str' ? s.ultStr : branch === 'spd' ? s.ultSpd : s.ultWis;
     const pct = Math.min(100, (filled / BRANCH_FILL) * 100);
     const can = canSpend(s, branch);
+    const ultNext = filled >= BRANCH_FILL && !ult;
     return `
-      <div class="skill-branch" data-branch="${branch}">
+      <div class="skill-branch b-${branch}" data-branch="${branch}">
         <div class="skill-head">
-          <span class="skill-ico">${icon}</span>
-          <div>
+          <span class="skill-ico">${icon(branch)}</span>
+          <div class="skill-txt">
             <strong>${label}</strong>
             <div class="skill-prog">${branchProgressLabel(s, branch, dict.ultShort)}</div>
           </div>
           <button type="button" class="spend-btn" data-spend="${branch}" aria-label="${dict.spend}: ${label}" title="${can ? dict.spend : filled >= BRANCH_FILL && ult ? dict.branchFull : dict.notEnough}" ${can ? '' : 'disabled'}>
-            ${filled >= BRANCH_FILL && !ult ? `⚡${ULTIMATE_COST}` : `＋`}
+            ${ultNext ? `${icon('star', 'xs')}${ULTIMATE_COST}` : `<span class="plus">＋</span>`}
           </button>
         </div>
         <div class="skill-bar"><i style="width:${pct}%"></i></div>
-        <div class="ult ${ult ? 'on' : ''}">${dict.ultimate}: ${ultName} ${ult ? '✅' : '🔒'}</div>
+        <div class="ult ${ult ? 'on' : ''}">${icon(ult ? 'check' : 'lock', 'xs')}<span>${dict.ultimate}: ${ultName}</span></div>
       </div>
     `;
   };
 
   const panel = el(`
-    <div class="panel skills-panel" data-ui="1">
-      <h2>🌳 ${dict.skills}</h2>
-      <p class="points">⭐ ${dict.skillPoints}: <strong id="pts">${s.points}</strong></p>
-      <p class="howto">${fmt(dict.skillHowto, { fill: BRANCH_FILL, ult: ULTIMATE_COST })}</p>
-      ${game.skillsOverRun ? `<p class="howto">${dict.skillsApplyNext}</p>` : ''}
-      ${branchRow('str', '🐂', dict.strength, dict.ultStr)}
-      ${branchRow('spd', '💨', dict.speed, dict.ultSpd)}
-      ${branchRow('wis', '🧠', dict.wisdom, dict.ultWis)}
-      <button type="button" class="primary" id="btn-back">${dict.back}</button>
+    <div class="${overRun ? 'panel skills-panel' : 'sub-screen'}" data-ui="1">
+      ${overRun ? `<h2 class="panel-title">${icon('skills', 'sm')}${dict.skills}</h2>` : screenBar(dict.skills, 'skills', pointsChip(game))}
+      <div class="${overRun ? '' : 'sub-body'}">
+        ${overRun ? `<p class="points">${pointsChip(game)}</p>` : ''}
+        <p class="howto">${fmt(dict.skillHowto, { fill: BRANCH_FILL, ult: ULTIMATE_COST })}</p>
+        ${overRun ? `<p class="howto">${dict.skillsApplyNext}</p>` : ''}
+        ${branchRow('str', dict.strength, dict.ultStr)}
+        ${branchRow('spd', dict.speed, dict.ultSpd)}
+        ${branchRow('wis', dict.wisdom, dict.ultWis)}
+        ${overRun ? `<button type="button" class="primary" id="btn-back">${icon('back', 'sm')}<span>${dict.back}</span></button>` : ''}
+      </div>
     </div>
   `);
 
@@ -381,13 +511,19 @@ function renderSkills(game: Game): HTMLElement {
       game.save.skills = spendPoint(game.save.skills, branch);
       game.persist();
       game.audio.ui();
-      const root = document.getElementById('ui-root');
-      if (root) renderUI(root, game);
+      rerender(game);
     });
   });
-  panel.querySelector('#btn-back')?.addEventListener('click', () => {
+  const back = () => {
     game.audio.ui();
     game.closeSkills(); // back to the menu, or to the paused / finished run
-  });
+  };
+  panel.querySelector('#btn-back')?.addEventListener('click', back);
+  // Full-screen variant: the bar's back button closes the tree instead of opening the menu.
+  const barBack = panel.querySelector('[data-act="menu-back"]');
+  if (barBack) {
+    barBack.removeAttribute('data-act');
+    barBack.addEventListener('click', back);
+  }
   return panel;
 }
