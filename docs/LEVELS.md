@@ -1,4 +1,4 @@
-# Levels — stations & difficulty (v0.6.0)
+# Levels — stations & difficulty (v0.6.1)
 
 Difficulty is a composite of **density** (0–10), **pressure** (boarding), **special mix**, and **timer seconds**. v0.6 retunes for **~10–15 s** exits with a **complexity staircase**: L1–5 normals only; one special introduced every three levels from L6; mixes on L24–30; L100 finale.
 
@@ -50,3 +50,15 @@ First clear of each playable level awards **3** skill points. Replays award **0*
 | 21 | angry |
 
 L24 tip reinforces squat in a mix exam.
+
+## Open door bays (v0.6.1)
+
+Side-door bays on the left (−X) wall at Z −2.6 / 0 / 2.6:
+
+| Levels | Open bays | Notes |
+|--------|-----------|--------|
+| 1–7 | 3 | All open |
+| 8–15 | 2 | Mid + near (Z 0, 2.6); far bay stays shut |
+| 16–30 / 100 | 1 | Mid only (Z 0) |
+
+Closed bays keep leaves shut, show a red indicator + 「此門不開」 sign, and toast if the player pushes them.
