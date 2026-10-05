@@ -67,7 +67,7 @@ export class Sim {
     w.addBox(-hw - 1, -hw, DOOR_Z - 0.2, C.backZ + 1);
     w.addBox(hw, hw + 1, DOOR_Z - 0.2, C.backZ + 1);
     w.addBox(-hw - 1, hw + 1, C.backZ, C.backZ + 1);
-    // Bench seats (longitudinal, like an MTR car): leave a narrower standing aisle.
+    // Bench seats (longitudinal, like an HCR car): leave a narrower standing aisle.
     for (const sx of [-1, 1]) {
       for (const cz of [-1.5, 0.5, 2.5]) {
         const inner = 1.2;
