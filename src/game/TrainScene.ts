@@ -558,29 +558,67 @@ export class TrainScene {
       this.scene.add(gang);
     }
 
-    const benchZs = [-3.35, -1.3, 1.3, 3.35];
-    for (const sx of [-1, 1]) {
-      for (const cz of benchZs) {
-        b.box(M.wallGrey, 0.7, 0.36, 1.05, sx * 1.62, 0.18, cz);
-        b.box(M.red, 0.02, 0.12, 1.05, sx * 1.265, 0.08, cz);
-        b.box(M.steel, 0.8, 0.07, 1.07, sx * 1.59, 0.4, cz);
-        for (const k of [-1, 1]) b.box(M.wallGrey, 0.74, 0.012, 0.025, sx * 1.6, 0.44, cz + k * 0.2);
-        b.box(M.steel, 0.07, 0.5, 1.07, sx * 1.95, 0.72, cz, 0, 0, sx * -0.12);
-        for (const ez of [-0.52, 0.52]) {
-          const z = cz + ez;
-          b.box(M.glass, 0.72, 1.05, 0.02, sx * 1.6, 1.0, z);
-          b.box(M.red, 0.74, 0.05, 0.05, sx * 1.6, 1.54, z);
-          b.add(M.steel, new THREE.CylinderGeometry(0.035, 0.035, 2.3, 10), sx * 1.24, 1.15, z);
-        }
+    // Longitudinal benches: BOTH walls only in long between-bay segments
+    // (skip short end stubs abutting outermost doors — those sit at door Z and
+    // read as "seat in doorway" from the ¾ camera). All meshes stay inside
+    // doorWallX() / +halfWidth.
+    const betweenBaySegs: [number, number][] = [];
+    for (let i = 0; i < bays.length - 1; i++) betweenBaySegs.push([bays[i] + dh, bays[i + 1] - dh]);
+    const aislePoleZs: number[] = [];
+    const hw = C.halfWidth;
+    // Seat depth kept clear of the wall face so nothing crosses onto the platform.
+    const seatW = 0.62;
+    const seatInset = 0.1; // from inner face of wall
+    const placeBench = (sx: -1 | 1, z0: number, z1: number, opts: { minAvail?: number; margin?: number } = {}) => {
+      const margin = opts.margin ?? 0.12;
+      const minAvail = opts.minAvail ?? 0.85;
+      const avail = z1 - z0 - 2 * margin;
+      if (avail < minAvail) return false;
+      const bl = Math.min(0.95, avail);
+      const cz = (z0 + z1) / 2;
+      const half = bl / 2;
+      // Outer edge of seat ≤ |halfWidth| − seatInset (never past doorWallX / far wall).
+      const cx = sx * (hw - seatInset - seatW / 2);
+      const topW = seatW + 0.08;
+      const topX = sx * (hw - seatInset - topW / 2);
+      const backX = sx * (hw - seatInset - 0.03);
+      const lipX = sx * (hw - seatInset - seatW + 0.02);
+      b.box(M.wallGrey, seatW, 0.36, bl, cx, 0.18, cz);
+      b.box(M.red, 0.02, 0.12, bl, lipX, 0.08, cz);
+      b.box(M.steel, topW, 0.07, bl + 0.02, topX, 0.4, cz);
+      for (const k of [-1, 1]) b.box(M.wallGrey, seatW + 0.04, 0.012, 0.025, cx, 0.44, cz + k * Math.min(0.2, half * 0.35));
+      // Backrest flush to wall, still inside the car.
+      b.box(M.steel, 0.06, 0.5, bl + 0.02, backX, 0.72, cz, 0, 0, sx * -0.08);
+      // Glass end panels + poles: clear margin from door frame (inside segment).
+      const endInset = Math.max(0.1, half * 0.15);
+      for (const ez of [-1, 1]) {
+        const z = cz + ez * (half - endInset);
+        b.box(M.glass, seatW + 0.06, 1.05, 0.02, cx, 1.0, z);
+        b.box(M.red, seatW + 0.08, 0.05, 0.05, cx, 1.54, z);
+        b.add(M.steel, new THREE.CylinderGeometry(0.035, 0.035, 2.3, 10), sx * (Math.abs(cx) - seatW / 2 + 0.08), 1.15, z);
       }
+      return true;
+    };
+    // Door wall (−X): only long mid segments between bays; large margin from door frames.
+    for (const [z0, z1] of betweenBaySegs) {
+      if (placeBench(-1, z0, z1, { margin: 0.28, minAvail: 0.5 })) aislePoleZs.push((z0 + z1) / 2);
     }
-    b.add(M.steel, new THREE.CylinderGeometry(0.04, 0.04, 2.3, 12), 0.35, 1.15, -1.3);
-    b.add(M.steel, new THREE.CylinderGeometry(0.04, 0.04, 2.3, 12), 0.35, 1.15, 1.3);
+    // Far wall (+X): same between-bay segments only (skip short end stubs at door Z).
+    // margin/minAvail match door wall so benches still fit the ~1.16m mid segs.
+    for (const [z0, z1] of betweenBaySegs) {
+      placeBench(1, z0, z1, { margin: 0.28, minAvail: 0.5 });
+    }
+    // Aisle grab poles at between-door centres (never in a doorway vestibule).
+    for (const pz of aislePoleZs.slice(0, 2)) {
+      b.add(M.steel, new THREE.CylinderGeometry(0.04, 0.04, 2.3, 12), 0.35, 1.15, pz);
+    }
 
-    for (const sx of [-1, 1]) {
+    for (const sx of [-1, 1] as const) {
       const rail = new THREE.CylinderGeometry(0.025, 0.025, len - 0.8, 8);
       b.add(M.steel, rail, sx * 1.18, 2.05, midZ, Math.PI / 2, 0, 0);
       for (let z = CAR_Z_MIN + 0.7; z < CAR_Z_MAX - 0.5; z += 0.75) {
+        // Door wall: skip hanging straps over open door vestibules.
+        if (sx < 0 && bays.some((bz) => Math.abs(z - bz) < dh + 0.05)) continue;
         b.box(M.steel, 0.015, 0.16, 0.015, sx * 1.18, 1.96, z);
         b.add(M.red, new THREE.TorusGeometry(0.055, 0.016, 4, 3), sx * 1.18, 1.84, z, 0, Math.PI / 2, Math.PI / 2);
       }
