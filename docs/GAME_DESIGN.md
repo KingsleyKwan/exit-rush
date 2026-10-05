@@ -120,8 +120,29 @@ Everything lives in **`src/game/sim/tuning.ts`** (`TUNING`), grouped as `physics
 
 - **Mobile-first**, portrait preferred; Three.js WebGL.
 - **Icon-first HUD**; text only where icons fail (station name, win/lose, skill labels).
-- Look: MTR-inspired **red (#B01C2E) / white / silver**, line-colour accents, bilingual station strip.
-- **No copyrighted MTR logos**; SVG/CSS/emoji/canvas originals only.
+- Look: MTR-inspired **red (#B01C2E) / white / silver / navy**, line-colour accents, bilingual station strip.
+- **No copyrighted MTR logos**; SVG/CSS/canvas originals only.
+
+### Art direction (v0.3.0)
+
+- **Style target:** chunky chibi low-poly — big heads, small bodies, flat shading, saturated per-type colours. Concept lineup, app icon and key art were **generated with Grok Image** and processed by `scripts/art/build_art.py` (icons, WebP key art, portrait strip, store capsules).
+- **Characters** (`src/game/characters.ts`): every look is one merged, vertex-coloured, flat-shaded geometry (head, face, hair, torso, arms, legs, props) → one `InstancedMesh` per look, so 80 bodies cost ~15 draw calls. Readability from the top-down camera comes from hats / hair / shoulder colour and props:
+
+| Type | Colour | Silhouette cues |
+|------|--------|-----------------|
+| Hero | blue shirt | lanyard, cyan glow shell + x-ray outline, ring |
+| Commuter | grey hoodie (+ 5 variants) | phone in hand, head down |
+| Stench | yellow singlet | wavy green stink lines + flies (High) |
+| Family | orange mum + 2 kids | three bodies on one disc |
+| Brat 百厭仔 | pink cap | small, bouncy, tongue out |
+| Couple | matching magenta | joined hands link, floating heart |
+| Angry 暴躁男 | red polo | anger vein, red tint + steam during wind-up |
+| Tourist | teal shirt, sun hat | camera, big brown suitcase |
+
+- **Type icons:** small round billboards (same glyphs as the legend) over special passengers within ~3.4 m of the player, plus any angry man winding up; toggle in settings.
+- **Car:** white walls, red stripe, stainless longitudinal benches, glass partitions, poles + overhead rails with red grips, red door frame with indicator lights, line-map strip above the door, yellow edge line, PSDs, red/white tiled pillars, navy bilingual station sign (level `stationEn` / `stationZh`, with an "inspired look · not affiliated" note). Static meshes merged per material.
+- **UI:** authored SVG icon set (`src/ui/icons.ts`), bold rounded filled glyphs; title over key art; level cards = number badge + line dots + station 中/EN + density/timer icons; passenger legend with concept portraits.
+- **Quality:** Low drops stink lines/flies/most puffs and the shadow map; High keeps everything.
 
 ## Bilingual
 
@@ -141,13 +162,13 @@ Everything lives in **`src/game/sim/tuning.ts`** (`TUNING`), grouped as `physics
 
 ## Polish checklist (aspiration)
 
-- [ ] Readable silhouette passenger types at phone distance
+- [x] Readable silhouette passenger types at phone distance (v0.3 chibi looks + type icons)
 - [x] Haptic ticks on shove (web `navigator.vibrate`; Capacitor later)
 - [ ] Onboarding: 3-beat gesture tutorial
 - [x] Safe-area insets / notch (v0.2.2) · 44 px touch targets
 - [x] Reduced-motion mode (camera shake/kick scaled down)
 - [ ] Offline PWA cache
-- [ ] Level select map with line colours
+- [x] Level select with line colours (v0.3 cards; full map TBD)
 - [ ] Daily challenge seed
 - [ ] Accessibility: colourblind passenger patterns
 - [ ] App Store / Play via Capacitor (+ Apple Developer account)
