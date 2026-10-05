@@ -1,1 +1,1 @@
-__READ_FILE__/workspace/hk-mtr-exit-rush/src/game/Audio.ts
+file:///workspace/hk-mtr-exit-rush/src/game/Audio.ts
