@@ -104,6 +104,13 @@ export interface Dict {
   reviewIntro: string;
   clearBonusN: string;
   levelsTeaserV05: string;
+  doorClosedToast: string;
+  doorBanner: string;
+  doorBannerZh: string;
+  doorBannerEn: string;
+  doorBannerEnOne: string;
+  doorOpenIcon: string;
+  doorClosedIcon: string;
 }
 
 export const en: Dict = {
@@ -208,5 +215,12 @@ export const en: Dict = {
   reviewIntro: 'How they block you',
   clearBonusN: '+{n} skill points',
   levelsTeaserV05: 'Short exits · learn one special every few levels',
+  doorClosedToast: "This door won't open!",
+  doorBanner: 'Only {n} doors open',
+  doorBannerZh: '只開{n}道門',
+  doorBannerEn: 'Only {n} doors open',
+  doorBannerEnOne: 'Only 1 door open',
+  doorOpenIcon: 'Open',
+  doorClosedIcon: 'Closed',
 };
 
