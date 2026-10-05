@@ -209,3 +209,4 @@ export const en: Dict = {
   clearBonusN: '+{n} skill points',
   levelsTeaserV05: 'Short exits · learn one special every few levels',
 };
+
