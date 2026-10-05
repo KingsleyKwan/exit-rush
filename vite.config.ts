@@ -1,7 +1,12 @@
 import { defineConfig } from 'vite';
 
+// Local `npm run dev` / default build → `/`.
+// GitHub Pages project site → set BASE_PATH=/hk-mtr-exit-rush/ (see .github/workflows/pages.yml).
+const raw = process.env.BASE_PATH?.trim() || '/';
+const base = raw.endsWith('/') ? raw : `${raw}/`;
+
 export default defineConfig({
-  base: './',
+  base,
   server: {
     host: true,
     port: 5173,
