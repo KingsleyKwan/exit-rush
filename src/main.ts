@@ -39,6 +39,12 @@ const game = new Game(canvas, {
 
 renderUI(uiRoot, game);
 
+// v0.5 FTUE: first launch jumps into L1 (ghost-hand teach).
+queueMicrotask(() => {
+  game.tryAutoFtue();
+  if (game.screen !== 'menu') renderUI(uiRoot, game);
+});
+
 // Unlock audio on the first gesture, and re-resume it on later gestures if the
 // OS suspended / interrupted it (iOS after calls, backgrounding, etc.).
 window.addEventListener(
