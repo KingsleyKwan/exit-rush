@@ -32,7 +32,7 @@ export const zhHK: Dict = {
   time: '時間',
   level: '關卡',
   density: '人潮',
-  howTo: '拖動任何位置控制方向 · 按住✊推開人群 · 趕喔關門前落車。',
+  howTo: '拖動任何位置控制方向 · 按住✊推開人群 · 趕喺關門前落車。',
   language: '語言',
   clearBonus: '+1 技能點',
   passenger: {
