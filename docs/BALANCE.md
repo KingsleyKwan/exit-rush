@@ -33,7 +33,7 @@ Median clear time / time left are over wins only.
 | L16–20 | earned | 92.5 % · 7.1 s · 24.2 s · 70 % | 73.8 % · 21.5 s · 21.8 s · 2 % |
 | L16–20 | none | 79.4 % · 9.0 s · 23.2 s · 46 % | 50.9 % · 25.3 s · 17.7 s · 0 % |
 
-### Level 100 (Tsim Sha Tsui after fireworks)
+### Level 100 (Tsim Sha Mouth / 尖沙嘴 after fireworks)
 
 | Build | Before (timer 22 s) win · med clear | After (timer 23 s) win · med clear |
 |---|---|---|
