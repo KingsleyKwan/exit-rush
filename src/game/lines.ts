@@ -9,27 +9,27 @@ export type LineId = 'isl' | 'twl' | 'ktl' | 'tcl' | 'ael' | 'eal' | 'tml' | 'si
 
 export const LINE_COLORS: Record<LineId, string> = {
   isl: '#0075c2', // 香島綫 blue
-  twl: '#e2231a', // 全灣綫 red
-  ktl: '#00a040', // 觀堂綫 green
-  tcl: '#f38b00', // 東衝綫 orange
+  twl: '#e2231a', // 荃直綫 red
+  ktl: '#00a040', // 觀濱綫 green
+  tcl: '#f38b00', // 東沖綫 orange
   ael: '#00888a', // 香城空港綫 teal
   eal: '#5eb6e4', // 東軌綫 light blue
   tml: '#9a3b26', // 屯碼綫 brown
   sil: '#b5bd00', // 南香島綫 lime
-  tkl: '#7d499d', // 將官澳綫 purple
+  tkl: '#7d499d', // 將軍綫 purple
 };
 
 /** Parody display names for lines (UI / docs). */
 export const LINE_NAMES: Record<LineId, { en: string; zh: string }> = {
   isl: { en: 'Heung Island Line', zh: '香島綫' },
-  twl: { en: 'Chuen Wan Line', zh: '全灣綫' },
-  ktl: { en: 'Kun Tong Line', zh: '觀堂綫' },
-  tcl: { en: 'Tung Chong Line', zh: '東衝綫' },
+  twl: { en: 'Chuen Jik Line', zh: '荃直綫' },
+  ktl: { en: 'Kun Tong Line', zh: '觀濱綫' },
+  tcl: { en: 'Tung Chong Line', zh: '東沖綫' },
   ael: { en: 'HCR Airport Line', zh: '香城空港綫' },
   eal: { en: 'East Track Line', zh: '東軌綫' },
   tml: { en: 'Tuen Ma Code Line', zh: '屯碼綫' },
   sil: { en: 'South Heung Island', zh: '南香島綫' },
-  tkl: { en: 'General Bay Line', zh: '將官澳綫' },
+  tkl: { en: 'General Bay Line', zh: '將軍綫' },
 };
 
 /** Lines serving each station — keyed by REAL English name (dev). */
