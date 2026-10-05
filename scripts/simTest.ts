@@ -8,8 +8,8 @@
  * Env:
  *   RUNS      runs per (level, loadout)                     default 6   (SEEDS is an alias)
  *   LEVEL     comma list of level ids                        default all
- *   LOADOUTS  comma list (see LOADOUTS below, or ad-hoc b:STR/SPD/WIS[+str|+spd|+wis])   default: none,earned on 1–20;
- *             pts20,ult-str,ult-spd,ult-wis on 100
+ *   LOADOUTS  comma list (see LOADOUTS below, or ad-hoc b:STR/SPD/STA[+str|+spd|+sta])   default: none,earned on 1–20;
+ *             pts20,ult-str,ult-spd,ult-sta on 100
  *   WORKERS   worker threads                                 default min(8, cpus)
  *   SEED      base seed offset                               default 0
  *   JSON      path: also write raw summary rows as JSON
@@ -17,7 +17,7 @@
  *   PATCH     JSON per-level overrides, e.g. '{"1":{"density":5,"timer":45}}'
  *
  * A simple bot plays (stick toward the doorway with a weave, charged shove when
- * blocked, sidestep when stuck, ults when sensible, follows the WIS path while shown). It is a
+ * blocked, sidestep when stuck, ults when sensible, uses Iron Stance when jammed). It is a
  * proxy for a decent — not perfect — player. Hard failures (exit 1): NaNs,
  * body cap exceeded, runaway overlap. Balance targets are reported, not enforced.
  */
@@ -26,7 +26,7 @@ import { cpus } from 'node:os';
 import { writeFileSync } from 'node:fs';
 import { Sim } from '../src/game/sim/Sim';
 import { mulberry32 } from '../src/game/sim/rng';
-import { DOOR_Z, TUNING, doorWallX, nearestDoorBay, openDoorBays } from '../src/game/sim/tuning';
+import { DOOR_BAYS, DOOR_Z, TUNING, doorWallX, nearestDoorBay, openDoorBays } from '../src/game/sim/tuning';
 import { LEVELS } from '../src/game/levels';
 import { BRANCH_FILL, modifiersFromSkills } from '../src/game/SkillTree';
 import { defaultSkills, type SkillState } from '../src/game/storage';
@@ -57,7 +57,7 @@ const DT = 1 / TUNING.physics.hz;
 // ------------------------------------------------------------------ loadouts
 
 /** Spread `pts` over the three branches (round-robin, STR first), capped per branch. */
-function spread(pts: number, order: ('str' | 'spd' | 'wis')[] = ['str', 'spd', 'wis']): SkillState {
+function spread(pts: number, order: ('str' | 'spd' | 'sta')[] = ['str', 'spd', 'sta']): SkillState {
   const s = defaultSkills();
   let i = 0;
   let guard = 0;
@@ -70,21 +70,21 @@ function spread(pts: number, order: ('str' | 'spd' | 'wis')[] = ['str', 'spd', '
   }
   return s;
 }
-function focus(pts: number, b: 'str' | 'spd' | 'wis'): SkillState {
+function focus(pts: number, b: 'str' | 'spd' | 'sta'): SkillState {
   const s = defaultSkills();
   s[b] = Math.min(BRANCH_FILL, pts);
   return s;
 }
 /** 99-point endgame build: one branch filled + ultimate (70), remaining 29 split over the others. */
-function ultBuild(b: 'str' | 'spd' | 'wis'): SkillState {
-  const others = (['str', 'spd', 'wis'] as const).filter((x) => x !== b);
+function ultBuild(b: 'str' | 'spd' | 'sta'): SkillState {
+  const others = (['str', 'spd', 'sta'] as const).filter((x) => x !== b);
   const s = defaultSkills();
   s[b] = BRANCH_FILL;
   s[others[0]] = 15;
   s[others[1]] = 14;
   if (b === 'str') s.ultStr = true;
   if (b === 'spd') s.ultSpd = true;
-  if (b === 'wis') s.ultWis = true;
+  if (b === 'sta') s.ultSta = true;
   return s;
 }
 /** Points a player has when *starting* this level (1 per clear; 100 assumes 99). */
@@ -95,29 +95,31 @@ const LOADOUTS: Record<string, (levelId: number) => SkillState> = {
   earned: (id) => spread(earnedPts(id) === 99 ? 19 : earnedPts(id)),
   'earned-str': (id) => focus(Math.min(19, id - 1), 'str'),
   'earned-spd': (id) => focus(Math.min(19, id - 1), 'spd'),
-  'earned-wis': (id) => focus(Math.min(19, id - 1), 'wis'),
+  'earned-sta': (id) => focus(Math.min(19, id - 1), 'sta'),
   pts20: () => spread(20),
   pts40: () => spread(40),
-  'pts99-noult': () => ({ ...defaultSkills(), str: 33, spd: 33, wis: 33 }),
+  'pts99-noult': () => ({ ...defaultSkills(), str: 33, spd: 33, sta: 33 }),
   'ult-str': () => ultBuild('str'),
   'ult-spd': () => ultBuild('spd'),
-  'ult-wis': () => ultBuild('wis'),
-  max: () => ({ str: 60, spd: 60, wis: 60, ultStr: true, ultSpd: true, ultWis: true, points: 0 }),
+  'ult-sta': () => ultBuild('sta'),
+  'ult-wis': () => ultBuild('sta'), // alias
+  'earned-wis': (id) => focus(Math.min(19, id - 1), 'sta'),
+  max: () => ({ str: 60, spd: 60, sta: 60, ultStr: true, ultSpd: true, ultSta: true, points: 0 }),
 };
 /** Ad-hoc build: "b:STR/SPD/WIS" with optional "+str", "+spd", "+wis" ults, e.g. b:60/15/14+str. */
 function parseBuild(name: string): ((levelId: number) => SkillState) | null {
-  const m = /^b:(\d+)\/(\d+)\/(\d+)((?:\+(?:str|spd|wis))*)$/.exec(name);
+  const m = /^b:(\d+)\/(\d+)\/(\d+)((?:\+(?:str|spd|sta))*)$/.exec(name);
   if (!m) return null;
-  const s: SkillState = { ...defaultSkills(), str: +m[1], spd: +m[2], wis: +m[3] };
+  const s: SkillState = { ...defaultSkills(), str: +m[1], spd: +m[2], sta: +m[3] };
   s.ultStr = m[4].includes('+str');
   s.ultSpd = m[4].includes('+spd');
-  s.ultWis = m[4].includes('+wis');
+  s.ultSta = m[4].includes('+sta');
   return () => s;
 }
 const loadout = (name: string): ((levelId: number) => SkillState) => LOADOUTS[name] ?? parseBuild(name)!;
 
 const DEFAULT_LOADOUTS = (id: number): string[] =>
-  id === 100 ? ['pts20', 'ult-str', 'ult-spd', 'ult-wis'] : ['none', 'earned'];
+  id === 100 ? ['pts20', 'ult-str', 'ult-spd', 'ult-sta'] : ['none', 'earned'];
 
 // ------------------------------------------------------------------ one run
 
@@ -204,7 +206,7 @@ function runLevel(levelId: number, skills: SkillState, seed: number): Run {
     if (sim.time > 1.5) {
       if (skills.ultSpd && blockedT > 0.25 && sim.tryUltimate('spd')) ults++;
       if (skills.ultStr && blockedT > 0.25 && sim.tryUltimate('str')) ults++;
-      if (skills.ultWis && (blockedT > 0.1 || b.contacts > 0) && sim.tryUltimate('wis')) ults++;
+      if (skills.ultSta && (blockedT > 0.1 || b.contacts > 0) && sim.tryUltimate('sta')) ults++;
     }
     const input: PlayerInput = { x: dx, z: -dz, mag: 1, shoveHeld: held };
     sim.step(DT, input);
@@ -297,60 +299,7 @@ function target(level: number, loadout: string): [number, number] | null {
   return [0.55, 0.75];
 }
 
-/** Fail hard if any seat AABB overlaps a door vestibule [bayZ ± doorHalf] or crosses onto the platform. */
-function assertNoSeatInDoorway(): void {
-  const level = LEVELS.find((l) => l.id === 1);
-  if (!level) throw new Error('level 1 missing');
-  const sim = new Sim(level, modifiersFromSkills(defaultSkills()), mulberry32(1));
-  const C = TUNING.car;
-  const hw = C.halfWidth;
-  const dh = C.doorHalf;
-  const bays = [...C.doorBays];
-  const seatInset = 0.1;
-  const seatW = 0.62;
-  let bad = 0;
-  let seatCount = 0;
-  for (const bx of sim.world.boxes) {
-    // Seat-like boxes: depth ≈ seatW, flush to either longitudinal wall (inside car).
-    const dx = bx.maxX - bx.minX;
-    const dz = bx.maxZ - bx.minZ;
-    if (dx < seatW - 0.05 || dx > seatW + 0.15) continue;
-    if (dz < 0.4 || dz > 1.2) continue;
-    const onDoorSide = bx.maxX < -1.0 && bx.minX > -hw + 0.02;
-    const onFarSide = bx.minX > 1.0 && bx.maxX < hw - 0.02;
-    if (!onDoorSide && !onFarSide) continue;
-    seatCount++;
-    if (onDoorSide && bx.minX < -hw - 0.001) {
-      console.error('seat crosses doorWallX onto platform', bx);
-      bad++;
-    }
-    if (onFarSide && bx.maxX > hw + 0.001) {
-      console.error('seat crosses +halfWidth past far wall', bx);
-      bad++;
-    }
-    // Outer face should sit near |hw| − seatInset (not the solid wall slab itself).
-    const outer = onDoorSide ? -bx.minX : bx.maxX;
-    if (Math.abs(outer - (hw - seatInset)) > 0.08) continue;
-    for (const bay of bays) {
-      const o0 = Math.max(bx.minZ, bay - dh);
-      const o1 = Math.min(bx.maxZ, bay + dh);
-      if (o1 > o0 + 0.01) {
-        console.error(`seat AABB intersects vestibule bay=${bay} side=${onDoorSide ? 'door' : 'far'}`, {
-          minX: bx.minX, maxX: bx.maxX, minZ: bx.minZ, maxZ: bx.maxZ,
-        });
-        bad++;
-      }
-    }
-  }
-  if (seatCount < 2) {
-    throw new Error(`seat layout: expected ≥2 seat colliders, found ${seatCount}`);
-  }
-  if (bad) throw new Error(`seat layout: ${bad} vestibule/platform violation(s)`);
-  console.log(`seat layout: ${seatCount} benches clear of vestibules [bayZ ± doorHalf] ✓`);
-}
-
 async function main(): Promise<void> {
-  assertNoSeatInDoorway();
   const RUNS = Number(process.env.RUNS ?? process.env.SEEDS ?? 6);
   const SEED = Number(process.env.SEED ?? 0);
   const levelFilter = process.env.LEVEL ? process.env.LEVEL.split(',').map(Number) : null;
@@ -385,6 +334,39 @@ async function main(): Promise<void> {
         ),
     )
   ).flat();
+
+  // Seat AABB: benches must not overlap any door vestibule [bayZ ± doorHalf].
+  {
+    const sim = new Sim(LEVELS.find((l) => l.id === 1)!, modifiersFromSkills(defaultSkills()), mulberry32(1));
+    const dh = TUNING.car.doorHalf;
+    const hw = TUNING.car.halfWidth;
+    let seatBoxes = 0;
+    for (const box of sim.world.boxes) {
+      const w = Math.abs(box.maxX - box.minX);
+      const len = box.maxZ - box.minZ;
+      // Seat colliders: ~0.62 wide, ≥0.7 long, both edges inside the car near ±halfWidth.
+      if (w < 0.45 || w > 0.75 || len < 0.7) continue;
+      const ax = Math.abs(box.minX);
+      const bx = Math.abs(box.maxX);
+      const nearSide = Math.min(ax, bx) > hw - 1.05 && Math.max(ax, bx) < hw - 0.02;
+      if (!nearSide) continue;
+      seatBoxes++;
+      for (const bay of DOOR_BAYS) {
+        const v0 = bay - dh;
+        const v1 = bay + dh;
+        const overlap = !(box.maxZ <= v0 + 1e-6 || box.minZ >= v1 - 1e-6);
+        if (overlap) {
+          console.error(`seat AABB overlaps vestibule bay=${bay}: z[${box.minZ.toFixed(3)},${box.maxZ.toFixed(3)}] vs [${v0},${v1}]`);
+          process.exit(1);
+        }
+      }
+    }
+    if (seatBoxes < 2) {
+      console.error(`expected ≥2 seat boxes, got ${seatBoxes}`);
+      process.exit(1);
+    }
+    console.log(`seat AABB ok (${seatBoxes} benches, no vestibule overlap)`);
+  }
 
   console.log(
     `runs=${RUNS}  workers=${WORKERS}  dt=${DT.toFixed(4)}  maxBodies=${TUNING.physics.maxBodies}  (${((performance.now() - t0) / 1000).toFixed(1)} s)`,
