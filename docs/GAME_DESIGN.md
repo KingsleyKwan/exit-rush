@@ -48,7 +48,7 @@ Colour-coded low-poly (box body + capsule/sphere head). Behaviours differ:
 | `normal` | Commuter | 乘客 | Grey-blue | Idle drift / light resist |
 | `stench` | Stench | 惡臭人 | Olive | Aura slows player in radius |
 | `family` | Family | 一家大細 | Warm yellow | Cluster of 3–4; hard to split |
-| `brat` | Brat | 屁孩 | Hot pink | Zigzag path, unpredictable |
+| `brat` | Brat | 百厭仔 | Hot pink | Zigzag path, unpredictable |
 | `couple` | Couple | 情侶 | Magenta pair | Occupies ~2 tiles; linked |
 | `angry` | Angry man | 暴躁男 | Red | Periodic shove impulse on player |
 | `luggage` | Luggage | 拉行李喼 | Brown + dark case | High mass; slows push heavily |
@@ -57,7 +57,7 @@ Future: tourist with map, influencer filming, elderly with cane, etc.
 
 ## Skill tree
 
-- **+1 skill point** per level clear (first clear; replays can award 0 or fractional later).
+- **+1 skill point** per level clear. v0.2.2 stop-gap while only 21 levels exist: replays also award +1, capped at **5 points per level** (`MAX_POINTS_PER_LEVEL`), so the ~99-point L100 loadout is reachable; drop the cap to 1 once levels 21–99 ship.
 - Three branches: **Strength (STR)** · **Speed (SPD)** · **Wisdom (WIS / INT)**.
 - **60 points** to fill one branch (tiers), then **+10** to unlock that branch’s **ultimate** → **70** for full branch + ultimate.
 
@@ -144,7 +144,7 @@ Everything lives in **`src/game/sim/tuning.ts`** (`TUNING`), grouped as `physics
 - [ ] Readable silhouette passenger types at phone distance
 - [x] Haptic ticks on shove (web `navigator.vibrate`; Capacitor later)
 - [ ] Onboarding: 3-beat gesture tutorial
-- [ ] Safe-area insets / notch
+- [x] Safe-area insets / notch (v0.2.2) · 44 px touch targets
 - [x] Reduced-motion mode (camera shake/kick scaled down)
 - [ ] Offline PWA cache
 - [ ] Level select map with line colours
@@ -156,5 +156,7 @@ Everything lives in **`src/game/sim/tuning.ts`** (`TUNING`), grouped as `physics
 
 - Vite + TypeScript + Three.js
 - `src/game/sim/` = pure gameplay sim (fixed step, headless-testable); `src/game/*.ts` views read it
-- Persist: `localStorage` key `hk-mtr-exit-rush-v1`
+- Persist: `localStorage` key `hk-mtr-exit-rush-v1` (v0.2.2: never throws — in-memory fallback + one-time toast when storage is blocked; new fields `clears`, `quality`, `autoQuality` default safely for old saves)
+- Graphics quality (v0.2.2): Auto / Low / High — see `src/game/quality.ts`. Low = no shadow map, no antialias, pixel ratio 1; Auto = device hints + FPS probe (cached)
+- Lifecycle (v0.2.2): `visibilitychange` / `pagehide` / `blur` auto-pause the run; AudioContext suspended while hidden
 - Future: Capacitor shell; no secrets in repo
