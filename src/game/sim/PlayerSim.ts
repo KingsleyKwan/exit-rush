@@ -19,7 +19,7 @@ export interface PathPoint {
   z: number;
 }
 
-const ULTS: UltKind[] = ['str', 'spd', 'wis'];
+const ULTS: UltKind[] = ['str', 'spd', 'sta'];
 
 export class PlayerSim {
   readonly body: Body;
@@ -34,7 +34,7 @@ export class PlayerSim {
   chargeUntil = 0;
   dashUntil = 0;
   senseUntil = 0;
-  ultCd: Record<UltKind, number> = { str: 0, spd: 0, wis: 0 };
+  ultCd: Record<UltKind, number> = { str: 0, spd: 0, sta: 0 };
   /** Smoothed, assisted move direction (unit, world XZ). */
   aimX = 0;
   aimZ = -1;
@@ -65,7 +65,7 @@ export class PlayerSim {
       maxSpeed: 9,
     });
     this.staminaMax = mods.staminaMax;
-    this.stamina = this.staminaMax;
+    this.stamina = this.staminaMax + (mods.staminaBuffer ?? 0);
   }
 
   isCharging(now: number): boolean {
@@ -75,6 +75,10 @@ export class PlayerSim {
     return now < this.dashUntil;
   }
   isSensing(now: number): boolean {
+    return now < this.senseUntil;
+  }
+  /** STA Iron Stance (senseUntil reused as iron timer in bridge). */
+  isIronStance(now: number): boolean {
     return now < this.senseUntil;
   }
 
@@ -99,6 +103,7 @@ export class PlayerSim {
     let mass = this.baseMass();
     if (charging) mass *= U.str.massMul;
     if (dashing) mass *= U.spd.massMul;
+    if (sensing) mass *= U.sta.massMul;
     setMass(b, mass);
 
     // ---- Stick → desired direction (with gap aim assist).
@@ -132,7 +137,8 @@ export class PlayerSim {
     this.moving = mag;
 
     // ---- Speed / drive.
-    const slow = crowd.auraSlowAt(b.x, b.z) * (1 - this.mods.auraResist);
+    const auraR = Math.min(1, this.mods.auraResist + (sensing ? U.sta.auraResist : 0));
+    const slow = crowd.auraSlowAt(b.x, b.z) * (1 - auraR);
     this.drag = this.crowdDrag(world, dashing);
     const St = P.stamina;
     let maxV = P.maxSpeed * this.mods.moveSpeed * (1 - slow) * (1 - this.drag);
@@ -192,14 +198,14 @@ export class PlayerSim {
 
     // ---- Stamina.
     this.pushing = mag > 0.2 && inContact;
+    const regenMul = sensing ? U.sta.regenMul : 1;
     if (this.winded) {
-      // Catching your breath: no drain, slow recovery even while still leaning in.
-      this.stamina += this.mods.staminaRegen * dt * (mag < 0.2 ? 1 : St.windedRegen);
+      this.stamina += this.mods.staminaRegen * regenMul * dt * (mag < 0.2 ? 1 : St.windedRegen);
     } else if (this.pushing && !dashing) {
       const drain = (St.drainBase + b.pressure * St.drainPerPressure) * mag / (1 + this.mods.resist);
-      this.stamina += (this.mods.staminaRegen * St.pushRegen - drain) * dt;
+      this.stamina += (this.mods.staminaRegen * regenMul * St.pushRegen - drain) * dt;
     } else {
-      this.stamina += this.mods.staminaRegen * dt * (mag < 0.2 ? 1 : 0.55);
+      this.stamina += this.mods.staminaRegen * regenMul * dt * (mag < 0.2 ? 1 : 0.55);
     }
     this.stamina = Math.min(this.staminaMax, this.stamina);
     if (this.stamina <= 0) {
@@ -224,16 +230,8 @@ export class PlayerSim {
     }
     this.shoveWasHeld = input.shoveHeld;
 
-    // ---- WIS: recompute highlighted path.
-    if (sensing) {
-      this.pathT -= dt;
-      if (this.pathT <= 0) {
-        this.pathT = U.wis.pathEvery;
-        this.path = this.computePath(world);
-      }
-    } else if (this.path.length) {
-      this.path = [];
-    }
+    // ---- STA Iron Stance: no path highlight (Crowd Sense removed).
+    if (this.path.length) this.path = [];
   }
 
   /**
@@ -337,9 +335,12 @@ export class PlayerSim {
       b.vx = dx * U.spd.burst;
       b.vz = dz * U.spd.burst;
     } else {
-      this.senseUntil = now + U.wis.duration;
+      // Iron Stance: reuse senseUntil as iron timer until full PlayerSim lands
+      this.senseUntil = now + U.sta.duration;
       this.pathT = 0;
-      this.path = this.computePath(world);
+      this.path = [];
+      this.winded = false;
+      this.stamina = Math.min(this.staminaMax, this.stamina + this.staminaMax * 0.35);
     }
     emit({ t: 'ult', kind, x: b.x, z: b.z, dx: this.faceX, dz: this.faceZ });
     return true;
