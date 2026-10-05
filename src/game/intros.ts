@@ -71,6 +71,15 @@ export const INTROS: Record<IntroKind, IntroCopy> = {
     tipEn: 'Dodge or shove first',
     tipZh: '閃或者搶先推',
   },
+  squat: {
+    kind: 'squat',
+    whatEn: 'Crouched low — rooted.',
+    whatZh: '踎低喺度，好穩。',
+    blockEn: 'Hard to shove over; weave wider around them.',
+    blockZh: '好難推踎起，要旁邊大啲閃過。',
+    tipEn: 'Weave wide',
+    tipZh: '大弧度閃過',
+  },
 };
 
-export const INTRO_ORDER: IntroKind[] = ['luggage', 'stench', 'family', 'brat', 'couple', 'angry'];
+export const INTRO_ORDER: IntroKind[] = ['luggage', 'squat', 'stench', 'family', 'brat', 'couple', 'angry'];
