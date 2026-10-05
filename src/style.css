@@ -1,1 +1,3 @@
-$file:/workspace/hk-mtr-exit-rush/src/style.css
+/* TEMP: restore pre-corruption CSS from last good main commit while exact local style.css push is prepared.
+   Replace with exact /workspace local bytes (30944) ASAP. */
+@import url("https://cdn.jsdelivr.net/gh/KingsleyKwan/hk-mtr-exit-rush@acabc09aeb9b60c59f3dbc79f2f782447cac0a5a/src/style.css");
