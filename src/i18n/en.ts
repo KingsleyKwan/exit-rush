@@ -33,6 +33,23 @@ export interface Dict {
   howTo: string;
   language: string;
   clearBonus: string;
+  /** Replay clear bonus; {n} = this level's clears, {max} = cap. */
+  replayBonus: string;
+  clearNoBonus: string;
+  back: string;
+  levelsTeaser: string;
+  /** {fill} = points to fill a branch, {ult} = ultimate cost. */
+  skillHowto: string;
+  ultShort: string;
+  skillsApplyNext: string;
+  quality: string;
+  qualityAuto: string;
+  qualityLow: string;
+  qualityHigh: string;
+  qualityNote: string;
+  saveFailed: string;
+  autoPaused: string;
+  secShort: string;
   passenger: {
     normal: string;
     stench: string;
@@ -80,6 +97,21 @@ export const en: Dict = {
   howTo: 'Drag anywhere to steer · hold ✊ to shove · get out before the doors close.',
   language: 'Language',
   clearBonus: '+1 skill point',
+  replayBonus: '+1 skill point (replay {n}/{max})',
+  clearNoBonus: 'No more skill points from this level',
+  back: 'Back',
+  levelsTeaser: 'Levels 21–99 TBD · Lv100 is the finale',
+  skillHowto: '{fill} points fill a branch · +{ult} for the Ultimate',
+  ultShort: 'Ult',
+  skillsApplyNext: 'Changes apply from your next run.',
+  quality: 'Graphics',
+  qualityAuto: 'Auto',
+  qualityLow: 'Low',
+  qualityHigh: 'High',
+  qualityNote: 'Anti-aliasing changes apply after a reload.',
+  saveFailed: "Can't save on this device — progress lasts until you close the game.",
+  autoPaused: 'Paused while you were away.',
+  secShort: 's',
   passenger: {
     normal: 'Commuter',
     stench: 'Stench',
