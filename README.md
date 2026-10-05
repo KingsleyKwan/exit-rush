@@ -46,6 +46,18 @@ RUNS=40 npm run test:sim   # balance-grade sample — see docs/BALANCE.md for op
 
 Touch / mouse: **drag anywhere** (floating joystick) to steer, **hold the fist button** to charge a shove and release to burst. Tap ult icons (when unlocked) during a run. Toggle **EN / 粵** from the menu bar or the pause menu.
 
+
+## Play on iPhone
+
+Live build (GitHub Pages): **https://kingsleykwan.github.io/hk-mtr-exit-rush/**
+
+1. Open the link in **Safari** on your iPhone.
+2. Tap the **Share** button → **Add to Home Screen**.
+3. Keep the name **逼落車** (or rename) → **Add**.
+4. Launch from the home-screen icon for a full-screen standalone app (notch-safe, `viewport-fit=cover`).
+
+The Pages deploy builds with `BASE_PATH=/hk-mtr-exit-rush/` so assets resolve under that subpath. Local `npm run dev` still serves at `/`.
+
 ## Controls
 
 | Input | Action |
