@@ -2,7 +2,7 @@
  * Authored icon set (v0.3) — bold, rounded, filled, 48×48 grid.
  *
  * Colour roles (see `.ico` rules in style.css):
- *   currentColor = main shape · `.w` white detail · `.k` ink detail · `.a` MTR-red accent
+ *   currentColor = main shape · `.w` white detail · `.k` ink detail · `.a` HCR-red accent
  *   `.ws` / `.ks` / `.as` = the same colours as round strokes.
  * Inline SVG keeps them crisp at any DPR, themable via CSS and free of extra requests.
  */
@@ -33,6 +33,8 @@ const P: Record<string, string> = {
   back: `<path d="M29.5 9L14.5 24l15 15" stroke="currentColor" ${S(6)}/>`,
   close: `<path d="M12 12l24 24M36 12L12 36" stroke="currentColor" ${S(6)}/>`,
   tag: `<path d="M5 9a4 4 0 0 1 4-4h14.3a4 4 0 0 1 2.8 1.2l16 16a4 4 0 0 1 0 5.6L27.8 42.1a4 4 0 0 1-5.6 0l-16-16A4 4 0 0 1 5 23.3z" fill="currentColor"/><circle cx="15" cy="15" r="3.6" class="w"/>`,
+  volume: `<path d="M4 16.5h8.5L24 7v34L12.5 31.5H4z" fill="currentColor"/><path d="M30 17.5c2.8 2.2 2.8 10.8 0 13M35.5 12.5c5.2 4.2 5.2 19.8 0 24" class="ws" ${S(3.4)}/>`,
+  mute: `<path d="M4 16.5h8.5L24 7v34L12.5 31.5H4z" fill="currentColor"/><path d="M31 18l14 14M45 18L31 32" class="as" ${S(4.2)}/>`,
   station: `<circle cx="24" cy="20" r="14" fill="currentColor"/><circle cx="24" cy="20" r="6" class="w"/><path d="M24 34v10" stroke="currentColor" ${S(5)}/>`,
   drag: `<circle cx="22" cy="13" r="9.5" stroke="currentColor" ${S(3)} opacity=".5"/><path d="M18 13.5a4 4 0 0 1 8 0v11.2l7.6 1.9a4.3 4.3 0 0 1 3.2 4.8L35.4 44H19.5l-7.2-9.4a3.6 3.6 0 0 1 5.5-4.6l.2.2z" fill="currentColor"/>`,
   // ---- passenger type glyphs (used for UI badges and the 3D floating icons)
