@@ -12,9 +12,14 @@ import {
   BRANCH_FILL,
   MAX_POINTS_PER_LEVEL,
   ULTIMATE_COST,
+  ULT_DEFS,
   branchProgressLabel,
   canSpend,
+  nodesFor,
+  nodeUnlocked,
   spendPoint,
+  ultUnlocked,
+  modifiersFromSkills,
   type Branch,
 } from '../game/SkillTree';
 
@@ -28,12 +33,16 @@ function el(html: string): HTMLElement {
 const asset = (f: string): string => new URL(f, document.baseURI).href;
 
 type PortraitKind = 'hero' | PassengerKind;
-const PORTRAITS: PortraitKind[] = ['hero', 'normal', 'stench', 'family', 'brat', 'couple', 'angry', 'luggage'];
+const PORTRAITS: PortraitKind[] = ['hero', 'normal', 'stench', 'family', 'brat', 'couple', 'angry', 'luggage', 'squat'];
 
 /** Character portrait cropped from the concept sheet (public/art/portraits.webp). */
 function portrait(kind: PortraitKind, cls = ''): string {
-  const i = PORTRAITS.indexOf(kind);
-  return `<span class="portrait ${cls}" aria-hidden="true" style="background-image:url('${asset('art/portraits.webp')}');background-position:${(i / (PORTRAITS.length - 1)) * 100}% 0"></span>`;
+  if (kind === 'squat') {
+    return `<span class="portrait portrait-ico ${cls}" aria-hidden="true">${icon('kind_squat')}</span>`;
+  }
+  const sheet: PortraitKind[] = ['hero', 'normal', 'stench', 'family', 'brat', 'couple', 'angry', 'luggage'];
+  const i = Math.max(0, sheet.indexOf(kind));
+  return `<span class="portrait ${cls}" aria-hidden="true" style="background-image:url('${asset('art/portraits.webp')}');background-position:${(i / (sheet.length - 1)) * 100}% 0"></span>`;
 }
 
 const backdrop = (): string => `<div class="backdrop" aria-hidden="true" style="background-image:url('${asset('art/key-art.webp')}')"></div>`;
@@ -208,7 +217,7 @@ function renderMenu(game: Game): HTMLElement {
         <div class="menu-tiles">
           <button type="button" class="tile" data-act="levels">${icon('levels')}<span>${dict.levelsTitle}</span><em>${clearedCount}/${levels.length}</em></button>
           <button type="button" class="tile" data-act="skills">${icon('skills')}<span>${dict.skills}</span><em>${icon('star', 'xs')}${game.save.skills.points}</em></button>
-          <button type="button" class="tile" data-act="legend">${icon('legend')}<span>${dict.legendTitle}</span><em>8</em></button>
+          <button type="button" class="tile" data-act="legend">${icon('legend')}<span>${dict.legendTitle}</span><em>9</em></button>
         </div>
         <div class="settings-row">
           <button type="button" class="setting" data-act="quality" aria-label="${dict.quality}: ${qualityLabel(game)}">${icon('quality', 'sm')}<span>${qualityLabel(game)}</span></button>
@@ -296,10 +305,13 @@ function renderLegend(game: Game): HTMLElement {
 function renderPlayHud(game: Game): HTMLElement {
   const dict = t();
   const lv = game.level!;
-  // Ults available in this run = skills the run started with.
+  // Ults / actives available in this run = skills the run started with.
   const s = game.runSkills;
-  const ult = (k: 'str' | 'spd' | 'wis', title: string, on: boolean) =>
+  const mods = modifiersFromSkills(s);
+  const ult = (k: 'str' | 'spd' | 'sta', title: string, on: boolean) =>
     `<button type="button" class="skill-use ult-${k} ${on ? '' : 'dim'}" data-ult="${k}" title="${title}" aria-label="${title}" ${on ? '' : 'disabled'}>${icon(on ? k : 'lock')}</button>`;
+  const act = (id: string, title: string, on: boolean, ico: string) =>
+    `<button type="button" class="skill-use act-${id} ${on ? '' : 'dim'}" data-act-skill="${id}" title="${title}" aria-label="${title}" ${on ? '' : 'disabled'}>${icon(on ? ico : 'lock')}</button>`;
 
   const hud = el(`
     <div class="play-hud" data-ui="1">
@@ -331,7 +343,9 @@ function renderPlayHud(game: Game): HTMLElement {
         <div class="ult-col">
           ${ult('str', dict.ultStr, s.ultStr)}
           ${ult('spd', dict.ultSpd, s.ultSpd)}
-          ${ult('wis', dict.ultWis, s.ultWis)}
+          ${ult('sta', dict.ultSta, s.ultSta)}
+          ${mods.hasBriefDash ? act('dash', dict.skillNodeActive + ': Brief Dash', true, 'spd') : ''}
+          ${mods.hasSecondWind ? act('wind', dict.skillNodeActive + ': Second Wind', true, 'sta') : ''}
         </div>
         <button type="button" class="shove-btn" id="btn-shove" title="${dict.shove}" aria-label="${dict.shove}">${icon('shove')}</button>
       </div>
@@ -341,8 +355,16 @@ function renderPlayHud(game: Game): HTMLElement {
   hud.querySelectorAll('[data-ult]').forEach((b) => {
     b.addEventListener('pointerdown', (e) => {
       e.preventDefault();
-      const k = (b as HTMLElement).dataset.ult as 'str' | 'spd' | 'wis';
+      const k = (b as HTMLElement).dataset.ult as 'str' | 'spd' | 'sta';
       game.tryUltimate(k);
+    });
+  });
+  hud.querySelectorAll('[data-act-skill]').forEach((b) => {
+    b.addEventListener('pointerdown', (e) => {
+      e.preventDefault();
+      const id = (b as HTMLElement).dataset.actSkill;
+      if (id === 'dash') game.tryBriefDash();
+      if (id === 'wind') game.trySecondWind();
     });
   });
   hud.querySelector('#btn-pause')?.addEventListener('click', () => {
@@ -396,7 +418,7 @@ function updatePlayHud(root: HTMLElement, game: Game): void {
     shove.classList.toggle('charging', game.shoveCharge() > 0);
   }
   root.querySelectorAll<HTMLElement>('[data-ult]').forEach((b) => {
-    const k = b.dataset.ult as 'str' | 'spd' | 'wis';
+    const k = b.dataset.ult as 'str' | 'spd' | 'sta';
     b.style.setProperty('--cd', game.ultCooldown(k).toFixed(3));
     b.classList.toggle('active', game.ultActive(k));
     b.classList.toggle('cooling', game.ultCooldown(k) > 0);
@@ -490,26 +512,50 @@ function renderSkills(game: Game): HTMLElement {
   const dict = t();
   const s = game.save.skills;
   const overRun = game.skillsOverRun;
-  const branchRow = (branch: Branch, label: string, ultName: string) => {
+  const en = getLang() === 'en';
+  const branchLabel = (b: Branch) => (b === 'str' ? dict.strength : b === 'spd' ? dict.speed : dict.staminaBranch);
+  const branchIco = (b: Branch) => (b === 'sta' ? 'sta' : b);
+
+  const arm = (branch: Branch, angleDeg: number) => {
     const filled = s[branch];
-    const ult = branch === 'str' ? s.ultStr : branch === 'spd' ? s.ultSpd : s.ultWis;
-    const pct = Math.min(100, (filled / BRANCH_FILL) * 100);
+    const nodes = nodesFor(branch);
+    const ult = ultUnlocked(s, branch);
     const can = canSpend(s, branch);
     const ultNext = filled >= BRANCH_FILL && !ult;
+    const ultDef = ULT_DEFS[branch];
+    const nodeHtml = nodes
+      .map((n, i) => {
+        const on = nodeUnlocked(s, n);
+        const name = en ? n.nameEn : n.nameZh;
+        const tip = en ? n.tipEn : n.tipZh;
+        const tbd = n.tbd ? ` · ${dict.tier3Tbd}` : '';
+        const kind = n.kind === 'active' ? dict.skillNodeActive : dict.skillNodePassive;
+        const title = `${name} — ${tip}${tbd} (${kind})`;
+        const major = n.kind === 'active' || n.at >= 40;
+        return `<button type="button" class="cst-node ${on ? 'on' : ''} ${major ? 'major' : ''} ${n.tbd ? 'tbd' : ''} t${n.tier}" style="--i:${i}" title="${title}" aria-label="${title}" disabled>
+          <span class="cst-dot">${on ? icon(branchIco(branch), 'xs') : icon('lock', 'xs')}</span>
+          <span class="cst-label">${name}</span>
+        </button>`;
+      })
+      .join('');
+    const ultTitle = `${en ? ultDef.nameEn : ultDef.nameZh} — ${en ? ultDef.tipEn : ultDef.tipZh}`;
     return `
-      <div class="skill-branch b-${branch}" data-branch="${branch}">
-        <div class="skill-head">
-          <span class="skill-ico">${icon(branch)}</span>
-          <div class="skill-txt">
-            <strong>${label}</strong>
-            <div class="skill-prog">${branchProgressLabel(s, branch, dict.ultShort)}</div>
-          </div>
-          <button type="button" class="spend-btn" data-spend="${branch}" aria-label="${dict.spend}: ${label}" title="${can ? dict.spend : filled >= BRANCH_FILL && ult ? dict.branchFull : dict.notEnough}" ${can ? '' : 'disabled'}>
+      <div class="cst-arm b-${branch}" style="--angle:${angleDeg}deg" data-branch="${branch}">
+        <div class="cst-arm-line" aria-hidden="true"></div>
+        <div class="cst-nodes">${nodeHtml}
+          <button type="button" class="cst-node major ult ${ult ? 'on' : ''}" title="${ultTitle}" aria-label="${ultTitle}" disabled>
+            <span class="cst-dot">${icon(ult ? 'star' : 'lock', 'xs')}</span>
+            <span class="cst-label">${en ? ultDef.nameEn : ultDef.nameZh}</span>
+          </button>
+        </div>
+        <div class="cst-arm-head">
+          <span class="skill-ico">${icon(branchIco(branch))}</span>
+          <strong>${branchLabel(branch)}</strong>
+          <div class="skill-prog">${branchProgressLabel(s, branch, dict.ultShort)}</div>
+          <button type="button" class="spend-btn" data-spend="${branch}" aria-label="${dict.spend}: ${branchLabel(branch)}" title="${can ? dict.spend : filled >= BRANCH_FILL && ult ? dict.branchFull : dict.notEnough}" ${can ? '' : 'disabled'}>
             ${ultNext ? `${icon('star', 'xs')}${ULTIMATE_COST}` : `<span class="plus">＋</span>`}
           </button>
         </div>
-        <div class="skill-bar"><i style="width:${pct}%"></i></div>
-        <div class="ult ${ult ? 'on' : ''}">${icon(ult ? 'check' : 'lock', 'xs')}<span>${dict.ultimate}: ${ultName}</span></div>
       </div>
     `;
   };
@@ -521,9 +567,12 @@ function renderSkills(game: Game): HTMLElement {
         ${overRun ? `<p class="points">${pointsChip(game)}</p>` : ''}
         <p class="howto">${fmt(dict.skillHowto, { fill: BRANCH_FILL, ult: ULTIMATE_COST })}</p>
         ${overRun ? `<p class="howto">${dict.skillsApplyNext}</p>` : ''}
-        ${branchRow('str', dict.strength, dict.ultStr)}
-        ${branchRow('spd', dict.speed, dict.ultSpd)}
-        ${branchRow('wis', dict.wisdom, dict.ultWis)}
+        <div class="constellation" role="group" aria-label="${dict.skills}">
+          <div class="cst-core" title="${dict.skillPoints}">${icon('skills')}<b>${s.points}</b></div>
+          ${arm('str', -90)}
+          ${arm('spd', 30)}
+          ${arm('sta', 150)}
+        </div>
         ${overRun ? `<button type="button" class="primary" id="btn-back">${icon('back', 'sm')}<span>${dict.back}</span></button>` : ''}
       </div>
     </div>
@@ -540,10 +589,9 @@ function renderSkills(game: Game): HTMLElement {
   });
   const back = () => {
     game.audio.ui();
-    game.closeSkills(); // back to the menu, or to the paused / finished run
+    game.closeSkills();
   };
   panel.querySelector('#btn-back')?.addEventListener('click', back);
-  // Full-screen variant: the bar's back button closes the tree instead of opening the menu.
   const barBack = panel.querySelector('[data-act="menu-back"]');
   if (barBack) {
     barBack.removeAttribute('data-act');
@@ -570,8 +618,8 @@ function renderIntroCard(game: Game): HTMLElement {
   const block = en ? copy.blockEn : copy.blockZh;
   const tip = en ? copy.tipEn : copy.tipZh;
   const otherName = en
-    ? ({ luggage: '拉行李喼', stench: '惡臭人', family: '一家大細', brat: '百厭仔', couple: '情侶', angry: '暴躁男' } as Record<string, string>)[kind]
-    : ({ luggage: 'Luggage', stench: 'Stench', family: 'Family', brat: 'Brat', couple: 'Couple', angry: 'Angry man' } as Record<string, string>)[kind];
+    ? ({ luggage: '拉行李喼', stench: '惡臭人', family: '一家大細', brat: '百厭仔', couple: '情侶', angry: '暴躁男', squat: '踎低客' } as Record<string, string>)[kind]
+    : ({ luggage: 'Luggage', stench: 'Stench', family: 'Family', brat: 'Brat', couple: 'Couple', angry: 'Angry man', squat: 'Squatter' } as Record<string, string>)[kind];
 
   const inLevel = !!game.level;
   const panel = el(`
