@@ -4,16 +4,13 @@ import { DEFAULT_AUDIO } from './Audio';
 export interface SkillState {
   str: number; // 0–60 filled, then ultimate via flag
   spd: number;
-  wis: number;
+  sta: number;
   ultStr: boolean;
   ultSpd: boolean;
-  ultWis: boolean;
+  ultSta: boolean;
   points: number;
 }
-
-/** User-facing graphics setting. `auto` picks low/high from device hints + an FPS probe. */
 export type QualitySetting = 'auto' | 'low' | 'high';
-/** Resolved render tier. */
 export type QualityLevel = 'low' | 'high';
 
 export interface SaveData {
@@ -22,41 +19,29 @@ export interface SaveData {
   skills: SkillState;
   highestCleared: number;
   cleared: number[];
-  /** v0.2.2: clears per level id (for the capped replay bonus). Old saves: derived from `cleared`. */
   clears: Record<string, number>;
-  /** v0.2.2: graphics setting (default `auto`). */
   quality: QualitySetting;
-  /** v0.2.2: cached result of the auto-quality probe (null = not probed yet). */
   autoQuality: QualityLevel | null;
-  /** v0.3: floating passenger-type icons above special passengers (default on). */
   typeIcons: boolean;
-  /** v0.4: mixer — master / music / sfx volumes 0–1 and mute toggle. */
   masterVol: number;
   musicVol: number;
   sfxVol: number;
   muted: boolean;
-  /** v0.5: passenger kinds whose intro card has been shown (or re-viewed from legend). */
   seenIntros: string[];
-  /** v0.5: first-run FTUE (auto L1 + ghost hand) completed. */
   ftueDone: boolean;
 }
 
 const KEY = 'hk-mtr-exit-rush-v1';
-
-/**
- * In-memory fallback used when localStorage is unavailable (Safari private mode,
- * quota exceeded, storage blocked). Progress then lasts for the session only.
- */
 let memory: string | null = null;
 
 export function defaultSkills(): SkillState {
   return {
     str: 0,
     spd: 0,
-    wis: 0,
+    sta: 0,
     ultStr: false,
     ultSpd: false,
-    ultWis: false,
+    ultSta: false,
     points: 0,
   };
 }
@@ -87,12 +72,10 @@ const vol = (v: unknown, d: number): number => {
   return Math.min(1, Math.max(0, v));
 };
 const bool = (v: unknown): boolean => v === true;
-
-/** Merge a parsed (possibly old / partial / corrupted) save over defaults. */
 export function normalizeSave(parsed: Partial<SaveData> | null | undefined): SaveData {
   const d = defaultSave();
   if (!parsed || typeof parsed !== 'object' || parsed.version !== 1) return d;
-  const sk = (parsed.skills ?? {}) as Partial<SkillState>;
+  const sk = (parsed.skills ?? {}) as Partial<SkillState> & { wis?: number; ultWis?: boolean };
   const cleared = Array.isArray(parsed.cleared)
     ? [...new Set(parsed.cleared.filter((n): n is number => typeof n === 'number' && Number.isFinite(n)))]
     : [];
@@ -105,16 +88,18 @@ export function normalizeSave(parsed: Partial<SaveData> | null | undefined): Sav
   for (const id of cleared) if (!clears[id]) clears[id] = 1;
   const q = parsed.quality;
   const aq = parsed.autoQuality;
+  const sta = num(sk.sta, num(sk.wis, 0));
+  const ultSta = bool(sk.ultSta) || bool(sk.ultWis);
   return {
     version: 1,
     lang: parsed.lang === 'en' || parsed.lang === 'zh-HK' ? parsed.lang : d.lang,
     skills: {
       str: num(sk.str, 0),
       spd: num(sk.spd, 0),
-      wis: num(sk.wis, 0),
+      sta,
       ultStr: bool(sk.ultStr),
       ultSpd: bool(sk.ultSpd),
-      ultWis: bool(sk.ultWis),
+      ultSta,
       points: num(sk.points, 0),
     },
     highestCleared: num(parsed.highestCleared, 0),
@@ -153,11 +138,6 @@ export function loadSave(): SaveData {
     return defaultSave();
   }
 }
-
-/**
- * Persist the save. Never throws: on failure the data is kept in memory for this
- * session and `false` is returned so the caller can warn the player once.
- */
 export function writeSave(data: SaveData): boolean {
   let json: string;
   try {
