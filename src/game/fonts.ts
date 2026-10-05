@@ -3,6 +3,8 @@
  * Fonts live under public/fonts/ (see OFL-Noto.txt).
  * Paths respect Vite `base` (e.g. /hk-mtr-exit-rush/ on GitHub Pages).
  */
+import { publicUrl } from './publicUrl';
+
 let ready: Promise<void> | null = null;
 let loaded = false;
 
@@ -10,11 +12,6 @@ const FACES: Array<{ family: string; file: string; weight?: string }> = [
   { family: 'ExitRush Sans', file: 'fonts/NotoSansHK-Bold.subset.woff2', weight: '700' },
   { family: 'ExitRush Serif', file: 'fonts/NotoSerifHK-Bold.subset.woff2', weight: '700' },
 ];
-
-function publicUrl(rel: string): string {
-  const base = import.meta.env.BASE_URL || '/';
-  return `${base}${rel.replace(/^\//, '')}`;
-}
 
 export function fontsReady(): boolean {
   return loaded;
@@ -40,7 +37,6 @@ export function loadGameFonts(): Promise<void> {
         document.fonts.add(loadedFace);
       }),
     );
-    // Ensure the browser has them for canvas measureText.
     await document.fonts.ready;
     loaded = true;
     console.info('[fonts] ExitRush Sans/Serif subsets ready');
