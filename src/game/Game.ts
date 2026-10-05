@@ -7,8 +7,10 @@ import { Effects } from './Effects';
 import { InputController } from './Input';
 import { GameAudio } from './Audio';
 import { haptic } from './haptics';
-import { getLevel, playableLevels, type LevelDef } from './levels';
-import { MAX_POINTS_PER_LEVEL, modifiersFromSkills } from './SkillTree';
+import { getLevel, playableLevels, isFinaleUnlocked, type LevelDef } from './levels';
+import { MAX_POINTS_PER_LEVEL, POINTS_PER_FIRST_CLEAR, modifiersFromSkills } from './SkillTree';
+import type { IntroKind } from './intros';
+import type { PassengerKind } from './PassengerTypes';
 import { loadSave, writeSave, type QualityLevel, type QualitySetting, type SaveData, type SkillState } from './storage';
 import { FpsProbe, PROBE_MIN_FPS, pixelRatioFor, resolveQuality } from './quality';
 import { setLang, getLang, t } from '../i18n';
@@ -17,7 +19,7 @@ import { TUNING } from './sim/tuning';
 import type { SimEvent, UltKind } from './sim/events';
 import type { PlayerInput } from './sim/PlayerSim';
 
-export type GameScreen = 'menu' | 'levels' | 'legend' | 'playing' | 'paused' | 'skills' | 'win' | 'lose';
+export type GameScreen = 'menu' | 'levels' | 'legend' | 'intro' | 'playing' | 'paused' | 'skills' | 'win' | 'lose';
 
 /** Screens drawn over the full-bleed key art (the 3D view is hidden, so skip rendering it). */
 const BACKDROP_SCREENS: GameScreen[] = ['menu', 'levels', 'legend'];
@@ -59,6 +61,14 @@ export class Game {
   /** Skills the current run was started with (spending mid-run applies on the next run). */
   runSkills: SkillState;
   lastClear: ClearResult | null = null;
+  /** Active intro card kind (screen === 'intro'). */
+  pendingIntro: IntroKind | null = null;
+  /** HUD tip chip kind while playing a reinforce level. */
+  activeTip: PassengerKind | null = null;
+  /** Show FTUE ghost-hand on L1. */
+  showFtueGhost = false;
+  /** Seconds remaining for FTUE ghost (visual only). */
+  ftueGhostT = 0;
   /** Resolved render tier currently applied. */
   quality: QualityLevel = 'high';
   /** Whether the WebGL context was created with antialias (fixed for its lifetime). */
@@ -356,6 +366,10 @@ export class Game {
   startLevel(id: number): void {
     const level = getLevel(id);
     if (!level || !level.playable) return;
+    if (id === 100 && !isFinaleUnlocked(this.save.cleared, this.save.highestCleared)) {
+      this.hooks.onToast?.(t().finaleLocked);
+      return;
+    }
     this.audio.unlock();
     this.audio.arrival();
     this.audio.announce(getLang());
@@ -366,6 +380,8 @@ export class Game {
     this.audio.startAmbience(level.density, level.id === 100);
     this.lastClear = null;
     this.autoPaused = false;
+    this.pendingIntro = null;
+    this.activeTip = level.tipKind ?? null;
     this.runSkills = { ...this.save.skills };
     const sim = new Sim(level, modifiersFromSkills(this.runSkills), Math.random);
     this.bindSim(sim);
@@ -377,12 +393,77 @@ export class Game {
     this.shoveBtn = false;
     this.train.setDoorOpenValue(1);
     this.audio.doorOpen();
-    this.screen = 'playing';
+
+    // FTUE ghost on first L1
+    this.showFtueGhost = id === 1 && !this.save.ftueDone;
+    this.ftueGhostT = this.showFtueGhost ? 5 : 0;
+
+    const intro = level.introKind;
+    if (intro && !this.save.seenIntros.includes(intro)) {
+      this.pendingIntro = intro as IntroKind;
+      this.screen = 'intro';
+    } else {
+      this.screen = 'playing';
+    }
     this.hooks.onState();
+  }
+
+  /** Dismiss the intro card and start the door timer. */
+  dismissIntro(markSeen = true): void {
+    if (this.screen !== 'intro' || !this.pendingIntro) return;
+    if (markSeen && !this.save.seenIntros.includes(this.pendingIntro)) {
+      this.save.seenIntros.push(this.pendingIntro);
+      this.persist();
+    }
+    this.activeTip = this.pendingIntro;
+    this.pendingIntro = null;
+    this.screen = 'playing';
+    this.lastT = performance.now();
+    this.audio.unlock();
+    this.hooks.onState();
+  }
+
+  /** Re-show an intro card from the legend (does not start a level). */
+  reviewIntro(kind: IntroKind): void {
+    if (this.level) return; // only from menu/legend
+    this.pendingIntro = kind;
+    if (!this.save.seenIntros.includes(kind)) {
+      this.save.seenIntros.push(kind);
+      this.persist();
+    }
+    this.screen = 'intro';
+    this.skillsReturn = 'legend';
+    this.hooks.onState();
+  }
+
+  /** Close a legend-only intro review. */
+  closeIntroReview(): void {
+    if (this.screen !== 'intro' || this.level) return;
+    this.pendingIntro = null;
+    this.screen = 'legend';
+    this.hooks.onState();
+  }
+
+  /** Mark FTUE complete once the player has dragged or time ran out. */
+  completeFtue(): void {
+    if (!this.save.ftueDone) {
+      this.save.ftueDone = true;
+      this.persist();
+    }
+    this.showFtueGhost = false;
+    this.ftueGhostT = 0;
+  }
+
+  /** First launch: jump straight into L1. */
+  tryAutoFtue(): void {
+    if (this.save.ftueDone || this.save.cleared.length > 0) return;
+    if (this.screen !== 'menu') return;
+    this.startLevel(1);
   }
 
   /** Pause a running level (no-op otherwise). `auto` = backgrounded / blurred. */
   pause(auto = false): void {
+    if (this.screen === 'intro') return;
     if (this.screen !== 'playing') return;
     this.screen = 'paused';
     this.autoPaused = auto;
@@ -422,6 +503,9 @@ export class Game {
     this.screen = 'menu';
     this.skillsReturn = 'menu';
     this.autoPaused = false;
+    this.pendingIntro = null;
+    this.activeTip = null;
+    this.showFtueGhost = false;
     this.level = null;
     this.input.reset();
     this.train.setWarning(0);
@@ -478,12 +562,13 @@ export class Game {
     this.save.clears[id] = count;
     if (!this.save.cleared.includes(id)) this.save.cleared.push(id);
     this.save.highestCleared = Math.max(this.save.highestCleared, id);
-    // First clear + capped replays award points (see MAX_POINTS_PER_LEVEL).
+    // v0.5: first clear only, POINTS_PER_FIRST_CLEAR each (no replay SP).
     const awarded = count <= MAX_POINTS_PER_LEVEL;
     if (awarded) {
-      this.save.skills.points += 1;
+      this.save.skills.points += POINTS_PER_FIRST_CLEAR;
       this.audio.skillPoint();
     }
+    if (id === 1) this.completeFtue();
     this.lastClear = { count, awarded };
     this.audio.stopAmbience();
     this.persist();
@@ -703,6 +788,14 @@ export class Game {
     const now = sim.time;
 
     // Result handling (short celebration / slam before the overlay).
+    if (this.showFtueGhost && this.screen === 'playing') {
+      this.ftueGhostT -= dt;
+      if (this.input.drag.magnitude > 0.25 || this.ftueGhostT <= 0) {
+        this.completeFtue();
+        this.hooks.onState();
+      }
+    }
+
     if (sim.result && this.screen === 'playing') {
       if (this.resultDelay < 0) {
         this.resultDelay = sim.result === 'win' ? 0.55 : 0.35;
