@@ -26,7 +26,7 @@ import { cpus } from 'node:os';
 import { writeFileSync } from 'node:fs';
 import { Sim } from '../src/game/sim/Sim';
 import { mulberry32 } from '../src/game/sim/rng';
-import { DOOR_Z, TUNING } from '../src/game/sim/tuning';
+import { DOOR_Z, TUNING, doorWallX, nearestDoorBay, openDoorBays } from '../src/game/sim/tuning';
 import { LEVELS } from '../src/game/levels';
 import { BRANCH_FILL, modifiersFromSkills } from '../src/game/SkillTree';
 import { defaultSkills, type SkillState } from '../src/game/storage';
@@ -149,41 +149,43 @@ function runLevel(levelId: number, skills: SkillState, seed: number): Run {
   let ults = 0;
   let steps = 0;
   // Progress tracking for the "unstick" behaviour a human would use.
-  let bestZ = p.body.z;
+  let bestZ = p.body.x; // best (most negative / doorward) X
   let stuckT = 0;
   let escapeT = 0;
   let escapeDir = 1;
   const t0 = performance.now();
   while (!sim.finished && steps < 200 * 60) {
     const b = p.body;
-    if (b.z < bestZ - 0.15) {
-      bestZ = b.z;
+    if (b.x < bestZ - 0.12) {
+      bestZ = b.x;
       stuckT = 0;
     } else {
       stuckT += DT;
     }
-    // Bot: aim at the doorway with a little weave to find gaps; follow the WIS path if shown.
-    let dx = -b.x * 0.8 + Math.sin(sim.time * 1.7) * 0.25;
-    let dz = DOOR_Z - b.z;
+    // Bot: aim at the nearest open side door (−X) with a little weave; follow WIS path if shown.
+    const bays = sim.openBays.length ? sim.openBays : openDoorBays(levelId);
+    const bay = nearestDoorBay(b.z, bays);
+    const wall = doorWallX();
+    let dx = wall - b.x + Math.sin(sim.time * 1.7) * 0.2;
+    let dz = bay - b.z;
     if (p.path.length > 1) {
       const q = p.path[Math.min(2, p.path.length - 1)];
       dx = q.x - b.x;
       dz = q.z - b.z;
-    } else if (Math.abs(b.x) > 1.0 && b.z > DOOR_Z + 1.2) {
-      // Squeezed out beside the benches: get back into the aisle first.
-      dx = -Math.sign(b.x);
-      dz = -0.25;
+    } else if (b.x > 0.9 && Math.abs(b.z - bay) > 0.9) {
+      // Still on the far side: line up with the bay along Z first, then push left.
+      dx = -0.35;
+      dz = bay - b.z;
     }
-    // No progress for a while: sidestep for a moment (alternating sides), like a player feeling for a gap.
     if (escapeT <= 0 && stuckT > 2) {
       escapeT = 0.7;
-      escapeDir = Math.abs(b.x) > 0.45 ? -Math.sign(b.x) : -escapeDir;
+      escapeDir = Math.abs(b.z - bay) > 0.35 ? Math.sign(bay - b.z) || 1 : -escapeDir;
       stuckT = 0;
     }
     if (escapeT > 0) {
       escapeT -= DT;
-      dx = escapeDir;
-      dz = -0.35;
+      dx = -0.35;
+      dz = escapeDir;
     }
     const l = Math.hypot(dx, dz) || 1;
     dx /= l;
