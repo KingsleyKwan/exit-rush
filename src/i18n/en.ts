@@ -89,6 +89,14 @@ export interface Dict {
   finale: string;
   cleared: string;
   artCredit: string;
+  // v0.5
+  finaleLocked: string;
+  introTap: string;
+  introTitle: string;
+  tipChip: string;
+  reviewIntro: string;
+  clearBonusN: string;
+  levelsTeaserV05: string;
 }
 
 export const en: Dict = {
@@ -125,11 +133,11 @@ export const en: Dict = {
   density: 'Crowd',
   howTo: 'Drag anywhere to steer · hold ✊ to shove · get out before the doors close.',
   language: 'Language',
-  clearBonus: '+1 skill point',
-  replayBonus: '+1 skill point (replay {n}/{max})',
-  clearNoBonus: 'No more skill points from this level',
+  clearBonus: '+3 skill points',
+  replayBonus: '+{n} skill points (replay {n}/{max})',
+  clearNoBonus: 'No more skill points from this level — first clear only',
   back: 'Back',
-  levelsTeaser: 'Levels 21–99 TBD · Lv100 is the finale',
+  levelsTeaser: 'Levels 1–30 playable · clear 30 to unlock Lv100',
   skillHowto: '{fill} points fill a branch · +{ult} for the Ultimate',
   ultShort: 'Ult',
   skillsApplyNext: 'Changes apply from your next run.',
@@ -179,4 +187,12 @@ export const en: Dict = {
   finale: 'Finale',
   cleared: 'Cleared',
   artCredit: 'Concept art: Grok Image. 香城鐵路 is fiction — inspired by HK metro, not affiliated.',
+  finaleLocked: 'Clear level 30 to unlock the fireworks finale.',
+  introTap: 'Tap to start',
+  introTitle: 'New passenger',
+  tipChip: 'Tip',
+  reviewIntro: 'How they block you',
+  clearBonusN: '+{n} skill points',
+  levelsTeaserV05: 'Short exits · learn one special every few levels',
 };
+
