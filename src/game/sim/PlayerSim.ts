@@ -2,7 +2,7 @@ import { applyImpulse, createBody, setMass, type Body, type World } from './Phys
 import type { SkillModifiers } from '../SkillTree';
 import type { CrowdSim } from './CrowdSim';
 import type { Emit, UltKind } from './events';
-import { DOOR_Z, PLAYER_START_X, PLAYER_START_Z, TUNING } from './tuning';
+import { DOOR_Z, PLAYER_START_X, PLAYER_START_Z, TUNING, doorWallX } from './tuning';
 
 export interface PlayerInput {
   /** Stick x: + = screen right (+X world). */
@@ -47,6 +47,8 @@ export class PlayerSim {
   /** 0–1 current crowd-drag slow (shuffling through a packed crowd). */
   drag = 0;
   path: PathPoint[] = [];
+  /** Nearest open side-door bay Z (set by Sim each step). */
+  targetDoorZ = DOOR_Z;
   private pathT = 0;
   private tmp: Body[] = [];
 
@@ -323,9 +325,9 @@ export class PlayerSim {
       let dx = this.faceX;
       let dz = this.faceZ;
       if (this.moving < 0.1) {
-        // No stick: dash toward the door.
-        dx = -b.x;
-        dz = DOOR_Z - b.z;
+        // No stick: dash toward the nearest open side door (−X).
+        dx = doorWallX() - b.x;
+        dz = this.targetDoorZ - b.z;
         const l = Math.hypot(dx, dz) || 1;
         dx /= l;
         dz /= l;
@@ -396,15 +398,17 @@ export class PlayerSim {
     return [rx, rz];
   }
 
-  /** Greedy gap-following path from the player to the doorway (WIS ultimate). */
+  /** Greedy gap-following path from the player to the nearest side door (WIS ultimate). */
   computePath(world: World): PathPoint[] {
     const C = TUNING.car;
+    const wall = doorWallX();
+    const bay = this.targetDoorZ;
     const pts: PathPoint[] = [];
     let x = this.body.x;
     let z = this.body.z;
     for (let i = 0; i < 18; i++) {
-      let dx = -x * 0.6;
-      let dz = DOOR_Z - 0.2 - z;
+      let dx = wall + 0.2 - x;
+      let dz = bay - z;
       const l = Math.hypot(dx, dz);
       if (l < 0.3) break;
       dx /= l;
@@ -412,9 +416,10 @@ export class PlayerSim {
       const [ax, az] = this.assistDir(x, z, dx, dz, 1, world);
       x += ax * 0.42;
       z += az * 0.42;
-      x = Math.max(-C.halfWidth + 0.3, Math.min(C.halfWidth - 0.3, x));
+      x = Math.max(-C.halfWidth + 0.15, Math.min(C.halfWidth - 0.3, x));
+      z = Math.max(C.zMin + 0.3, Math.min(C.zMax - 0.3, z));
       pts.push({ x, z });
-      if (z <= DOOR_Z + C.winDepth && Math.abs(x) < C.winHalf) break;
+      if (x <= wall + C.winDepth && Math.abs(z - bay) < C.winHalf) break;
     }
     return pts;
   }

@@ -1,7 +1,7 @@
 import { applyImpulse, createBody, type Body, type World } from './Physics';
 import { PASSENGER_DEFS, type PassengerKind } from '../PassengerTypes';
 import { crowdCount, type LevelDef } from '../levels';
-import { TUNING } from './tuning';
+import { CAR_Z_MAX, CAR_Z_MIN, TUNING, doorWallX, nearestDoorBay } from './tuning';
 import type { Emit } from './events';
 import type { Rng } from './rng';
 
@@ -18,7 +18,7 @@ export interface Agent {
   /** Boarders: final spot inside the car. */
   goalX: number;
   goalZ: number;
-  /** Boarders: x they aim for when funnelling through the doorway. */
+  /** Boarders: Z they aim for when funnelling through a side doorway. */
   doorX: number;
   displacedT: number;
   stuckT: number;
@@ -41,6 +41,11 @@ export interface Agent {
 
 export interface CrowdCtx {
   time: number;
+  /** Left door-wall X (platform side). */
+  doorWallX: number;
+  /** Open side-door bay Z centres. */
+  openBays: readonly number[];
+  /** Mid-car Z (compat / ambient). */
   doorZ: number;
   pressure: number;
   boardingActive: boolean;
@@ -228,59 +233,64 @@ export class CrowdSim {
     return out;
   }
 
-  private randomCarSpot(doorZ: number): [number, number] {
+  private randomCarSpot(openBays: readonly number[]): [number, number] {
     const c = TUNING.car;
-    // Metro riders bunch up near the doors: bias spawns toward the door end.
-    const z = doorZ + 0.75 + Math.pow(this.rng(), 1.5) * (c.backZ - 0.3 - (doorZ + 0.75));
-    const wide = this.rng() < 0.3;
-    const x = (this.rng() - 0.5) * 2 * (wide ? 1.7 : 1.1);
-    return [x, z];
+    // Bias riders toward the door (left) wall — the crush the player must cross.
+    const bay = openBays[Math.floor(this.rng() * openBays.length)] ?? 0;
+    const z = bay + (this.rng() - 0.5) * 2.2;
+    const towardDoor = Math.pow(this.rng(), 0.7);
+    const x = -c.halfWidth + 0.55 + towardDoor * (c.halfWidth * 1.55);
+    return [clamp(x, -c.halfWidth + 0.35, c.halfWidth - 0.35), clamp(z, CAR_Z_MIN + 0.4, CAR_Z_MAX - 0.4)];
   }
 
-  spawnInitial(level: LevelDef, doorZ: number, avoidX: number, avoidZ: number): void {
+  spawnInitial(level: LevelDef, openBays: readonly number[], avoidX: number, avoidZ: number): void {
     const n = crowdCount(level.density);
     let people = 0;
     let guard = 0;
     while (people < n && guard++ < n * 6) {
       const kind = pickKind(level.mix, this.rng);
-      let [x, z] = this.randomCarSpot(doorZ);
+      let [x, z] = this.randomCarSpot(openBays);
       if (Math.hypot(x - avoidX, z - avoidZ) < 0.75) continue;
       const made = this.spawnGroup(kind, x, z, 'rider', 0.45);
       people += made.length;
     }
-    // Boarders waiting on the platform (the wall you see when the doors open).
+    // Boarders waiting on the platform beyond the left wall.
     const C = TUNING.crowd;
     this.boardBudget = Math.round(C.boardBudgetBase + level.pressure * C.boardBudgetPerPressure);
     const queue = Math.min(this.boardBudget, Math.round(C.boardQueueBase + level.pressure * C.boardQueuePerPressure));
     let q = 0;
     guard = 0;
     while (q < queue && guard++ < queue * 5) {
-      const made = this.spawnBoarderUnit(level, doorZ);
+      const made = this.spawnBoarderUnit(level, openBays);
       if (made === 0) break;
       q += made;
     }
     this.boardBudget = Math.max(0, this.boardBudget - q);
   }
 
-  private spawnBoarderUnit(level: LevelDef, doorZ: number): number {
+  private spawnBoarderUnit(level: LevelDef, openBays: readonly number[]): number {
     const kind = pickKind(level.mix, this.rng);
-    const x = (this.rng() - 0.5) * 2.4;
-    const z = doorZ - 0.5 - this.rng() * 1.8;
+    const wall = doorWallX();
+    const bay = openBays[Math.floor(this.rng() * openBays.length)] ?? 0;
+    // Platform side (−X), lined up on a door bay.
+    const x = wall - 0.55 - this.rng() * 1.6;
+    const z = bay + (this.rng() - 0.5) * 1.1;
     const made = this.spawnGroup(kind, x, z, 'boarder', 0.6);
     if (made.length === 0) return 0;
-    const gx = (this.rng() - 0.5) * 2.0;
-    const gz = doorZ + 1.4 + this.rng() * (TUNING.car.backZ - 0.6 - (doorZ + 1.4));
-    const dx = (this.rng() - 0.5) * 0.9;
+    // Goal deep toward the far (+X) side of the car.
+    const gx = 0.4 + this.rng() * 1.2;
+    const gz = bay + (this.rng() - 0.5) * 2.4;
+    const doorZAim = bay + (this.rng() - 0.5) * 0.5;
     for (const a of made) {
-      a.goalX = gx + (a.body.x - made[0].body.x);
-      a.goalZ = gz + (a.body.z - made[0].body.z);
-      a.doorX = clamp(dx + (a.body.x - made[0].body.x) * 0.5, -0.55, 0.55);
+      a.goalX = clamp(gx + (a.body.x - made[0].body.x), -TUNING.car.halfWidth + 0.4, TUNING.car.halfWidth - 0.35);
+      a.goalZ = clamp(gz + (a.body.z - made[0].body.z), CAR_Z_MIN + 0.4, CAR_Z_MAX - 0.4);
+      a.doorX = doorZAim; // reuse field: Z aim through the doorway
     }
     return made.length;
   }
 
   /** Counterflow: boarders stream in from the platform while the doors are open. */
-  tickBoarding(dt: number, level: LevelDef, doorZ: number, time: number, doorOpen: number): void {
+  tickBoarding(dt: number, level: LevelDef, openBays: readonly number[], time: number, doorOpen: number): void {
     const C = TUNING.crowd;
     if (doorOpen < 0.95 || this.boardBudget <= 0) return;
     const t = time - C.boardDelay;
@@ -293,17 +303,20 @@ export class CrowdSim {
         this.spawnAcc = Math.min(this.spawnAcc, 1);
         return;
       }
-      const made = this.spawnBoarderUnit(level, doorZ);
+      const made = this.spawnBoarderUnit(level, openBays);
       if (made === 0) return; // platform jammed — try next step
       this.spawnAcc -= 1;
       this.boardBudget = Math.max(0, this.boardBudget - made);
     }
   }
 
-  activeBoardersNearDoor(doorZ: number): number {
+  activeBoardersNearDoor(wallX: number, openBays: readonly number[]): number {
     let n = 0;
     for (const a of this.agents) {
-      if (a.mode === 'boarder' && a.body.z < doorZ + 2.5) n++;
+      if (a.mode !== 'boarder') continue;
+      if (a.body.x > wallX + 2.2) continue;
+      const bay = nearestDoorBay(a.body.z, openBays);
+      if (Math.abs(a.body.z - bay) < 2.2) n++;
     }
     return n;
   }
@@ -338,10 +351,10 @@ export class CrowdSim {
       a.age += dt;
 
       if (a.mode === 'boarder' && ctx.boardingActive) {
-        // Funnel to the doorway, then push to a spot deep in the car.
-        const inside = b.z > ctx.doorZ + 0.2;
-        const wx = inside ? a.goalX : a.doorX;
-        const wz = inside ? a.goalZ : ctx.doorZ + 0.7;
+        // Funnel through a side doorway (−X → +X), then settle deep in the car.
+        const inside = b.x > ctx.doorWallX + 0.25;
+        const wx = inside ? a.goalX : ctx.doorWallX + 0.55;
+        const wz = inside ? a.goalZ : a.doorX;
         const dx = wx - b.x;
         const dz = wz - b.z;
         const dist = Math.hypot(dx, dz) || 1e-6;
@@ -361,7 +374,7 @@ export class CrowdSim {
         if (
           (inside && dist < 0.45) ||
           a.age > C.boardMaxTime ||
-          (b.z > ctx.doorZ + 1.6 && a.stuckT > 1.8)
+          (b.x > ctx.doorWallX + 1.4 && a.stuckT > 1.8)
         ) {
           a.mode = 'rider';
           a.homeX = b.x;
@@ -393,11 +406,11 @@ export class CrowdSim {
         } else {
           a.displacedT = Math.max(0, a.displacedT - dt);
         }
-        // Boarding pressure squeezes riders near the door deeper into the car.
+        // Boarding pressure squeezes riders near the left doors toward the far (+X) wall.
         if (a.mode === 'rider' && ctx.pressureField > 0) {
-          const dd = b.z - ctx.doorZ;
+          const dd = b.x - ctx.doorWallX;
           if (dd > 0 && dd < C.pressureRange) {
-            fz += C.pressureForce * ctx.pressureField * (1 - dd / C.pressureRange) * m;
+            fx += C.pressureForce * ctx.pressureField * (1 - dd / C.pressureRange) * m;
           }
         }
         // Sidestep for the player ("唔該借借") — stronger with WIS.

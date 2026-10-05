@@ -1,7 +1,16 @@
 import { World, type Body, type Box } from './Physics';
 import { CrowdSim } from './CrowdSim';
 import { PlayerSim, type PlayerInput } from './PlayerSim';
-import { DOOR_Z, PLAYER_START_Z, TUNING } from './tuning';
+import {
+  CAR_Z_MAX,
+  CAR_Z_MIN,
+  DOOR_Z,
+  PLAYER_START_X,
+  TUNING,
+  doorWallX,
+  nearestDoorBay,
+  openDoorBays,
+} from './tuning';
 import type { SimEvent, UltKind } from './events';
 import type { LevelDef } from '../levels';
 import type { SkillModifiers } from '../SkillTree';
@@ -9,9 +18,20 @@ import type { Rng } from './rng';
 
 export type SimResult = 'win' | 'lose' | null;
 
+interface DoorLeafPair {
+  bayZ: number;
+  /** Leaf that slides toward −Z. */
+  leafNeg: Box;
+  /** Leaf that slides toward +Z. */
+  leafPos: Box;
+  open: boolean;
+}
+
 /**
  * One level run: physics world + crowd AI + player controller + door timer.
  * Step it at a fixed rate (TUNING.physics.hz); it never touches the DOM or three.js.
+ *
+ * v0.4.1: exits are sliding doors on the left (−X) long wall; car ends are gangways.
  */
 export class Sim {
   readonly world: World;
@@ -19,17 +39,17 @@ export class Sim {
   readonly player: PlayerSim;
   readonly level: LevelDef;
   readonly events: SimEvent[] = [];
+  readonly openBays: number[];
   time = 0;
   timeLeft: number;
-  /** 0 closed … 1 fully open. */
+  /** 0 closed … 1 fully open (shared across open bays). */
   doorOpen = 1;
   result: SimResult = null;
   /** Ambient mode (menu backdrop): no timer, no boarding, no win/lose. */
   ambient = false;
   private progressBest = 0;
   private lastAngryHit = -99;
-  private leafL: Box;
-  private leafR: Box;
+  private doors: DoorLeafPair[] = [];
   private emit = (e: SimEvent): void => {
     this.events.push(e);
   };
@@ -38,6 +58,7 @@ export class Sim {
     const P = TUNING.physics;
     this.level = level;
     this.timeLeft = level.timer;
+    this.openBays = openDoorBays(level.id);
     this.world = new World({
       iterations: P.iterations,
       beta: P.contactBeta,
@@ -48,49 +69,81 @@ export class Sim {
       cellSize: P.cellSize,
       impactThreshold: P.impactEvent,
     });
-    const [l, r] = this.buildStatic();
-    this.leafL = l;
-    this.leafR = r;
+    this.doors = this.buildStatic();
     this.player = new PlayerSim(mods);
     this.world.add(this.player.body);
     this.crowd = new CrowdSim(this.world, rng);
-    this.crowd.spawnInitial(level, DOOR_Z, this.player.body.x, this.player.body.z);
+    this.crowd.spawnInitial(level, this.openBays, this.player.body.x, this.player.body.z);
     this.world.rebuildGrid();
     this.world.onImpact = (a, b, j, x, z) => this.onImpact(a, b, j, x, z);
   }
 
-  private buildStatic(): [Box, Box] {
+  /** Build car walls with gaps at open door bays on the left (−X) wall. */
+  private buildStatic(): DoorLeafPair[] {
     const w = this.world;
     const C = TUNING.car;
     const hw = C.halfWidth;
-    // Car side walls + back wall.
-    w.addBox(-hw - 1, -hw, DOOR_Z - 0.2, C.backZ + 1);
-    w.addBox(hw, hw + 1, DOOR_Z - 0.2, C.backZ + 1);
-    w.addBox(-hw - 1, hw + 1, C.backZ, C.backZ + 1);
-    // Bench seats (longitudinal, like an HCR car): leave a narrower standing aisle.
+    const dh = C.doorHalf;
+    const open = new Set(this.openBays);
+    const wallX = -hw;
+
+    // Right (+X) wall — solid (far from platform).
+    w.addBox(hw, hw + 1, CAR_Z_MIN - 0.5, CAR_Z_MAX + 0.5);
+    // Gangway end walls (no exit).
+    w.addBox(-hw - 0.2, hw + 0.2, CAR_Z_MIN - 1, CAR_Z_MIN);
+    w.addBox(-hw - 0.2, hw + 0.2, CAR_Z_MAX, CAR_Z_MAX + 1);
+
+    // Left (−X) wall segments between door bays.
+    const bays = [...C.doorBays].sort((a, b) => a - b);
+    const edges: number[] = [CAR_Z_MIN];
+    for (const bz of bays) {
+      edges.push(bz - dh, bz + dh);
+    }
+    edges.push(CAR_Z_MAX);
+    for (let i = 0; i + 1 < edges.length; i += 2) {
+      const z0 = edges[i];
+      const z1 = edges[i + 1];
+      if (z1 - z0 > 0.05) w.addBox(wallX - 1, wallX, z0, z1);
+    }
+    // Closed door bays: fill the gap with a solid wall (no leaf).
+    for (const bz of bays) {
+      if (!open.has(bz)) w.addBox(wallX - 1, wallX, bz - dh, bz + dh);
+    }
+
+    // Longitudinal benches between door bays (both sides), aisle clear.
+    const benchZs = [-3.4, -1.3, 1.3, 3.4];
     for (const sx of [-1, 1]) {
-      for (const cz of [-1.5, 0.5, 2.5]) {
-        const inner = 1.2;
-        w.addBox(sx > 0 ? inner : -hw, sx > 0 ? hw : -inner, cz - 0.7, cz + 0.7);
+      for (const cz of benchZs) {
+        // Skip benches that would block an open door vestibule on the left.
+        if (sx < 0 && open.has(nearestDoorBay(cz, [...open])) && Math.abs(cz - nearestDoorBay(cz, [...open])) < dh + 0.35) {
+          continue;
+        }
+        const inner = 1.15;
+        w.addBox(sx > 0 ? inner : -hw + 0.05, sx > 0 ? hw : -inner, cz - 0.55, cz + 0.55);
       }
     }
-    // Grab pole.
-    w.circles.push({ x: 0.9, z: 1.2, r: 0.05 });
-    // End wall around the doorway.
-    const pw = C.platformHalfWidth;
-    w.addBox(-pw - 1, -C.doorHalf, DOOR_Z - 0.2, DOOR_Z + 0.08);
-    w.addBox(C.doorHalf, pw + 1, DOOR_Z - 0.2, DOOR_Z + 0.08);
-    // Platform bounds.
-    const pz = DOOR_Z - C.platformDepth;
-    w.addBox(-pw - 1, pw + 1, pz - 1, pz);
-    w.addBox(-pw - 1, -pw, pz - 1, DOOR_Z);
-    w.addBox(pw, pw + 1, pz - 1, DOOR_Z);
-    // Door leaves: zero-width while open, slide into the doorway as they close.
-    const l = w.addBox(-C.doorHalf, -C.doorHalf, DOOR_Z - 0.06, DOOR_Z + 0.06);
-    const r = w.addBox(C.doorHalf, C.doorHalf, DOOR_Z - 0.06, DOOR_Z + 0.06);
-    l.enabled = false;
-    r.enabled = false;
-    return [l, r];
+    // Grab poles in the aisle.
+    w.circles.push({ x: 0.35, z: -1.3, r: 0.05 });
+    w.circles.push({ x: 0.35, z: 1.3, r: 0.05 });
+
+    // Platform bounds (−X of the door wall).
+    const px0 = wallX - C.platformDepth;
+    const pl = C.platformHalfLen;
+    w.addBox(px0 - 1, px0, -pl - 1, pl + 1); // far platform edge
+    w.addBox(px0 - 1, wallX + 0.5, -pl - 1, -pl); // −Z lip
+    w.addBox(px0 - 1, wallX + 0.5, pl, pl + 1); // +Z lip
+
+    // Door leaves for open bays (slide along Z into the opening as they close).
+    const pairs: DoorLeafPair[] = [];
+    for (const bz of bays) {
+      if (!open.has(bz)) continue;
+      const leafNeg = w.addBox(wallX - 0.08, wallX + 0.08, bz, bz); // zero-height while open
+      const leafPos = w.addBox(wallX - 0.08, wallX + 0.08, bz, bz);
+      leafNeg.enabled = false;
+      leafPos.enabled = false;
+      pairs.push({ bayZ: bz, leafNeg, leafPos, open: true });
+    }
+    return pairs;
   }
 
   private onImpact(a: Body, b: Body | null, j: number, x: number, z: number): void {
@@ -110,16 +163,24 @@ export class Sim {
     return this.result !== null;
   }
 
+  /** 0 at start (+X / deep) → 1 at the nearest open door on the platform side. */
   doorProgress(): number {
-    const z = this.player.body.z;
-    const t = (PLAYER_START_Z - z) / (PLAYER_START_Z - DOOR_Z);
-    return Math.max(0, Math.min(1, t));
+    const b = this.player.body;
+    const wall = doorWallX();
+    const bay = nearestDoorBay(b.z, this.openBays);
+    const spanX = PLAYER_START_X - (wall - TUNING.car.winDepth);
+    const tX = (PLAYER_START_X - b.x) / Math.max(0.5, spanX);
+    const tZ = 1 - Math.min(1, Math.abs(b.z - bay) / 3.5);
+    return Math.max(0, Math.min(1, tX * 0.75 + tZ * 0.25 * Math.max(0, tX)));
   }
 
   reachedDoor(): boolean {
     const b = this.player.body;
     const C = TUNING.car;
-    return b.z <= DOOR_Z + C.winDepth && Math.abs(b.x) < C.winHalf;
+    const wall = doorWallX();
+    if (b.x > wall - C.winDepth) return false;
+    if (this.doorOpen < 0.15) return false;
+    return this.openBays.some((bay) => Math.abs(b.z - bay) < C.winHalf);
   }
 
   tryUltimate(kind: UltKind): boolean {
@@ -133,6 +194,7 @@ export class Sim {
     const C = TUNING.car;
     const pl = this.player;
     const now = this.time;
+    const wall = doorWallX();
 
     if (this.ambient) {
       this.doorOpen = 1;
@@ -143,30 +205,37 @@ export class Sim {
       this.doorOpen = Math.max(0, this.doorOpen - dt * 3);
     } else {
       this.doorOpen = 1;
-      // Victory walk out onto the platform.
-      const tx = 0 - pl.body.x;
-      const tz = DOOR_Z - 1.6 - pl.body.z;
+      // Victory walk out onto the platform (−X).
+      const bay = nearestDoorBay(pl.body.z, this.openBays);
+      const tx = wall - 1.8 - pl.body.x;
+      const tz = bay - pl.body.z;
       const l = Math.hypot(tx, tz);
       input = l > 0.2 ? { x: tx / l, z: -tz / l, mag: 0.8, shoveHeld: false } : { x: 0, z: 0, mag: 0, shoveHeld: false };
     }
 
-    // Door leaves narrow the doorway physically while closing.
+    // Door leaves narrow each open bay along Z while closing.
     const half = C.doorHalf * this.doorOpen;
-    this.leafL.maxX = -half;
-    this.leafR.minX = half;
-    this.leafL.enabled = this.leafR.enabled = this.doorOpen < 0.999;
+    for (const d of this.doors) {
+      d.leafNeg.maxZ = d.bayZ - half;
+      d.leafNeg.minZ = d.bayZ - C.doorHalf;
+      d.leafPos.minZ = d.bayZ + half;
+      d.leafPos.maxZ = d.bayZ + C.doorHalf;
+      d.leafNeg.enabled = d.leafPos.enabled = this.doorOpen < 0.999;
+    }
 
     const sensing = pl.isSensing(now);
     const boardingActive = !this.ambient && now >= TUNING.crowd.boardDelay && this.doorOpen > 0.5;
-    const nearDoor = this.crowd.activeBoardersNearDoor(DOOR_Z);
+    const nearDoor = this.crowd.activeBoardersNearDoor(wall, this.openBays);
     const pressureField = boardingActive ? this.level.pressure * Math.min(1, nearDoor / 4) : 0;
 
     if (!this.ambient && (!this.result || this.result === 'win')) {
-      this.crowd.tickBoarding(dt, this.level, DOOR_Z, now, this.doorOpen);
+      this.crowd.tickBoarding(dt, this.level, this.openBays, now, this.doorOpen);
     }
     const C2 = TUNING.crowd;
     this.crowd.update(dt, {
       time: now,
+      doorWallX: wall,
+      openBays: this.openBays,
       doorZ: DOOR_Z,
       pressure: this.level.pressure,
       boardingActive,
@@ -189,6 +258,8 @@ export class Sim {
         pl.stunT = TUNING.player.stunTime * (1 - pl.mods.resist);
       },
     });
+    // Tell the player which bay to aim for (WIS path / dash).
+    pl.targetDoorZ = nearestDoorBay(pl.body.z, this.openBays);
     pl.step(dt, now, input, this.world, this.crowd, this.emit);
     this.world.step(dt);
     this.time += dt;
