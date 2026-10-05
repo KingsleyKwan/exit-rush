@@ -1,8 +1,8 @@
-# 逼落車 | HK MTR Exit Rush
+# 逼落車 | Exit Rush (香城鐵路)
 
-Mobile-first 3D crowd-exit game: you are a passenger trying to **get off** the train while Golden Week / rush-hour crowds **force on** (逼上車). Inspired by Hong Kong MTR station vibe (red/white, bilingual signs, line colours) — **original art only**, no copyrighted MTR logos or audio.
+Mobile-first 3D crowd-exit game set on the fictional **香城鐵路 / Hong City Rail (HCR)**: get **off** the train while rush-hour crowds **force on** (逼上車). **Parody** of Hong Kong metro vibes (coloured stations, bilingual signs) — **original art & audio only**; not affiliated with MTR Corporation or any real railway. Station names are playful parodies (see [`docs/STATIONS.md`](docs/STATIONS.md)).
 
-> Vertical slice (**v0.3.0**). Steam-store polish is the aspiration; v0.2 added real crowd physics, counterflow boarding, joystick + shove controls and a juice pass; v0.2.1 was a balance pass (see [`docs/BALANCE.md`](docs/BALANCE.md)); v0.2.2 was a bug-fix / mobile-robustness pass; **v0.3.0 is the art & icon pass** (see below).
+> Vertical slice (**v0.4.0**). Steam-store polish is the aspiration; v0.2 added real crowd physics, counterflow boarding, joystick + shove controls and a juice pass; v0.2.1 was a balance pass (see [`docs/BALANCE.md`](docs/BALANCE.md)); v0.2.2 was a bug-fix / mobile-robustness pass; **v0.3.0 was the art & icon pass**; **v0.4.0 is audio + per-station themes** (see below).
 
 <p align="center">
   <img src="docs/screens/ingame-l100.jpg" width="240" alt="Level 100 in-game, phone portrait">
@@ -11,7 +11,25 @@ Mobile-first 3D crowd-exit game: you are a passenger trying to **get off** the t
 </p>
 <p align="center"><img src="docs/screens/desktop-l100.jpg" width="640" alt="Level 100, landscape"></p>
 
+## v0.4.0 audio & station themes
+
+- **Fictional operator:** 香城鐵路 / Hong City Rail (HCR). Parody station & line names — mapping in [`docs/STATIONS.md`](docs/STATIONS.md).
+- **Original metro-style SFX** (Web Audio synthesis only — **no real-railway recordings**): rapid two-tone door-closing warning synced to the last-5s beeps; multi-note arrival jingle; doors open whoosh/hiss + thunk; departure rumble; crowd murmur ambience scaled by density (plus distant fireworks pops on L100); UI clicks; skill-point chime; win jingle / lose buzzer; stylised station-announce chime (no cloud TTS — bilingual sign flash instead).
+- **Mixer:** master / music / sfx volumes + mute toggle (menu + pause), persisted in the save (`masterVol`, `musicVol`, `sfxVol`, `muted`; old saves get defaults). Still respects visibility-pause suspend and iOS unlock.
+- **Per-station visual themes** (`src/game/stationThemes.ts`): wall/pillar tile colour, accent, line colour and lettering style for all 21 playable stations. Platform pillars and back wall follow the station colour; the strip map highlights the line colour; level cards show a station-colour swatch.
+- **Fonts (SIL OFL):** subset `Noto Sans CJK HK Bold` + `Noto Serif CJK HK Bold` woff2 under `public/fonts/` (~115 KB total) for station-sign canvas textures (serif for classic 香島/全灣 lettering, sans for modern lines). Licence: `public/fonts/OFL-Noto.txt`. **No proprietary railway fonts.**
+
+
+<p align="center">
+  <img src="docs/screens-v04/01-menu.jpg" width="180" alt="Title — 香城鐵路">
+  <img src="docs/screens-v04/02-levels.jpg" width="180" alt="Level select — parody stations">
+  <img src="docs/screens-v04/03-l1-sheung-huan.jpg" width="180" alt="L1 上圜 theme">
+  <img src="docs/screens-v04/04-l18-chuen-wan.jpg" width="180" alt="L18 全灣 theme">
+  <img src="docs/screens-v04/05-l100-tst.jpg" width="180" alt="L100 尖沙嘴 theme">
+</p>
+
 ## How to run
+
 
 ```bash
 cd hk-mtr-exit-rush
@@ -44,8 +62,8 @@ Touch / mouse: **drag anywhere** (floating joystick) to steer, **hold the fist b
 - **Concept art → game.** Style target, app icon and key art were **generated with Grok Image** (sources not in the repo; pipeline in [`scripts/art/build_art.py`](scripts/art/build_art.py) → `python3 scripts/art/build_art.py --src <dir>`). It crops the app icon to a full-bleed square (1024 store copy + 512/192/180 apple-touch/32 favicon, no transparency), compresses the key art to WebP for the title backdrop, cuts 8 passenger portraits into one alpha WebP strip for UI cards, and writes Steam-capsule-style crops (`store/capsule-1920x1080.jpg`, `store/capsule-460x215.jpg`). Added build assets ≈ 0.3 MB.
 - **Chunky chibi low-poly characters** (`src/game/characters.ts`): big heads with eyes/brows/mouth, hair shapes, torso, arms, legs, all merged into one flat-shaded, vertex-coloured geometry per look and drawn with one `InstancedMesh` per look (shared `MeshLambertMaterial`). Per-type silhouettes match the concept lineup: hero (blue shirt + lanyard, cyan glow shell + x-ray outline through the crowd), commuters (grey hoodie + phone, 6 colour variants), stench guy (yellow singlet, wavy green stink lines + flies), family (orange mum + 2 kids), brat (pink cap, small, bouncy), couple (matching magenta, joined hands, floating heart), angry man (red polo, anger vein + steam puffs during wind-up, red tint), tourist (sun hat, camera, big brown rolling suitcase). Waddle/bob, lean, squash & stretch and hit-flash work through instance matrices/colours.
 - **Floating type icons** (billboards) above special passengers near you (≈3.4 m) and above any angry man winding up; toggle in the menu / legend.
-- **MTR-style car** (original, no logos): white interior, red stripe, stainless longitudinal benches, glass partitions, vertical poles, overhead rails with red grips, red door frame + door-indicator lights, line-map strip above the door (stations from the level's line, bilingual), yellow edge line, platform screen doors, red-and-white tiled pillars and a navy bilingual station sign using the level's `stationEn` / `stationZh`; dark tunnel + neighbouring track on wide screens. Static geometry is merged by material (~a dozen draw calls).
-- **Icon-first UI** (`src/ui/icons.ts`): one authored, bold, rounded, filled SVG set (door, stamina, timer, shove, STR/SPD/WIS, skills, 粵/EN, pause/play/restart/home, quality, star, lock, crowd, legend, per-type glyphs) in MTR red / white / navy — no more emoji. New title screen over the key art, compact level cards (number badge with line dots, station 中/EN, density + timer icons, ✓), new **passenger legend** screen, icon HUD, round icon buttons on pause / win / lose.
+- **HCR metro-style car** (original, no logos): white interior, red stripe, stainless longitudinal benches, glass partitions, vertical poles, overhead rails with red grips, red door frame + door-indicator lights, line-map strip above the door (stations from the level's line, bilingual), yellow edge line, platform screen doors, red-and-white tiled pillars and a navy bilingual station sign using the level's `stationEn` / `stationZh`; dark tunnel + neighbouring track on wide screens. Static geometry is merged by material (~a dozen draw calls).
+- **Icon-first UI** (`src/ui/icons.ts`): one authored, bold, rounded, filled SVG set (door, stamina, timer, shove, STR/SPD/WIS, skills, 粵/EN, pause/play/restart/home, quality, star, lock, crowd, legend, per-type glyphs) in HCR red / white / navy — no more emoji. New title screen over the key art, compact level cards (number badge with line dots, station 中/EN, density + timer icons, ✓), new **passenger legend** screen, icon HUD, round icon buttons on pause / win / lose.
 - **Low quality** drops stink lines, flies and some puffs; High keeps them. Measured in headless Chrome (SwiftShader software GL, 390×844 @3x): L100 Low ≈ 25 fps with ~80 bodies, ~97 draw calls, ~47k triangles; High ≈ 6 fps there because software GL renders shadows + AA at DPR 2 on the CPU — real GPUs are far faster.
 - Saves unchanged (new `typeIcons` field defaults to on); skill tree, levels, physics, quality and i18n untouched apart from the new strings (EN + zh-HK).
 
@@ -64,11 +82,11 @@ Touch / mouse: **drag anywhere** (floating joystick) to steer, **hold the fist b
 - **Skill-point economy (stop-gap):** with only 21 playable levels, a level now awards a point on its first clear **and on replays, up to 5 points per level** (`MAX_POINTS_PER_LEVEL` in `SkillTree.ts`) → 105 points reachable, enough for a full branch + ultimate and the ~99-point L100 loadout. Set it back to 1 when levels 21–99 ship.
 - Mobile polish: brand bar hidden during a run (HUD moves up under the notch), safe-area insets on all sides, every button ≥ 44 px, `prefers-reduced-motion` followed live, three.js split into its own cached chunk.
 
-## Status (v0.3.0)
+## Status (v0.4.0)
 
 | Area | Status |
 |------|--------|
-| Train car + door + platform scene (Three.js) — MTR-style interior, PSDs, bilingual station sign | ✅ v0.3 |
+| Train car + door + platform scene (Three.js) — HCR metro-style interior, PSDs, bilingual station sign | ✅ v0.3 |
 | Chibi low-poly characters, 8 passenger types, instanced; type icons | ✅ v0.3 |
 | Authored SVG icon set, title / level select / passenger legend screens, app icon + key art | ✅ v0.3 |
 | Crowd physics: mass, velocity/damping, soft contacts, spatial hash, 60 Hz fixed step | ✅ v0.2 |
@@ -85,11 +103,12 @@ Touch / mouse: **drag anywhere** (floating joystick) to steer, **hold the fist b
 | Auto-pause on background / blur, audio suspend & resume | ✅ v0.2.2 |
 | Graphics quality Auto / Low / High (FPS probe), instanced crowd heads/shadows | ✅ v0.2.2 |
 | i18n EN + zh-HK (all UI strings in dictionaries, `<html lang>` synced) | ✅ v0.2.2 |
-| Placeholder Web Audio SFX (synthesized) | ✅ |
+| Original metro-style Web Audio SFX + mixer + mute | ✅ v0.4 |
+| Per-station wall/pillar themes + OFL sign fonts | ✅ v0.4 |
 | Levels 21–99 content | 📝 TBD (see `docs/LEVELS.md`) |
 | Balance pass: crowd drag, skill-point scaling, ult parity (SPD dash toned down), multi-run sim harness | ✅ v0.2.1 |
 | Capacitor / App Store (native haptics) | ⏳ Roadmap |
-| Real MTR-like chimes (licensed) | ⏳ Placeholders only |
+| Further foley / optional offline JA TTS | ⏳ jingle + sign flash shipped |
 
 Physics & feel tuning knobs live in [`src/game/sim/tuning.ts`](src/game/sim/tuning.ts) (also `window.TUNING` in dev / `?debug`). See [`docs/GAME_DESIGN.md`](docs/GAME_DESIGN.md#physics--feel).
 
@@ -97,7 +116,7 @@ Physics & feel tuning knobs live in [`src/game/sim/tuning.ts`](src/game/sim/tuni
 
 1. **Content** — Fill levels 6–99; polish level 100 (十一煙花後尖沙嘴).
 2. **Feel** — Animated low-poly characters, per-type SFX, native haptics via Capacitor; playtest the v0.2.1 curve with humans.
-3. **Audio** — Commission / license royalty-free MTR-*style* door & arrival cues (never rip official audio).
+3. **Audio** — ✅ v0.4 original synthesised metro-*style* cues (never use real-railway audio). Further polish / foley welcome.
 4. **Mobile wrap** — Capacitor → iOS / Android. **App Store requires an Apple Developer account** ($99/yr).
 5. **Polish** — Limb animation (walk cycles), station announcement style UI, accessibility (colourblind patterns), tutorials, store screenshots.
 
@@ -109,7 +128,7 @@ Physics & feel tuning knobs live in [`src/game/sim/tuning.ts`](src/game/sim/tuni
 
 ## License / assets
 
-Code: project-owned. Visuals & audio are **original** and inspired by HK MTR aesthetics — not affiliated with MTR Corporation; no MTR logos or official audio. Concept art, app icon and key art were **generated with Grok Image**; in-game 3D characters and the scene are built in code from primitives; UI icons are hand-authored SVG.
+Code: project-owned. Visuals & audio are **original** and inspired by HK metro aesthetics — not affiliated with any real railway; no real-operator logos or audio. Concept art, app icon and key art were **generated with Grok Image**; in-game 3D characters and the scene are built in code from primitives; UI icons are hand-authored SVG.
 
 ## No secrets
 
