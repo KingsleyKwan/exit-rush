@@ -9,8 +9,17 @@ export const MTR_FLOOR = 0x3a3f46;
 export { DOOR_Z };
 export const PLAYER_START = new THREE.Vector3(PLAYER_START_X, 0, PLAYER_START_Z);
 
-const REDUCED_MOTION =
-  typeof window !== 'undefined' && window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
+/** Live `prefers-reduced-motion` flag (follows OS setting changes while running). */
+let REDUCED_MOTION = false;
+if (typeof window !== 'undefined' && window.matchMedia) {
+  const mq = window.matchMedia('(prefers-reduced-motion: reduce)');
+  REDUCED_MOTION = mq.matches;
+  const onChange = (e: MediaQueryListEvent) => {
+    REDUCED_MOTION = e.matches;
+  };
+  if (mq.addEventListener) mq.addEventListener('change', onChange);
+  else mq.addListener?.(onChange);
+}
 
 /**
  * Car + platform scene, door leaves & warning lights, and a juicy camera rig
@@ -28,6 +37,7 @@ export class TrainScene {
   private exitZone: THREE.Mesh;
   private exitMat: THREE.MeshBasicMaterial;
   private warn = 0;
+  private dirLight: THREE.DirectionalLight;
 
   // Camera rig state
   private camPos = new THREE.Vector3(0, 6.3, 6.8);
@@ -66,6 +76,7 @@ export class TrainScene {
     sc.near = 1;
     sc.far = 20;
     this.scene.add(dir);
+    this.dirLight = dir;
 
     this.buildCar();
     this.buildPlatform();
@@ -278,6 +289,11 @@ export class TrainScene {
       this.exitMat.color.setHex(0x66ff99);
       this.exitMat.opacity = 0.18 + 0.12 * Math.sin(t * 3);
     }
+  }
+
+  /** Quality tier: toggle the shadow-casting light (renderer.shadowMap is toggled by Game). */
+  setShadows(on: boolean): void {
+    this.dirLight.castShadow = on;
   }
 
   private fitAspect(aspect: number): void {

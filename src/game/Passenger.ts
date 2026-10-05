@@ -3,8 +3,12 @@ import { PASSENGER_DEFS } from './PassengerTypes';
 import { TUNING } from './sim/tuning';
 import type { Agent } from './sim/CrowdSim';
 
-/** Shared geometry / materials (never disposed per passenger). */
-const G = {
+/**
+ * Shared geometry / materials (never disposed per passenger). Heads and blob
+ * shadows are drawn by Crowd as two InstancedMeshes; each Passenger only owns
+ * its body material (needed for per-agent hit flash / angry glow).
+ */
+export const G = {
   body: new THREE.BoxGeometry(0.42, 0.8, 0.3),
   head: new THREE.SphereGeometry(0.17, 10, 8),
   suitcase: new THREE.BoxGeometry(0.26, 0.5, 0.4),
@@ -13,7 +17,7 @@ const G = {
   disc: new THREE.CircleGeometry(0.32, 16),
   shadow: new THREE.CircleGeometry(0.3, 14),
 };
-const M = {
+export const M = {
   head: new THREE.MeshStandardMaterial({ color: 0xf1c27d, roughness: 0.7 }),
   suitcase: new THREE.MeshStandardMaterial({ color: 0x3e2723, roughness: 0.45, metalness: 0.15 }),
   handle: new THREE.MeshStandardMaterial({ color: 0x9e9e9e, metalness: 0.6, roughness: 0.3 }),
@@ -38,6 +42,9 @@ export class Passenger {
   readonly mesh = new THREE.Group();
   /** Extra objects living in world space (suitcase). */
   readonly extras: THREE.Object3D[] = [];
+  /** Transform anchors for the instanced head / blob shadow (see Crowd). */
+  readonly headAnchor = new THREE.Object3D();
+  readonly shadowAnchor = new THREE.Object3D();
   private lean = new THREE.Group();
   private rig = new THREE.Group();
   private bodyMat: THREE.MeshStandardMaterial;
@@ -60,18 +67,15 @@ export class Passenger {
     body.scale.x = def.widthMul ?? 1;
     body.position.y = 0.5;
     body.castShadow = true;
-    const head = new THREE.Mesh(G.head, M.head);
-    head.position.y = 1.08;
-    head.castShadow = true;
-    this.rig.add(body, head);
+    this.headAnchor.position.y = 1.08;
+    this.rig.add(body, this.headAnchor);
     this.lean.add(this.rig);
     this.mesh.add(this.lean);
     this.mesh.scale.setScalar(agent.scale);
 
-    const shadow = new THREE.Mesh(G.shadow, M.shadow);
-    shadow.rotation.x = -Math.PI / 2;
-    shadow.position.y = 0.012;
-    this.mesh.add(shadow);
+    this.shadowAnchor.rotation.x = -Math.PI / 2;
+    this.shadowAnchor.position.y = 0.012;
+    this.mesh.add(this.shadowAnchor);
 
     if (agent.kind === 'stench') {
       this.auraMat = new THREE.MeshBasicMaterial({

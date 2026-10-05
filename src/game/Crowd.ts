@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { Passenger } from './Passenger';
+import { Passenger, G, M } from './Passenger';
 import type { CrowdSim } from './sim/CrowdSim';
 import { TUNING } from './sim/tuning';
 
@@ -7,15 +7,57 @@ const linkGeo = new THREE.CylinderGeometry(0.025, 0.025, 1, 6);
 linkGeo.rotateZ(Math.PI / 2); // length along X
 
 /**
- * View for the crowd sim: one Passenger mesh per agent (created lazily as
- * boarders spawn), plus "holding hands" links between couples that redden
- * under tension.
+ * View for the crowd sim: one Passenger body per agent (created lazily as
+ * boarders spawn) plus "holding hands" links between couples that redden
+ * under tension. Heads and blob shadows (identical for everyone) are drawn as
+ * two InstancedMeshes, cutting draw calls (and shadow-pass calls) per agent.
+ *
+ * Restart hygiene: `bind()` → `clear()` removes every per-agent object and
+ * disposes its per-agent material; shared geometries/materials and the
+ * instanced meshes are reused across levels.
  */
 export class Crowd {
   readonly group = new THREE.Group();
   private views = new Map<number, Passenger>();
   private links = new Map<number, { mesh: THREE.Mesh; mat: THREE.MeshBasicMaterial }>();
   private sim: CrowdSim | null = null;
+  private heads: THREE.InstancedMesh;
+  private blobs: THREE.InstancedMesh;
+  private capacity = 0;
+
+  constructor() {
+    this.heads = this.makeInstanced(G.head, M.head, true);
+    this.blobs = this.makeInstanced(G.shadow, M.shadow, false);
+    this.ensureCapacity(Math.max(64, TUNING.physics.maxBodies + 16));
+  }
+
+  private makeInstanced(geo: THREE.BufferGeometry, mat: THREE.Material, cast: boolean): THREE.InstancedMesh {
+    const m = new THREE.InstancedMesh(geo, mat, 1);
+    m.count = 0;
+    m.castShadow = cast;
+    m.frustumCulled = false; // instances span the whole car
+    return m;
+  }
+
+  /** Grow the instanced pools (rare: only if more agents than expected). */
+  private ensureCapacity(n: number): void {
+    if (n <= this.capacity) return;
+    const cap = Math.max(n, this.capacity * 2);
+    const regrow = (old: THREE.InstancedMesh): THREE.InstancedMesh => {
+      this.group.remove(old);
+      old.dispose(); // frees instance buffers only; geometry/material are shared
+      const m = new THREE.InstancedMesh(old.geometry, old.material as THREE.Material, cap);
+      m.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
+      m.count = 0;
+      m.castShadow = old.castShadow;
+      m.frustumCulled = false;
+      this.group.add(m);
+      return m;
+    };
+    this.heads = regrow(this.heads);
+    this.blobs = regrow(this.blobs);
+    this.capacity = cap;
+  }
 
   bind(sim: CrowdSim): void {
     this.clear();
@@ -39,11 +81,21 @@ export class Crowd {
       l.mat.dispose();
     }
     this.links.clear();
+    this.heads.count = 0;
+    this.blobs.count = 0;
     this.sim = null;
+  }
+
+  /** Release GPU resources owned by the crowd view (app teardown). */
+  dispose(): void {
+    this.clear();
+    this.heads.dispose();
+    this.blobs.dispose();
   }
 
   private sync(): void {
     if (!this.sim) return;
+    this.ensureCapacity(this.sim.agents.length);
     for (const a of this.sim.agents) {
       if (this.views.has(a.id)) continue;
       const v = new Passenger(a);
@@ -62,7 +114,19 @@ export class Crowd {
   update(alpha: number, dt: number, time: number): void {
     if (!this.sim) return;
     if (this.views.size !== this.sim.agents.length) this.sync();
-    for (const v of this.views.values()) v.update(alpha, dt, time);
+    let i = 0;
+    for (const v of this.views.values()) {
+      v.update(alpha, dt, time);
+      // Group sits at the origin, so world matrices == group-local instance matrices.
+      v.mesh.updateMatrixWorld(true);
+      this.heads.setMatrixAt(i, v.headAnchor.matrixWorld);
+      this.blobs.setMatrixAt(i, v.shadowAnchor.matrixWorld);
+      i++;
+    }
+    this.heads.count = i;
+    this.blobs.count = i;
+    this.heads.instanceMatrix.needsUpdate = true;
+    this.blobs.instanceMatrix.needsUpdate = true;
     const rest = TUNING.types.couple.rest;
     for (const [id, l] of this.links) {
       const v = this.views.get(id);
