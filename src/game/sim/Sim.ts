@@ -110,21 +110,28 @@ export class Sim {
       if (!open.has(bz)) w.addBox(wallX - 1, wallX, bz - dh, bz + dh);
     }
 
-    // Longitudinal benches between door bays (both sides), aisle clear.
-    const benchZs = [-3.4, -1.3, 1.3, 3.4];
-    for (const sx of [-1, 1]) {
-      for (const cz of benchZs) {
-        // Skip benches that would block an open door vestibule on the left.
-        if (sx < 0 && open.has(nearestDoorBay(cz, [...open])) && Math.abs(cz - nearestDoorBay(cz, [...open])) < dh + 0.35) {
-          continue;
-        }
+    // Longitudinal benches flush to walls BETWEEN door bays only (matches TrainScene).
+    // Same wall-panel segments; never overlap a door opening or the aisle centre.
+    const benchMargin = 0.1;
+    const benchSegs: [number, number][] = [[CAR_Z_MIN, bays[0] - dh]];
+    for (let i = 0; i < bays.length - 1; i++) benchSegs.push([bays[i] + dh, bays[i + 1] - dh]);
+    benchSegs.push([bays[bays.length - 1] + dh, CAR_Z_MAX]);
+    const aislePoleZs: number[] = [];
+    for (const sx of [-1, 1] as const) {
+      for (const [z0, z1] of benchSegs) {
+        const avail = z1 - z0 - 2 * benchMargin;
+        if (avail < 0.5) continue;
+        const halfLen = Math.min(1.05, avail) / 2;
+        const cz = (z0 + z1) / 2;
         const inner = 1.15;
-        w.addBox(sx > 0 ? inner : -hw + 0.05, sx > 0 ? hw : -inner, cz - 0.55, cz + 0.55);
+        w.addBox(sx > 0 ? inner : -hw + 0.05, sx > 0 ? hw : -inner, cz - halfLen, cz + halfLen);
+        if (sx < 0 && avail >= 0.9) aislePoleZs.push(cz);
       }
     }
-    // Grab poles in the aisle.
-    w.circles.push({ x: 0.35, z: -1.3, r: 0.05 });
-    w.circles.push({ x: 0.35, z: 1.3, r: 0.05 });
+    // Grab poles in the aisle at between-door centres (never in a doorway).
+    for (const pz of aislePoleZs.slice(0, 2)) {
+      w.circles.push({ x: 0.35, z: pz, r: 0.05 });
+    }
 
     // Platform bounds (−X of the door wall).
     const px0 = wallX - C.platformDepth;
