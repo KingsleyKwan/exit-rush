@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import { TrainScene, DOOR_Z, PLAYER_START } from './TrainScene';
+import { openDoorBays } from './sim/tuning';
 import { Player } from './Player';
 import { Crowd } from './Crowd';
 import { Effects } from './Effects';
@@ -88,6 +89,12 @@ export class Game {
     this.save = loadSave();
     this.runSkills = { ...this.save.skills };
     setLang(this.save.lang);
+    this.audio.applySettings({
+      master: this.save.masterVol,
+      music: this.save.musicVol,
+      sfx: this.save.sfxVol,
+      muted: this.save.muted,
+    });
 
     const q = resolveQuality(this.save.quality, this.save.autoQuality);
     this.antialias = q === 'high';
@@ -147,6 +154,7 @@ export class Game {
     sim.player.body.enabled = false;
     this.bindSim(sim);
     this.setStationFor(lv);
+    this.train.setOpenBays(openDoorBays(lv.id));
   }
 
   /** Platform sign + strip map: this level's station with its neighbours in the level list. */
@@ -246,6 +254,35 @@ export class Game {
   }
 
   /** Settings toggle: floating passenger-type icons. */
+  setMuted(muted: boolean): void {
+    this.save.muted = muted;
+    this.audio.setMuted(muted);
+    this.persist();
+    this.hooks.onState();
+  }
+
+  toggleMute(): void {
+    this.setMuted(!this.save.muted);
+  }
+
+  setMasterVol(v: number): void {
+    this.save.masterVol = v;
+    this.audio.setMaster(v);
+    this.persist();
+  }
+
+  setMusicVol(v: number): void {
+    this.save.musicVol = v;
+    this.audio.setMusic(v);
+    this.persist();
+  }
+
+  setSfxVol(v: number): void {
+    this.save.sfxVol = v;
+    this.audio.setSfx(v);
+    this.persist();
+  }
+
   setTypeIcons(on: boolean): void {
     this.save.typeIcons = on;
     this.crowd.setIcons(on);
@@ -321,8 +358,12 @@ export class Game {
     if (!level || !level.playable) return;
     this.audio.unlock();
     this.audio.arrival();
+    this.audio.announce(getLang());
     this.level = level;
     this.setStationFor(level);
+    this.train.setOpenBays(openDoorBays(level.id));
+    this.train.flashAnnouncement(level, getLang());
+    this.audio.startAmbience(level.density, level.id === 100);
     this.lastClear = null;
     this.autoPaused = false;
     this.runSkills = { ...this.save.skills };
@@ -384,6 +425,7 @@ export class Game {
     this.level = null;
     this.input.reset();
     this.train.setWarning(0);
+    this.audio.stopAmbience();
     this.makeAmbient();
     this.hooks.onState();
   }
@@ -438,8 +480,12 @@ export class Game {
     this.save.highestCleared = Math.max(this.save.highestCleared, id);
     // First clear + capped replays award points (see MAX_POINTS_PER_LEVEL).
     const awarded = count <= MAX_POINTS_PER_LEVEL;
-    if (awarded) this.save.skills.points += 1;
+    if (awarded) {
+      this.save.skills.points += 1;
+      this.audio.skillPoint();
+    }
     this.lastClear = { count, awarded };
+    this.audio.stopAmbience();
     this.persist();
     this.screen = 'win';
     this.hooks.onState();
@@ -450,6 +496,7 @@ export class Game {
     this.train.setWarning(0);
     this.audio.doorClose();
     this.audio.lose();
+    this.audio.stopAmbience();
     haptic([80, 50, 120], 0);
     this.screen = 'lose';
     this.hooks.onState();

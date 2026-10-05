@@ -1,7 +1,7 @@
 /**
  * Per-station visual themes for the platform (wall/pillar tile colour, accents,
  * lettering). Colours approximate the mosaic / panel colours riders recognise
- * on 香島 / 全灣 / etc. — approximate hex values only; no logos or
+ * on 香島 / 荃直 / etc. — approximate hex values only; no logos or
  * official artwork. Stations marked `approx: true` use a plausible colour
  * when published references were unclear or the real finish is mostly grey.
  */
