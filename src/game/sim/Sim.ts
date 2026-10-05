@@ -190,7 +190,7 @@ export class Sim {
     const spanX = PLAYER_START_X - (wall - TUNING.car.winDepth);
     const tX = (PLAYER_START_X - b.x) / Math.max(0.5, spanX);
     const tZ = 1 - Math.min(1, Math.abs(b.z - bay) / 3.5);
-    return Math.max(0, Math.min(1, tX * 0.75 + tZ * 0.25 * Math.max(0, tX));
+    return Math.max(0, Math.min(1, tX * 0.75 + tZ * 0.25 * Math.max(0, tX)));
   }
 
   reachedDoor(): boolean {

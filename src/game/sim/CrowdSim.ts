@@ -51,7 +51,7 @@ export interface CrowdCtx {
   boardingActive: boolean;
   /** 0–1: how strongly boarders are currently compressing the crowd. */
   pressureField: number;
-  /** 0–1: WIS ultimate makes the crowd hesitate. */
+  /** 0–1: STA Iron Stance makes the crowd hesitate slightly. */
   calm: number;
   player: Body;
   /** Player's current move direction (unit) and how hard they move (0–1). */
@@ -324,6 +324,30 @@ export class CrowdSim {
   // ---------------------------------------------------------------- behaviour
 
   /** Combined stench slow (0–1, before WIS resist) at a point. */
+  /**
+   * Extra crowd-drag when weaving laterally past squatting passengers
+   * (they block the lower body / hard to slip past sideways).
+   */
+  squatLateralDrag(px: number, pz: number, aimX: number, aimZ: number): number {
+    const T = TUNING.types.squat;
+    let extra = 0;
+    for (const a of this.agents) {
+      if (a.kind !== 'squat') continue;
+      const b = a.body;
+      const rx = b.x - px;
+      const rz = b.z - pz;
+      const d = Math.hypot(rx, rz);
+      if (d > 1.1 || d < 1e-4) continue;
+      // Lateral alignment: beside you more than in front.
+      const along = (rx * aimX + rz * aimZ) / d;
+      const lat = Math.abs(rx * aimZ - rz * aimX) / d;
+      if (lat > 0.35 && along < 0.55) {
+        extra += T.lateralDrag * (1 - d / 1.1);
+      }
+    }
+    return Math.min(0.45, extra);
+  }
+
   auraSlowAt(x: number, z: number): number {
     const R = TUNING.types.stench.auraRadius;
     let s = 0;

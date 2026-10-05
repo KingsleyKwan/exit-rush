@@ -1,6 +1,7 @@
 import { applyImpulse, createBody, setMass, type Body, type World } from './Physics';
 import type { SkillModifiers } from '../SkillTree';
 import type { CrowdSim } from './CrowdSim';
+import { PASSENGER_DEFS } from '../PassengerTypes';
 import type { Emit, UltKind } from './events';
 import { DOOR_Z, PLAYER_START_X, PLAYER_START_Z, TUNING, doorWallX } from './tuning';
 
@@ -33,8 +34,10 @@ export class PlayerSim {
   stunT = 0;
   chargeUntil = 0;
   dashUntil = 0;
-  senseUntil = 0;
+  ironUntil = 0;
   ultCd: Record<UltKind, number> = { str: 0, spd: 0, sta: 0 };
+  /** Cooldowns for Tier3 actives. */
+  activeCd: { dash: number; wind: number } = { dash: 0, wind: 0 };
   /** Smoothed, assisted move direction (unit, world XZ). */
   aimX = 0;
   aimZ = -1;
@@ -65,7 +68,8 @@ export class PlayerSim {
       maxSpeed: 9,
     });
     this.staminaMax = mods.staminaMax;
-    this.stamina = this.staminaMax + (mods.staminaBuffer ?? 0);
+    // STA T2b buffer is spendable but does not raise the regen cap.
+    this.stamina = this.staminaMax + mods.staminaBuffer;
   }
 
   isCharging(now: number): boolean {
@@ -74,12 +78,12 @@ export class PlayerSim {
   isDashing(now: number): boolean {
     return now < this.dashUntil;
   }
-  isSensing(now: number): boolean {
-    return now < this.senseUntil;
-  }
-  /** STA Iron Stance (senseUntil reused as iron timer in bridge). */
   isIronStance(now: number): boolean {
-    return now < this.senseUntil;
+    return now < this.ironUntil;
+  }
+  /** @deprecated path highlight removed with WIS; kept false for Effects callers. */
+  isSensing(_now: number): boolean {
+    return false;
   }
 
   baseMass(): number {
@@ -93,17 +97,19 @@ export class PlayerSim {
     const b = this.body;
     const charging = this.isCharging(now);
     const dashing = this.isDashing(now);
-    const sensing = this.isSensing(now);
+    const iron = this.isIronStance(now);
 
     this.shoveCd = Math.max(0, this.shoveCd - dt);
     this.stunT = Math.max(0, this.stunT - dt);
     for (const k of ULTS) this.ultCd[k] = Math.max(0, this.ultCd[k] - dt);
+    this.activeCd.dash = Math.max(0, this.activeCd.dash - dt);
+    this.activeCd.wind = Math.max(0, this.activeCd.wind - dt);
 
     // Mass: STR resist + ult buffs.
     let mass = this.baseMass();
     if (charging) mass *= U.str.massMul;
     if (dashing) mass *= U.spd.massMul;
-    if (sensing) mass *= U.sta.massMul;
+    if (iron) mass *= U.sta.massMul;
     setMass(b, mass);
 
     // ---- Stick → desired direction (with gap aim assist).
@@ -120,10 +126,7 @@ export class PlayerSim {
     }
     if (this.stunT > 0) mag *= 0.25;
     if (mag > 0) {
-      const strength = Math.min(
-        1,
-        sensing ? 0.9 : P.aim.base + this.mods.gapSense * P.aim.perGapSense,
-      );
+      const strength = Math.min(1, P.aim.base + this.mods.gapSense * P.aim.perGapSense);
       const [ax, az] = this.assistDir(b.x, b.z, dx, dz, strength, world);
       const s = 1 - Math.exp(-P.aim.smooth * dt);
       this.aimX += (ax - this.aimX) * s;
@@ -137,11 +140,14 @@ export class PlayerSim {
     this.moving = mag;
 
     // ---- Speed / drive.
-    const auraR = Math.min(1, this.mods.auraResist + (sensing ? U.sta.auraResist : 0));
+    const auraR = Math.min(1, this.mods.auraResist + (iron ? U.sta.auraResist : 0));
     const slow = crowd.auraSlowAt(b.x, b.z) * (1 - auraR);
     this.drag = this.crowdDrag(world, dashing);
+    // Squatting neighbours add lateral weave friction (harder to slip past).
+    this.drag = Math.min(0.85, this.drag + crowd.squatLateralDrag(b.x, b.z, this.aimX, this.aimZ));
     const St = P.stamina;
-    let maxV = P.maxSpeed * this.mods.moveSpeed * (1 - slow) * (1 - this.drag);
+    const clear = b.contacts === 0 && b.pressure < 0.002;
+    let maxV = P.maxSpeed * this.mods.moveSpeed * (clear ? this.mods.clearSpeed : 1) * (1 - slow) * (1 - this.drag);
     if (charging) maxV *= 1.3;
     if (dashing) maxV *= U.spd.speedMul;
     if (this.winded) maxV *= St.windedSpeedMul;
@@ -168,6 +174,16 @@ export class PlayerSim {
 
     // ---- Shouldering: slide along whoever blocks you instead of sticking head-on.
     const inContact = b.contacts > 0 && b.pressure > 0.005;
+    if (this.mods.frontPush > 0 && inContact && this.aimX * b.cnx + this.aimZ * b.cnz < -0.2) {
+      const boost = 1 + this.mods.frontPush;
+      fx *= boost;
+      fz *= boost;
+      const fm2 = Math.hypot(fx, fz);
+      if (fm2 > cap * boost) {
+        fx *= (cap * boost) / fm2;
+        fz *= (cap * boost) / fm2;
+      }
+    }
     if (mag > 0.2 && inContact) {
       const cl = Math.hypot(b.cnx, b.cnz);
       if (cl > 1e-4) {
@@ -181,7 +197,7 @@ export class PlayerSim {
           if (tl > 1e-3) {
             tx /= tl;
             tz /= tl;
-            const k = P.slip * (1 + this.mods.gapSense * 2) * cap * -dot * mag;
+            const k = P.slip * (1 + this.mods.gapSense * 2) * this.mods.weaveSlip * cap * -dot * mag;
             fx += tx * k;
             fz += tz * k;
           }
@@ -198,16 +214,24 @@ export class PlayerSim {
 
     // ---- Stamina.
     this.pushing = mag > 0.2 && inContact;
-    const regenMul = sensing ? U.sta.regenMul : 1;
+    const regenMul = iron ? U.sta.regenMul : 1;
     if (this.winded) {
       this.stamina += this.mods.staminaRegen * regenMul * dt * (mag < 0.2 ? 1 : St.windedRegen);
     } else if (this.pushing && !dashing) {
-      const drain = (St.drainBase + b.pressure * St.drainPerPressure) * mag / (1 + this.mods.resist);
+      const drain =
+        ((St.drainBase + b.pressure * St.drainPerPressure) * mag) /
+        (1 + this.mods.resist) *
+        (1 - this.mods.drainResist);
       this.stamina += (this.mods.staminaRegen * regenMul * St.pushRegen - drain) * dt;
     } else {
       this.stamina += this.mods.staminaRegen * regenMul * dt * (mag < 0.2 ? 1 : 0.55);
     }
-    this.stamina = Math.min(this.staminaMax, this.stamina);
+    // Non-regen buffer (above max) slowly bleeds to the regen cap unless in Iron Stance.
+    if (this.stamina > this.staminaMax) {
+      if (!iron) this.stamina = Math.max(this.staminaMax, this.stamina - this.mods.staminaRegen * 0.25 * dt);
+    } else {
+      this.stamina = Math.min(this.staminaMax, this.stamina);
+    }
     if (this.stamina <= 0) {
       this.stamina = 0;
       if (!this.winded) {
@@ -230,7 +254,6 @@ export class PlayerSim {
     }
     this.shoveWasHeld = input.shoveHeld;
 
-    // ---- STA Iron Stance: no path highlight (Crowd Sense removed).
     if (this.path.length) this.path = [];
   }
 
@@ -250,6 +273,7 @@ export class PlayerSim {
       if (d < D.radius) n += 1 - d / D.radius;
     }
     let drag = Math.min(D.max, n * D.perBody) * (1 - Math.min(1, this.mods.gapSense * D.perGapSense));
+    drag *= 1 - this.mods.blockedDragCut;
     if (dashing) drag *= D.dashMul;
     return drag;
   }
@@ -265,6 +289,9 @@ export class PlayerSim {
     const dx = this.faceX;
     const dz = this.faceZ;
     applyImpulse(b, dx * S.lunge * power * b.mass, dz * S.lunge * power * b.mass);
+    const chargeMul =
+      this.mods.hasChargedShove && power > 0.85 ? this.mods.chargeShoveMul : 1;
+    const cone = this.mods.shoveConeCos;
     const near = world.query(b.x, b.z, S.range, this.tmp);
     let hits = 0;
     for (const o of near) {
@@ -273,10 +300,19 @@ export class PlayerSim {
       const rz = o.z - b.z;
       const d = Math.hypot(rx, rz) || 1e-6;
       const along = (rx * dx + rz * dz) / d;
-      if (along < S.coneCos) continue;
+      if (along < cone) continue;
       const fall = Math.max(0, 1 - Math.max(0, d - b.r - o.r) / S.range);
-      const J = S.impulse * power * this.mods.pushForce * (0.35 + 0.65 * fall);
-      // Mix radial + forward so people peel aside rather than all flying straight.
+      let typeMul = 1;
+      const ag0 = crowd.byBody.get(o.id);
+      if (ag0 && PASSENGER_DEFS[ag0.kind].hardToShove) typeMul = TUNING.types.squat.shoveMul;
+      const J =
+        S.impulse *
+        power *
+        this.mods.pushForce *
+        this.mods.knockbackMul *
+        chargeMul *
+        typeMul *
+        (0.35 + 0.65 * fall);
       let nx = (rx / d) * 0.6 + dx * 0.4;
       let nz = (rz / d) * 0.6 + dz * 0.4;
       const nl = Math.hypot(nx, nz) || 1;
@@ -285,11 +321,23 @@ export class PlayerSim {
       applyImpulse(o, nx * J, nz * J);
       applyImpulse(b, -dx * J * 0.12, -dz * J * 0.12);
       hits++;
-      const ag = crowd.byBody.get(o.id);
+      const ag = ag0;
       if (ag) {
         ag.bumpAcc = Math.max(ag.bumpAcc, 0.6 + power * 0.4);
         crowd.annoy(ag);
         emit({ t: 'shoveHit', x: o.x, z: o.z, power, agentId: ag.id });
+      }
+    }
+    // STR T3b Ground Pound: full-charge adds a small radial shockwave.
+    if (this.mods.hasGroundPound && power > 0.95) {
+      const K = TUNING.skills;
+      for (const o of world.query(b.x, b.z, K.groundPoundRadius, this.tmp)) {
+        if (o === b) continue;
+        const rx = o.x - b.x;
+        const rz = o.z - b.z;
+        const d = Math.hypot(rx, rz) || 1e-6;
+        const fall = Math.max(0, 1 - d / K.groundPoundRadius);
+        applyImpulse(o, (rx / d) * K.groundPoundImpulse * fall, (rz / d) * K.groundPoundImpulse * fall);
       }
     }
     emit({ t: 'shove', x: b.x, z: b.z, dx, dz, power, hits });
@@ -335,14 +383,45 @@ export class PlayerSim {
       b.vx = dx * U.spd.burst;
       b.vz = dz * U.spd.burst;
     } else {
-      // Iron Stance: reuse senseUntil as iron timer until full PlayerSim lands
-      this.senseUntil = now + U.sta.duration;
-      this.pathT = 0;
-      this.path = [];
+      // STA Iron Stance: heavy footing + burst regen (no path highlight).
+      this.ironUntil = now + U.sta.duration;
       this.winded = false;
       this.stamina = Math.min(this.staminaMax, this.stamina + this.staminaMax * 0.35);
+      this.path = [];
     }
     emit({ t: 'ult', kind, x: b.x, z: b.z, dx: this.faceX, dz: this.faceZ });
+    return true;
+  }
+
+  /** SPD T3 Brief Dash active. */
+  tryBriefDash(now: number): boolean {
+    if (!this.mods.hasBriefDash || this.activeCd.dash > 0) return false;
+    const K = TUNING.skills;
+    this.activeCd.dash = K.briefDashCd;
+    this.dashUntil = now + K.briefDashDuration;
+    let dx = this.faceX;
+    let dz = this.faceZ;
+    if (this.moving < 0.1) {
+      dx = doorWallX() - this.body.x;
+      dz = this.targetDoorZ - this.body.z;
+      const l = Math.hypot(dx, dz) || 1;
+      dx /= l;
+      dz /= l;
+    }
+    this.aimX = this.faceX = dx;
+    this.aimZ = this.faceZ = dz;
+    this.body.vx = dx * K.briefDashBurst;
+    this.body.vz = dz * K.briefDashBurst;
+    return true;
+  }
+
+  /** STA T3 Second Wind active. */
+  trySecondWind(): boolean {
+    if (!this.mods.hasSecondWind || this.activeCd.wind > 0) return false;
+    const K = TUNING.skills;
+    this.activeCd.wind = K.secondWindCd;
+    this.winded = false;
+    this.stamina = Math.min(this.staminaMax, this.stamina + K.secondWindAmount);
     return true;
   }
 
