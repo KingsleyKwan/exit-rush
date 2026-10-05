@@ -7,6 +7,14 @@ export const BRANCH_FILL = 60;
 export const ULTIMATE_COST = 10;
 export const BRANCH_TOTAL = BRANCH_FILL + ULTIMATE_COST;
 
+/**
+ * Max skill points one level can award (first clear + replays). v0.2.2 stop-gap
+ * while levels 21–99 don't exist: 21 playable levels × 5 = 105 points, enough for
+ * the ~99-point L100 loadout (branch + ultimate) that docs/BALANCE.md tunes for.
+ * Set back to 1 once the full 100-level curve ships.
+ */
+export const MAX_POINTS_PER_LEVEL = 5;
+
 export type Branch = 'str' | 'spd' | 'wis';
 
 export interface SkillModifiers {
@@ -72,11 +80,11 @@ export function spendPoint(s: SkillState, branch: Branch): SkillState {
   return next;
 }
 
-export function branchProgressLabel(s: SkillState, branch: Branch): string {
+export function branchProgressLabel(s: SkillState, branch: Branch, ultLabel = 'Ult'): string {
   const v = s[branch];
   const ult =
     branch === 'str' ? s.ultStr : branch === 'spd' ? s.ultSpd : s.ultWis;
   if (ult) return `${BRANCH_TOTAL}/${BRANCH_TOTAL}`;
-  if (v >= BRANCH_FILL) return `${BRANCH_FILL}/${BRANCH_FILL} → Ult ${ULTIMATE_COST}`;
+  if (v >= BRANCH_FILL) return `${BRANCH_FILL}/${BRANCH_FILL} → ${ultLabel} ${ULTIMATE_COST}`;
   return `${v}/${BRANCH_FILL}`;
 }

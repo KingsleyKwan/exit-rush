@@ -22,15 +22,32 @@ export class GameAudio {
     return this.ctx;
   }
 
-  /** Call from first user gesture */
+  /** Call from a user gesture (safe to call repeatedly; also recovers iOS "interrupted"). */
   unlock(): void {
     try {
       const ctx = this.ensure();
-      if (ctx.state === 'suspended') void ctx.resume();
+      if (ctx.state !== 'running' && !this.isHidden()) void ctx.resume().catch(() => undefined);
       this.unlocked = true;
     } catch {
       this.unlocked = false;
     }
+  }
+
+  private isHidden(): boolean {
+    return typeof document !== 'undefined' && document.hidden;
+  }
+
+  /** App backgrounded: stop the audio clock (saves battery, no stray beeps). */
+  suspend(): void {
+    const ctx = this.ctx;
+    if (ctx && ctx.state === 'running') void ctx.suspend().catch(() => undefined);
+  }
+
+  /** Back in the foreground: resume audio if it was unlocked before. */
+  resume(): void {
+    const ctx = this.ctx;
+    if (!ctx || !this.unlocked || this.isHidden()) return;
+    if (ctx.state !== 'running') void ctx.resume().catch(() => undefined);
   }
 
   private out(): AudioNode {
