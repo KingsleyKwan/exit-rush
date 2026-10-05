@@ -39,11 +39,8 @@ const game = new Game(canvas, {
 
 renderUI(uiRoot, game);
 
-// v0.5 FTUE: first launch jumps into L1 (ghost-hand teach).
-queueMicrotask(() => {
-  game.tryAutoFtue();
-  if (game.screen !== 'menu') renderUI(uiRoot, game);
-});
+// FTUE auto-start is wired once Game.tryAutoFtue lands with the rest of v0.5 Game.ts.
+// (Temporarily omitted so Pages can build while large Game.ts is still being pushed.)
 
 // Unlock audio on the first gesture, and re-resume it on later gestures if the
 // OS suspended / interrupted it (iOS after calls, backgrounding, etc.).
