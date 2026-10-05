@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { heroGeometry } from './characters';
 
 interface Particle {
   x: number;
@@ -73,8 +74,8 @@ export class Effects {
       this.rings.push({ mesh, mat: mat2, t: 1, dur: 1, maxR: 1 });
     }
 
-    const ghostGeo = new THREE.CapsuleGeometry(0.26, 0.5, 3, 8);
-    ghostGeo.translate(0, 0.66, 0);
+    // Dash afterimages reuse the hero silhouette.
+    const ghostGeo = heroGeometry();
     for (let i = 0; i < 10; i++) {
       const mat3 = new THREE.MeshBasicMaterial({ color: 0x4dd0e1, transparent: true, opacity: 0, depthWrite: false });
       const mesh = new THREE.Mesh(ghostGeo, mat3);

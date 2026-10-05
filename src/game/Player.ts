@@ -1,16 +1,21 @@
 import * as THREE from 'three';
 import type { PlayerSim } from './sim/PlayerSim';
 import { TUNING } from './sim/tuning';
+import { heroGeometry, heroShellGeometry } from './characters';
 
 /**
- * Player visual. Physics/state live in sim/PlayerSim; this reads it each frame
- * and adds squash/stretch, lean, a stamina/charge ring and ult tints.
+ * Player visual (v0.3 chibi hero: blue shirt, lanyard, cyan glow outline).
+ * Physics/state live in sim/PlayerSim; this reads it each frame and adds
+ * squash/stretch, lean, waddle, a stamina/charge ring and ult tints. A see-through
+ * silhouette (drawn only where the crowd hides the hero) keeps the player findable.
  */
 export class Player {
   readonly mesh = new THREE.Group();
   private lean = new THREE.Group();
   private rig = new THREE.Group();
-  private bodyMat: THREE.MeshStandardMaterial;
+  private bodyMat: THREE.MeshLambertMaterial;
+  private glowMat: THREE.MeshBasicMaterial;
+  private xrayMat: THREE.MeshBasicMaterial;
   private ring: THREE.Mesh;
   private ringMat: THREE.MeshBasicMaterial;
   private aim: THREE.Mesh;
@@ -22,23 +27,29 @@ export class Player {
   private lastImpact = 0;
 
   constructor() {
-    this.bodyMat = new THREE.MeshStandardMaterial({ color: 0x2196f3, roughness: 0.5 });
-    const body = new THREE.Mesh(new THREE.CapsuleGeometry(0.26, 0.5, 4, 10), this.bodyMat);
-    body.position.y = 0.66;
+    this.bodyMat = new THREE.MeshLambertMaterial({ vertexColors: true, flatShading: true });
+    const body = new THREE.Mesh(heroGeometry(), this.bodyMat);
     body.castShadow = true;
-    const head = new THREE.Mesh(
-      new THREE.SphereGeometry(0.19, 12, 12),
-      new THREE.MeshStandardMaterial({ color: 0xf1c27d }),
-    );
-    head.position.y = 1.2;
-    head.castShadow = true;
-    // Little backpack so facing reads.
-    const pack = new THREE.Mesh(
-      new THREE.BoxGeometry(0.3, 0.34, 0.14),
-      new THREE.MeshStandardMaterial({ color: 0x0d47a1, roughness: 0.6 }),
-    );
-    pack.position.set(0, 0.72, -0.27);
-    this.rig.add(body, head, pack);
+    body.renderOrder = 2;
+    // Rim glow: inflated back-face shell.
+    this.glowMat = new THREE.MeshBasicMaterial({ color: 0x5ad2ff, side: THREE.BackSide, transparent: true, opacity: 0.95 });
+    const glow = new THREE.Mesh(heroShellGeometry(), this.glowMat);
+    glow.renderOrder = 2;
+    // X-ray silhouette: drawn in the opaque pass after the crowd (renderOrder 1)
+    // but before the hero body (2), with GreaterDepth — so it only lights up
+    // where passengers stand in front of the hero, never over the hero itself.
+    const xr = new THREE.CapsuleGeometry(0.24, 0.62, 3, 10);
+    xr.translate(0, 0.62, 0);
+    this.xrayMat = new THREE.MeshBasicMaterial({
+      color: 0x5ad2ff,
+      opacity: 0.55,
+      blending: THREE.AdditiveBlending,
+      depthWrite: false,
+      depthFunc: THREE.GreaterDepth,
+    });
+    const xray = new THREE.Mesh(xr, this.xrayMat);
+    xray.renderOrder = 1;
+    this.rig.add(body, glow, xray);
     this.lean.add(this.rig);
     this.mesh.add(this.lean);
 
@@ -94,7 +105,8 @@ export class Player {
     while (d > Math.PI) d -= Math.PI * 2;
     while (d < -Math.PI) d += Math.PI * 2;
     this.yaw += d * (1 - Math.exp(-12 * dt));
-    this.rig.rotation.y = this.yaw;
+    const waddle = Math.sin(this.bob) * 0.08 * Math.min(1, speed);
+    this.rig.rotation.set(0, this.yaw, waddle);
     const lx = Math.max(-0.3, Math.min(0.3, b.vz * 0.08 + (p.pushing ? p.faceZ * 0.12 : 0)));
     const lz = Math.max(-0.3, Math.min(0.3, -b.vx * 0.08 - (p.pushing ? p.faceX * 0.12 : 0) + wob));
     this.lean.rotation.x += (lx - this.lean.rotation.x) * Math.min(1, dt * 12);
@@ -123,6 +135,14 @@ export class Player {
     } else {
       this.bodyMat.emissiveIntensity = 0;
     }
+    // Glow: breathes gently; matches ult / winded state.
+    const g = this.glowMat.color;
+    if (p.isCharging(now)) g.setRGB(1, 0.6, 0.15);
+    else if (p.isDashing(now)) g.setRGB(0.4, 1, 1);
+    else if (p.winded) g.setRGB(1, 0.3, 0.3);
+    else g.setRGB(0.35, 0.82, 1);
+    this.glowMat.opacity = 0.75 + 0.25 * Math.sin(time * 4);
+    this.xrayMat.color.copy(g);
 
     // Aim chevron in front of the player while steering.
     const show = p.moving > 0.15 ? 0.55 : 0;
