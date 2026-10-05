@@ -49,14 +49,13 @@ export const STATIONS: StationDef[] = [
   { id: 'hung-hom', realEn: 'Hung Hom', realZh: '紅磡', displayEn: 'Maan Gwok', displayZh: '萬國', displayJa: 'マーングォック' },
   { id: 'east-tst', realEn: 'East Tsim Sha Tsui', realZh: '尖東', displayEn: 'Dun East', displayZh: '頓東', displayJa: 'トン東' },
   { id: 'tst', realEn: 'Tsim Sha Tsui', realZh: '尖沙咀', displayEn: 'Dun Sha Mouth', displayZh: '頓沙嘴', displayJa: 'トンシャーツィ' },
-];
-
-/** Extra parody names (not in current levels) kept for docs / future levels. */
-export const STATIONS_EXTRA: StationDef[] = [
-  // Owner-specified
+  // v0.5 — New Territories parody stops (L21–22)
   { id: 'yuen-long', realEn: 'Yuen Long', realZh: '元朗', displayEn: 'Yuen Kwok', displayZh: '元國', displayJa: 'ユエンコク' },
   { id: 'long-ping', realEn: 'Long Ping', realZh: '朗屏', displayEn: 'Long Ping Flat', displayZh: '塱平', displayJa: 'ロンピン' },
 ];
+
+/** Extra parody names reserved for future levels / docs. */
+export const STATIONS_EXTRA: StationDef[] = [];
 
 const byRealEn = new Map(STATIONS.map((s) => [s.realEn, s]));
 const byDisplayEn = new Map(STATIONS.map((s) => [s.displayEn, s]));
