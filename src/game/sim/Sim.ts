@@ -110,24 +110,33 @@ export class Sim {
       if (!open.has(bz)) w.addBox(wallX - 1, wallX, bz - dh, bz + dh);
     }
 
-    // Longitudinal benches flush to walls BETWEEN door bays only (matches TrainScene).
-    // Same wall-panel segments; never overlap a door opening or the aisle centre.
-    const benchMargin = 0.1;
-    const benchSegs: [number, number][] = [[CAR_Z_MIN, bays[0] - dh]];
-    for (let i = 0; i < bays.length - 1; i++) benchSegs.push([bays[i] + dh, bays[i + 1] - dh]);
-    benchSegs.push([bays[bays.length - 1] + dh, CAR_Z_MAX]);
+    // Longitudinal benches (matches TrainScene v0.5.1):
+    // Door wall (−X): only long between-bay segments (skip short end stubs).
+    // Far wall (+X): all wall segs that fit (≥1.0m). Never overlap a door vestibule.
+    const benchMargin = 0.12;
+    const betweenBaySegs: [number, number][] = [];
+    for (let i = 0; i < bays.length - 1; i++) betweenBaySegs.push([bays[i] + dh, bays[i + 1] - dh]);
+    const allSegs: [number, number][] = [[CAR_Z_MIN, bays[0] - dh], ...betweenBaySegs, [bays[bays.length - 1] + dh, CAR_Z_MAX]];
     const aislePoleZs: number[] = [];
-    for (const sx of [-1, 1] as const) {
-      for (const [z0, z1] of benchSegs) {
-        const avail = z1 - z0 - 2 * benchMargin;
-        if (avail < 0.5) continue;
-        const halfLen = Math.min(1.05, avail) / 2;
-        const cz = (z0 + z1) / 2;
-        const inner = 1.15;
-        w.addBox(sx > 0 ? inner : -hw + 0.05, sx > 0 ? hw : -inner, cz - halfLen, cz + halfLen);
-        if (sx < 0 && avail >= 0.9) aislePoleZs.push(cz);
-      }
+    const seatInset = 0.1;
+    const seatW = 0.62;
+    const addBench = (sx: -1 | 1, z0: number, z1: number, opts: { minAvail?: number; margin?: number } = {}): boolean => {
+      const margin = opts.margin ?? benchMargin;
+      const minAvail = opts.minAvail ?? 0.85;
+      const avail = z1 - z0 - 2 * margin;
+      if (avail < minAvail) return false;
+      const halfLen = Math.min(0.95, avail) / 2;
+      const cz = (z0 + z1) / 2;
+      // Keep colliders inside the car (do not cross doorWallX / +halfWidth).
+      const outer = sx * (hw - seatInset);
+      const inner = sx * (hw - seatInset - seatW);
+      w.addBox(Math.min(inner, outer), Math.max(inner, outer), cz - halfLen, cz + halfLen);
+      return true;
+    };
+    for (const [z0, z1] of betweenBaySegs) {
+      if (addBench(-1, z0, z1, { margin: 0.28, minAvail: 0.5 })) aislePoleZs.push((z0 + z1) / 2);
     }
+    for (const [z0, z1] of allSegs) addBench(1, z0, z1, { margin: 0.1, minAvail: 0.55 });
     // Grab poles in the aisle at between-door centres (never in a doorway).
     for (const pz of aislePoleZs.slice(0, 2)) {
       w.circles.push({ x: 0.35, z: pz, r: 0.05 });
