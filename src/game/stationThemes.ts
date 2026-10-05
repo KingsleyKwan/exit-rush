@@ -1,11 +1,9 @@
 /**
  * Per-station visual themes for the platform (wall/pillar tile colour, accents,
  * lettering). Colours approximate the mosaic / panel colours riders recognise
- * on Island / Tsuen Wan / etc. — approximate hex values only; no logos or
+ * on 香島 / 全灣 / etc. — approximate hex values only; no logos or
  * official artwork. Stations marked `approx: true` use a plausible colour
  * when published references were unclear or the real finish is mostly grey.
- * Keys are REAL English names (dev); `themeFor()` accepts parody display names
- * via `themeKeyFor`.
  */
 import { LINE_COLORS, linesFor, type LineId } from './lines';
 import { themeKeyFor } from './stations';
@@ -67,8 +65,8 @@ function theme(
 }
 
 /**
- * Keyed by REAL English station name (dev). Look up with `themeFor(displayEn)`.
- * Wall colours from public fan colour charts — approximate only.
+ * Keyed by REAL English station names (dev). `themeFor(displayEn)` resolves via
+ * `themeKeyFor`. Wall colours from public fan colour charts — approximate only.
  */
 export const STATION_THEMES: Record<string, StationTheme> = {
   // Island Line (classic mosaic)
