@@ -82,7 +82,7 @@ export const TUNING = {
     /** Spatial hash cell size (m) — must be >= largest body diameter. */
     cellSize: 0.9,
     /** Hard cap on simultaneous bodies (player + passengers + suitcases). */
-    maxBodies: 80,
+    maxBodies: 96,
     /** Normal impulse above which a contact emits a "bump" event for juice. */
     impactEvent: 0.55,
   },
@@ -158,9 +158,9 @@ export const TUNING = {
       lunge: 2.6,
     },
     aim: {
-      /** Assist strength with WIS 0. */
+      /** Assist strength with gapSense 0. */
       base: 0.14,
-      /** Extra assist per point of WIS gapSense (0–0.4). */
+      /** Extra assist per point of SPD gapSense (0–0.4). */
       perGapSense: 1.3,
       probe: 1.7,
       /** Fan half-angle (rad) searched for gaps. */
@@ -171,7 +171,7 @@ export const TUNING = {
     },
     /**
      * Crowd drag: top speed shrinks with the number of bodies within `radius`
-     * (each weighted 1 − d/radius): × (1 − min(max, n·perBody)). WIS gapSense
+     * (each weighted 1 − d/radius): × (1 − min(max, n·perBody)). SPD gapSense
      * cuts it by gapSense·perGapSense; the SPD dash keeps `dashMul` of it.
      */
     crowdDrag: { radius: 0.9, perBody: 0.25, max: 0.65, perGapSense: 1.0, dashMul: 0.5 },
@@ -197,17 +197,17 @@ export const TUNING = {
     /** Boarders (counterflow). */
     boardDelay: 0.7,
     boardRamp: 2.5,
-    boardRateBase: 0.35,
-    boardRatePerPressure: 1.9,
-    boardBudgetBase: 8,
-    boardBudgetPerPressure: 16,
-    boardQueueBase: 5,
-    boardQueuePerPressure: 5,
+    boardRateBase: 0.48,
+    boardRatePerPressure: 2.3,
+    boardBudgetBase: 11,
+    boardBudgetPerPressure: 20,
+    boardQueueBase: 8,
+    boardQueuePerPressure: 7,
     boardSpeed: 1.8,
     boardAccel: 6,
     boardMaxDrive: 12,
     boardMaxTime: 10,
-    /** Riders sidestep for the player (base + WIS gapSense bonus). */
+    /** Riders sidestep for the player (base + SPD gapSense bonus). */
     yieldBase: 0.1,
     yieldPerGapSense: 4,
   },
@@ -219,31 +219,50 @@ export const TUNING = {
     brat: { zigFreq: 5.5, zigForce: 3.4, dartEvery: 1.6, dartImpulse: 1.1 },
     angry: { range: 1.0, windup: 0.32, impulse: 3.6, retaliateCd: 0.5, neighbourImpulse: 1.0 },
     luggage: { caseRadius: 0.2, caseMass: 2.6, caseDamping: 7, rest: 0.4, k: 95, linkDamping: 8 },
+    /** Squatting passenger: hard to shove over; lateral weave penalty. */
+    squat: { shoveMul: 0.35, lateralDrag: 0.55 },
   },
 
   /**
-   * Skill-tree passives at a full branch (60 points); linear per point.
-   * STR: push force ×(1+pushForce), +staminaMax, resist (mass + angry-shove/drain resistance).
-   * SPD: move speed ×(1+moveSpeed), +staminaRegen. WIS: auraResist, gapSense (aim assist,
-   * riders sidestep, less crowd drag).
+   * Skill-tree (v0.6 constellation): continuous fill + major nodes every ~10 pts.
+   * STR: push / resist / front shove / charge. SPD: move / clear-lane / drag cut / gapSense.
+   * STA (was WIS): stamina pool/regen/buffer, auraResist, drain resist. Ult: Iron Stance.
    */
   skills: {
-    pushForce: 0.6,
+    pushForce: 0.55,
     resist: 0.5,
     staminaBase: 100,
-    staminaMax: 50,
-    moveSpeed: 0.45,
+    staminaMax: 55,
+    moveSpeed: 0.4,
     regenBase: 12,
-    staminaRegen: 18,
-    auraResist: 0.7,
-    gapSense: 0.4,
+    staminaRegen: 16,
+    auraResist: 0.65,
+    gapSense: 0.35,
+    frontPush: 0.35,
+    chargeShoveMul: 1.45,
+    wideConeCos: 0.22,
+    knockbackMul: 1.25,
+    clearSpeed: 1.18,
+    blockedDragCut: 0.4,
+    weaveSlip: 1.55,
+    drainResist: 0.35,
+    regenNodeBonus: 6,
+    staminaBuffer: 28,
+    groundPoundRadius: 1.6,
+    groundPoundImpulse: 2.4,
+    briefDashBurst: 3.6,
+    briefDashDuration: 0.35,
+    briefDashCd: 4.5,
+    secondWindAmount: 45,
+    secondWindCd: 12,
   },
 
   ult: {
     cooldown: 10,
     str: { radius: 2.9, impulse: 5.5, duration: 1.6, massMul: 2.2, driveMul: 1.8 },
     spd: { burst: 5.5, duration: 1.0, speedMul: 1.7, massMul: 2.2 },
-    wis: { duration: 3.0, calm: 0.65, pathEvery: 0.2 },
+    /** Iron Stance — burst regen + heavy footing (replaces WIS Crowd Sense). */
+    sta: { duration: 2.8, regenMul: 3.2, massMul: 2.4, auraResist: 0.85, calm: 0.4 },
   },
 
   door: {
