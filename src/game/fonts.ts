@@ -1,6 +1,7 @@
 /**
  * Load subset OFL fonts used for station-sign canvas textures.
  * Fonts live under public/fonts/ (see OFL-Noto.txt).
+ * Paths respect Vite `base` (e.g. /hk-mtr-exit-rush/ on GitHub Pages).
  */
 let ready: Promise<void> | null = null;
 let loaded = false;
@@ -9,6 +10,11 @@ const FACES: Array<{ family: string; file: string; weight?: string }> = [
   { family: 'ExitRush Sans', file: 'fonts/NotoSansHK-Bold.subset.woff2', weight: '700' },
   { family: 'ExitRush Serif', file: 'fonts/NotoSerifHK-Bold.subset.woff2', weight: '700' },
 ];
+
+function publicUrl(rel: string): string {
+  const base = import.meta.env.BASE_URL || '/';
+  return `${base}${rel.replace(/^\//, '')}`;
+}
 
 export function fontsReady(): boolean {
   return loaded;
@@ -22,10 +28,9 @@ export function loadGameFonts(): Promise<void> {
       loaded = true;
       return;
     }
-    const base = document.baseURI;
     await Promise.all(
       FACES.map(async (f) => {
-        const url = new URL(f.file, base).href;
+        const url = publicUrl(f.file);
         const face = new FontFace(f.family, `url(${url})`, {
           weight: f.weight ?? '700',
           style: 'normal',
