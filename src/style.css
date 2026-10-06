@@ -1,7 +1,7 @@
 :root {
-  --mtr-red: #b01c2e;
-  --mtr-red-dark: #8a1523;
-  --mtr-red-hi: #e0334a;
+  --brand-red: #b01c2e;
+  --brand-red-dark: #8a1523;
+  --brand-red-hi: #e0334a;
   --navy: #1b2a4e;
   --navy-2: #24365f;
   --ink: #141820;
@@ -93,11 +93,11 @@ button {
   --ico-w: #1b2a4e;
   --ico-ink: #5ad2ff;
 }
-.ico .wt { fill: var(--ico-text, var(--mtr-red)); }
+.ico .wt { fill: var(--ico-text, var(--brand-red)); }
 .ico .k { fill: var(--ico-ink, #1a1d22); }
 .ico .ks { stroke: var(--ico-ink, #1a1d22); }
-.ico .a { fill: var(--ico-accent, var(--mtr-red)); }
-.ico .as { stroke: var(--ico-accent, var(--mtr-red)); }
+.ico .a { fill: var(--ico-accent, var(--brand-red)); }
+.ico .as { stroke: var(--ico-accent, var(--brand-red)); }
 
 .kind-stench { color: #8bc34a; }
 .kind-family { color: #f08a3c; }
@@ -242,12 +242,12 @@ button {
   font-size: 46px;
   font-weight: 900;
   letter-spacing: 0.04em;
-  text-shadow: 0 3px 0 var(--mtr-red-dark), 0 6px 18px rgba(0, 0, 0, 0.6);
+  text-shadow: 0 3px 0 var(--brand-red-dark), 0 6px 18px rgba(0, 0, 0, 0.6);
 }
 .wordmark span {
   margin-top: 6px;
   align-self: flex-start;
-  background: var(--mtr-red);
+  background: var(--brand-red);
   padding: 4px 10px;
   border-radius: 8px;
   font-weight: 900;
@@ -288,7 +288,7 @@ button {
   padding: 12px 20px;
   border-radius: 20px;
   color: #fff;
-  background: linear-gradient(180deg, var(--mtr-red-hi), var(--mtr-red) 55%, var(--mtr-red-dark));
+  background: linear-gradient(180deg, var(--brand-red-hi), var(--brand-red) 55%, var(--brand-red-dark));
   box-shadow: 0 6px 0 #5e0e18, 0 12px 28px rgba(0, 0, 0, 0.5), inset 0 1px 0 rgba(255, 255, 255, 0.35);
   text-align: left;
 }
@@ -299,7 +299,7 @@ button {
   padding: 8px;
   border-radius: 50%;
   background: #fff;
-  color: var(--mtr-red);
+  color: var(--brand-red);
 }
 .play-txt {
   display: flex;
@@ -414,7 +414,7 @@ button {
   gap: 10px;
 }
 .lv-card {
-  --line: var(--mtr-red);
+  --line: var(--brand-red);
   position: relative;
   display: grid;
   grid-template-columns: auto 1fr;
@@ -545,7 +545,7 @@ button {
   background-position: center 30%;
   box-shadow: 0 4px 0 #5e0e18, 0 8px 22px rgba(0, 0, 0, 0.5), inset 0 0 0 2px var(--gold);
 }
-.lv-card.finale .lv-badge { background: var(--mtr-red); }
+.lv-card.finale .lv-badge { background: var(--brand-red); }
 .lv-card.finale .lv-meta { color: #fff; }
 .lv-card.finale .lv-state { color: var(--gold); }
 .lv-finale {
@@ -627,7 +627,7 @@ button {
   color: #18202e;
   border-radius: 24px;
   padding: 18px 16px 18px;
-  box-shadow: 0 0 0 4px var(--mtr-red), 0 18px 50px rgba(0, 0, 0, 0.55);
+  box-shadow: 0 0 0 4px var(--brand-red), 0 18px 50px rgba(0, 0, 0, 0.55);
   z-index: 10;
   text-align: center;
 }
@@ -649,7 +649,7 @@ button {
   margin-top: 12px;
   padding: 12px;
   border-radius: 16px;
-  background: linear-gradient(180deg, var(--mtr-red-hi), var(--mtr-red) 60%, var(--mtr-red-dark));
+  background: linear-gradient(180deg, var(--brand-red-hi), var(--brand-red) 60%, var(--brand-red-dark));
   color: #fff;
   font-weight: 900;
   font-size: 18px;
@@ -707,13 +707,13 @@ button {
   display: inline-flex;
   color: var(--navy);
 }
-.lose-ico { color: var(--mtr-red); }
+.lose-ico { color: var(--brand-red); }
 .lose-ico .x {
   position: absolute;
   right: -8px;
   bottom: -4px;
   color: #fff;
-  background: var(--mtr-red);
+  background: var(--brand-red);
   border-radius: 50%;
   padding: 4px;
   display: flex;
@@ -786,7 +786,7 @@ button {
   font-size: 15px;
   font-weight: 900;
   color: #fff;
-  background: linear-gradient(180deg, var(--mtr-red-hi), var(--mtr-red));
+  background: linear-gradient(180deg, var(--brand-red-hi), var(--brand-red));
   box-shadow: 0 3px 0 #5e0e18;
 }
 .spend-btn .plus { font-size: 24px; line-height: 1; }
@@ -802,7 +802,7 @@ button {
 .skill-bar i {
   display: block;
   height: 100%;
-  background: linear-gradient(90deg, #ffd54f, var(--mtr-red));
+  background: linear-gradient(90deg, #ffd54f, var(--brand-red));
   border-radius: inherit;
 }
 .ult {
@@ -929,7 +929,7 @@ button {
 }
 
 .station-chip {
-  background: var(--mtr-red);
+  background: var(--brand-red);
   padding: 4px 12px;
   border-radius: 999px;
   font-size: 13px;
@@ -990,7 +990,7 @@ button {
   display: block;
   height: 100%;
   width: 0;
-  background: linear-gradient(90deg, var(--mtr-red), #ff6b7a);
+  background: linear-gradient(90deg, var(--brand-red), #ff6b7a);
   border-radius: inherit;
   transition: width 0.12s linear;
 }
@@ -1022,6 +1022,57 @@ button {
 }
 .stam-meter.winded .meter-bar.stamina i {
   background: #e53935;
+}
+/* 大聲公 Loudmouth noise zone: orange pulsing bar + chip with the loudmouth icon.
+   The chip sits in the station row (left of pause, above the timer) so it never covers a bar
+   or the doors banner; it always reserves its slot (opacity only) → no layout shift. */
+.noise-chip {
+  margin-left: auto;
+  flex: none;
+  transform: scale(0.6);
+  opacity: 0;
+  pointer-events: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  padding: 3px 9px 3px 4px;
+  border-radius: 999px;
+  background: #ff8f00;
+  color: #fff;
+  font-size: 12px;
+  font-weight: 900;
+  line-height: 1;
+  white-space: nowrap;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.35), 0 0 0 2px rgba(255, 255, 255, 0.85);
+  transition: opacity 0.15s, transform 0.15s;
+}
+.hud-row .station-chip { min-width: 0; }
+.noise-chip .ico {
+  width: 16px;
+  height: 16px;
+  color: #fff;
+  --ico-ink: #ff8f00;
+  --ico-w: #ff8f00;
+}
+
+.noise-chip.on {
+  opacity: 1;
+  transform: scale(1);
+  animation: noise-shake 0.3s ease-in-out infinite alternate;
+}
+.stam-meter.noisy .meter-bar {
+  animation: noise-pulse 0.32s ease-in-out infinite alternate;
+}
+.stam-meter.noisy:not(.winded) .meter-bar.stamina i {
+  background: linear-gradient(90deg, #e65100, #ffb300);
+}
+@keyframes noise-pulse {
+  from { box-shadow: 0 0 0 1px rgba(255, 143, 0, 0.5); }
+  to { box-shadow: 0 0 0 2px #ffb300, 0 0 12px #ff8f00; }
+}
+@keyframes noise-shake {
+  from { transform: rotate(-4deg); }
+  to { transform: rotate(4deg); }
 }
 
 .timer-val {
@@ -1136,7 +1187,7 @@ button {
   height: 86px;
   font-size: 38px;
   border-radius: 50%;
-  background: radial-gradient(circle at 40% 35%, #e53950, var(--mtr-red) 60%, var(--mtr-red-dark));
+  background: radial-gradient(circle at 40% 35%, #e53950, var(--brand-red) 60%, var(--brand-red-dark));
   box-shadow:
     0 6px 18px rgba(0, 0, 0, 0.45),
     0 0 0 calc(var(--charge) * 10px) rgba(255, 179, 0, 0.55);
@@ -1159,7 +1210,7 @@ button {
   -webkit-backdrop-filter: blur(4px);
 }
 .station-chip {
-  --line: var(--mtr-red);
+  --line: var(--brand-red);
   display: inline-flex;
   align-items: center;
   gap: 8px;
@@ -1190,7 +1241,7 @@ button {
 .skill-use.act-leap:not(.dim),
 .skill-use.act-wind:not(.dim) { background: linear-gradient(180deg, #66bb6a, #2e7d32); --ico-ink: #1b5e20; }
 .skill-use.act-leap:not(.dim) { background: linear-gradient(180deg, #4fd2f0, #0288d1); --ico-ink: #0b3a5a; }
-.shove-btn .ico { width: 46px; height: 46px; --ico-ink: var(--mtr-red-dark); }
+.shove-btn .ico { width: 46px; height: 46px; --ico-ink: var(--brand-red-dark); }
 .shove-btn { box-shadow: 0 6px 0 #5e0e18, 0 10px 22px rgba(0, 0, 0, 0.45), 0 0 0 calc(var(--charge) * 10px) rgba(255, 179, 0, 0.55); }
 .shove-btn.charging .ico { --ico-ink: #8a3d00; }
 
@@ -1205,7 +1256,7 @@ button {
   padding: 10px 14px;
   border-radius: 12px;
   background: rgba(20, 22, 26, 0.94);
-  border: 1px solid var(--mtr-red);
+  border: 1px solid var(--brand-red);
   font-size: 14px;
   z-index: 50;
   pointer-events: none;
