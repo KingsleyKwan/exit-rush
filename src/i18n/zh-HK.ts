@@ -205,4 +205,7 @@ export const zhHK: Dict = {
   slotGloves: '手套',
   slotHead: '頭',
   slotCore: '核心',
+  coinShop: '升級用金幣，唔係技能點。金幣靠通關賺。',
+  needLevel: '要先通關第 {n} 關。',
+  needCoins: '金幣唔夠。通關先至有金幣。',
 };

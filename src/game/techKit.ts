@@ -534,29 +534,51 @@ export function noteTechResult(
   }
 }
 
-export function buyItem(save: SaveData, id: ItemId): boolean {
+export type BuyBlock =
+  | { reason: 'coins'; price: number }
+  | { reason: 'level'; need: number; price: number }
+  | { reason: 'max' };
+
+/** Why the next tier cannot be bought. Null means the same checks buyItem is about to pass. */
+export function buyBlock(save: SaveData, id: ItemId): BuyBlock | null {
   const def = itemDef(id);
-  if (!def) return false;
-  const cleared = new Set(progressOf(save, 'tech').cleared);
-  const highest = progressOf(save, 'tech').highestCleared;
+  if (!def) return { reason: 'max' };
+  const prog = progressOf(save, 'tech');
+  const cleared = new Set(prog.cleared);
+  const highest = prog.highestCleared;
   if (def.slot === 'consumable') {
     const have = save.tech.stock[id] ?? 0;
-    if (have >= 9) return false;
-    if (highest < (def.req[0] ?? 0) && !cleared.has(def.req[0] ?? 0)) return false;
+    if (have >= 9) return { reason: 'max' };
+    const need = def.req[0] ?? 0;
     const price = def.price[0];
-    if (coinBalance(save) < price) return false;
+    // Consumables require that exact level, not any later clear.
+    if (highest < need && !cleared.has(need)) return { reason: 'level', need, price };
+    if (coinBalance(save) < price) return { reason: 'coins', price };
+    return null;
+  }
+  const cur = (save.tech.items[id] ?? 0) as 0 | Tier;
+  if (cur >= def.price.length) return { reason: 'max' };
+  const next = (cur + 1) as Tier;
+  const need = def.req[next - 1] ?? 0;
+  const price = def.price[next - 1];
+  if (need > 0 && highest < need && ![...cleared].some((n) => n >= need)) return { reason: 'level', need, price };
+  if (coinBalance(save) < price) return { reason: 'coins', price };
+  return null;
+}
+
+export function buyItem(save: SaveData, id: ItemId): boolean {
+  if (buyBlock(save, id)) return false;
+  const def = itemDef(id);
+  if (!def) return false;
+  if (def.slot === 'consumable') {
+    const have = save.tech.stock[id] ?? 0;
+    const price = def.price[0];
     save.tech.stock[id] = have + 1;
     save.tech.consumableSpend += price;
     return true;
   }
   const cur = (save.tech.items[id] ?? 0) as 0 | Tier;
-  if (cur >= def.price.length) return false;
-  const next = (cur + 1) as Tier;
-  const need = def.req[next - 1] ?? 0;
-  if (need > 0 && highest < need && ![...cleared].some((n) => n >= need)) return false;
-  const price = def.price[next - 1];
-  if (coinBalance(save) < price) return false;
-  save.tech.items[id] = next;
+  save.tech.items[id] = (cur + 1) as Tier;
   return true;
 }
 
@@ -978,8 +1000,21 @@ export function techKitSelfTest(): string[] {
   const before = coinBalance(save);
   eq('buy S1', buyItem(save, 'S1'));
   eq('spend', coinBalance(save) === before - 100, String(coinBalance(save)));
+  const mid = buyBlock(save, 'S1');
+  eq('mid level', mid != null && mid.reason === 'level' && mid.need === 40, mid?.reason ?? 'open');
   eq('sell', sellItem(save, 'S1'));
   eq('refund', coinBalance(save) === before, String(coinBalance(save)));
+  const poor = {
+    tech: emptyTech(),
+    progress: {
+      hero: { cleared: [], clears: {}, highestCleared: 0, seenBosses: [] },
+      mage: { cleared: [], clears: {}, highestCleared: 0, seenBosses: [] },
+      tech: { cleared: [1], clears: {}, highestCleared: 1, seenBosses: [] },
+    },
+    character: 'tech' as const,
+  } as unknown as SaveData;
+  const poorBlock = buyBlock(poor, 'S1');
+  eq('poor coins', poorBlock?.reason === 'coins', poorBlock?.reason ?? 'open');
   const gridBefore = coinBalance(save);
   eq('expand', expandGrid(save));
   eq('grid not free', coinBalance(save) === gridBefore - 150);

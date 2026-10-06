@@ -9,12 +9,14 @@ import { playableLevels } from '../game/levels';
 import {
   ITEMS,
   cellsFor,
+  buyBlock,
   coinBalance,
   gridOf,
   GRID_TIERS,
   isItemId,
   itemDef,
   placeCheck,
+  type BuyBlock,
   type ItemId,
   type Rot,
   type Tier,
@@ -35,6 +37,12 @@ function tierName(tier: number, dict: ReturnType<typeof t>): string {
   if (tier >= 3) return dict.tierLux;
   if (tier === 2) return dict.tierMid;
   return dict.tierCheap;
+}
+
+function buyLock(block: BuyBlock | null, dict: ReturnType<typeof t>): string {
+  if (!block || block.reason === 'max') return '';
+  if (block.reason === 'level') return dict.needLevel.replace('{n}', String(block.need));
+  return dict.needCoins;
 }
 
 function slotName(slot: string | undefined, dict: ReturnType<typeof t>): string {
@@ -168,6 +176,10 @@ export function renderWorkshop(game: Game, _rerender: (game: Game) => void): HTM
     : '';
 
   const nextGrid = tech.gridTier < 4 ? GRID_TIERS[tech.gridTier + 1] : null;
+  const growLocked = nextGrid != null && coins < nextGrid.price;
+  const growBtn = (label: string, extra = '') => nextGrid
+    ? `<button type="button" class="primary${growLocked ? ' is-locked' : ''}${extra}" data-act="bag-grow" ${growLocked ? 'aria-disabled="true"' : ''}>${label}</button>`
+    : '';
   const shopCards = ITEMS.map((it) => {
     const owned = it.slot === 'consumable' ? 0 : (tech.items[it.id] ?? 0);
     const stock = tech.stock[it.id] ?? 0;
@@ -184,13 +196,15 @@ export function renderWorkshop(game: Game, _rerender: (game: Game) => void): HTM
     const sizeRow = nowShape && nextShape
       ? `${nowShape}<span class="shape-arrow">→</span>${nextShape}`
       : (nowShape || nextShape);
+    const lockLine = buyLock(buyBlock(game.save, it.id), dict);
     return `<article class="shop-card">
       <header>${gearIcon(it.id, it.slot)}<b>${name}</b></header>
       <p>${blurb}</p>
       ${have ? `<p class="shop-meta">${have}</p>` : ''}
       <div class="shop-size">${sizeRow}</div>
+      ${lockLine ? `<p class="shop-lock">${lockLine}</p>` : ''}
       <div class="shop-actions">
-        ${next >= 0 ? `<button type="button" class="primary" data-buy="${it.id}" ${coins < price ? 'disabled' : ''}>${buyLabel} · ${price}</button>` : ''}
+        ${next >= 0 ? `<button type="button" class="primary${lockLine ? ' is-locked' : ''}" data-buy="${it.id}" ${lockLine ? 'aria-disabled="true"' : ''}>${buyLabel} · ${price}</button>` : ''}
         ${owned > 0 && it.slot !== 'consumable' ? `<button type="button" class="ghost" data-sell="${it.id}">${dict.sellItem}</button>` : ''}
       </div>
     </article>`;
@@ -210,11 +224,11 @@ export function renderWorkshop(game: Game, _rerender: (game: Game) => void): HTM
        <div class="bag-actions">
          <button type="button" class="ghost" data-act="bag-pack">${dict.autoPack}</button>
          <button type="button" class="ghost" data-act="bag-rec">${dict.recommendKit}</button>
-         ${nextGrid ? `<button type="button" class="primary" data-act="bag-grow" ${coins < nextGrid.price ? 'disabled' : ''}>${dict.expandBag} · ${nextGrid.price}</button>` : ''}
+         ${growBtn(`${dict.expandBag} · ${nextGrid?.price ?? ''}`)}
        </div>`
     : tab === 'shop'
-      ? `<div class="shop-list">${shopCards}
-          ${nextGrid ? `<button type="button" class="primary bag-grow" data-act="bag-grow" ${coins < nextGrid.price ? 'disabled' : ''}>${dict.expandBag} · ${nextGrid.cols}×${nextGrid.rows} · ${nextGrid.price}</button>` : ''}
+      ? `<div class="shop-list"><p class="sfx-note">${dict.coinShop}</p>${shopCards}
+          ${growBtn(`${dict.expandBag} · ${nextGrid?.cols ?? ''}×${nextGrid?.rows ?? ''} · ${nextGrid?.price ?? ''}`, ' bag-grow')}
         </div>`
       : `<div class="set-row">${sets}</div><p class="sfx-note">${dict.placeHint}</p>`;
 
@@ -295,12 +309,18 @@ export function renderWorkshop(game: Game, _rerender: (game: Game) => void): HTM
   page.querySelectorAll('[data-act="bag-pack"]').forEach((b) => b.addEventListener('click', () => game.techAutoPack()));
   page.querySelectorAll('[data-act="bag-rec"]').forEach((b) => b.addEventListener('click', () => game.techRecommend(nextUncleared(game))));
   page.querySelectorAll('[data-act="bag-grow"]').forEach((b) => b.addEventListener('click', () => {
-    if (!game.techExpand()) game.toast(dict.notEnough);
+    if (!game.techExpand()) game.toast(dict.needCoins);
   }));
   page.querySelectorAll<HTMLElement>('[data-buy]').forEach((b) => {
     b.addEventListener('click', () => {
       const id = b.dataset.buy ?? '';
-      if (!game.techBuy(id)) game.toast(dict.notEnough);
+      if (!isItemId(id)) return;
+      const why = buyLock(buyBlock(game.save, id), dict);
+      if (why) {
+        game.toast(why);
+        return;
+      }
+      if (!game.techBuy(id)) game.toast(dict.needCoins);
     });
   });
   page.querySelectorAll<HTMLElement>('[data-sell]').forEach((b) => {

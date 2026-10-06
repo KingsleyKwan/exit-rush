@@ -212,6 +212,11 @@ export interface Dict {
   slotGloves: string;
   slotHead: string;
   slotCore: string;
+  /** Gear L shop: upgrades spend coins, not skill points. */
+  coinShop: string;
+  /** {n} = cleared level required before this tier. */
+  needLevel: string;
+  needCoins: string;
 }
 
 export const en: Dict = {
@@ -420,5 +425,8 @@ export const en: Dict = {
   slotGloves: 'gloves',
   slotHead: 'head',
   slotCore: 'a core',
+  coinShop: 'Upgrades spend coins from clears, not skill points.',
+  needLevel: 'Clear level {n} first.',
+  needCoins: 'Not enough coins. Clear levels to earn them.',
 };
 

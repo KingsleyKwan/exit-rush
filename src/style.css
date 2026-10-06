@@ -2062,6 +2062,8 @@ button {
 }
 .shop-card header { display: flex; align-items: center; gap: 8px; }
 .shop-card p { margin: 4px 0; font-size: 13px; opacity: .9; }
+.shop-card p.shop-lock { color: #ffb74d; font-weight: 700; opacity: 1; }
+.workshop .primary.is-locked { opacity: 0.45; box-shadow: none; }
 .coin-chip, .trial-banner {
   display: inline-flex; align-items: center; gap: 6px;
   background: rgba(255,176,58,.16);
