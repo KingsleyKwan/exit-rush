@@ -45,7 +45,9 @@ export class PlayerSim {
   hopUntil = 0;
   hopStart = 0;
   /** Counter-skill telemetry (tests / debugging). */
-  stats = { hops: 0, leaps: 0, splits: 0, shakeOffs: 0, pushDrain: 0 };
+  stats = { hops: 0, leaps: 0, splits: 0, shakeOffs: 0, pushDrain: 0, loudDrain: 0 };
+  /** 大聲公: current loudmouth noise drain (stamina/s) — HUD indicator + stamina-bar pulse. */
+  noiseDrain = 0;
   /** Smoothed, assisted move direction (unit, world XZ). */
   aimX = 0;
   aimZ = -1;
@@ -249,6 +251,7 @@ export class PlayerSim {
     // ---- Stamina.
     this.pushing = mag > 0.2 && inContact;
     const regenMul = iron ? U.sta.regenMul : 1;
+    const stam0 = this.stamina;
     if (this.winded) {
       this.stamina += this.mods.staminaRegen * regenMul * dt * (mag < 0.2 ? 1 : St.windedRegen);
     } else if (this.pushing && !dashing) {
@@ -262,6 +265,24 @@ export class PlayerSim {
       this.stamina += (this.mods.staminaRegen * regenMul * St.pushRegen - drain) * dt;
     } else {
       this.stamina += this.mods.staminaRegen * regenMul * dt * (mag < 0.2 ? 1 : 0.55);
+    }
+    // Regen never lifts stamina above the cap (or above an existing STA buffer) — previously idle regen
+    // out-ran the buffer bleed and stamina crept past max indefinitely.
+    const regenCap = Math.max(this.staminaMax, stam0);
+    if (this.stamina > regenCap) this.stamina = regenCap;
+    // 大聲公 Loudmouth noise zone: continuous drain + halved regen (STA 60 Unbothered cuts it ~70%).
+    const noise = crowd.noiseAt(b.x, b.z);
+    if (noise > 0) {
+      const Ld = TUNING.types.loud;
+      const mul = this.mods.unbothered ? TUNING.skills.unbotheredLoudMul : 1;
+      this.noiseDrain = noise * Ld.drainPeak * mul;
+      // Undo part of this step's regen (regen was added above), then drain.
+      const regenBack = this.mods.staminaRegen * regenMul * (1 - Ld.regenMul) * mul;
+      const loss = (this.noiseDrain + (this.winded ? 0 : regenBack)) * dt;
+      this.stamina -= loss;
+      this.stats.loudDrain += this.noiseDrain * dt;
+    } else {
+      this.noiseDrain = 0;
     }
     // Non-regen buffer (above max) slowly bleeds to the regen cap unless in Iron Stance.
     if (this.stamina > this.staminaMax) {

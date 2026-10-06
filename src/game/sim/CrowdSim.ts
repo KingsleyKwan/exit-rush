@@ -268,6 +268,21 @@ export class CrowdSim {
       const made = this.spawnGroup(kind, x, z, 'rider', 0.45);
       people += made.length;
     }
+    // 大聲公 intro car must actually contain a couple of loudmouths to learn from: the car is
+    // packed by now, so swap plain commuters (away from the player) for loudmouths in place.
+    if (level.introKind === 'loud') {
+      let have = this.agents.filter((a) => a.kind === 'loud').length;
+      const swap = this.agents.filter((a) => a.kind === 'normal' && Math.hypot(a.body.x - avoidX, a.body.z - avoidZ) > 1.6);
+      while (have < 2 && swap.length) {
+        const old = swap.splice(Math.floor(this.rng() * swap.length), 1)[0];
+        const { x, z } = old.body;
+        this.world.remove(old.body);
+        this.byBody.delete(old.body.id);
+        this.agents.splice(this.agents.indexOf(old), 1);
+        this.makeAgent('loud', x, z, 'rider', false);
+        have++;
+      }
+    }
     // Boarders waiting on the platform beyond the left wall.
     const C = TUNING.crowd;
     this.boardBudget = Math.round(C.boardBudgetBase + level.pressure * C.boardBudgetPerPressure);
@@ -283,7 +298,10 @@ export class CrowdSim {
   }
 
   private spawnBoarderUnit(level: LevelDef, openBays: readonly number[]): number {
-    const kind = pickKind(level.mix, this.rng);
+    let kind = pickKind(level.mix, this.rng);
+    // 大聲公 are riders already mid-call; boarders streaming through the door would park the
+    // noise zone on the exit itself (unavoidable), so they board as plain commuters.
+    if (kind === 'loud') kind = 'normal';
     const wall = doorWallX();
     const bay = openBays[Math.floor(this.rng() * openBays.length)] ?? 0;
     // Platform side (−X), lined up on a door bay.
@@ -360,6 +378,21 @@ export class CrowdSim {
       }
     }
     return Math.min(0.45, extra);
+  }
+
+  /**
+   * 大聲公 noise intensity at a point: 0 outside every loudmouth's radius, else the summed
+   * falloff (edge → 1 at the centre), capped at `stackCap`. Multiply by `drainPeak` for stamina/s.
+   */
+  noiseAt(x: number, z: number): number {
+    const L = TUNING.types.loud;
+    let n = 0;
+    for (const a of this.agents) {
+      if (!PASSENGER_DEFS[a.kind].noise) continue;
+      const d = Math.hypot(a.body.x - x, a.body.z - z);
+      if (d < L.radius) n += L.edge + (1 - L.edge) * (1 - d / L.radius);
+    }
+    return Math.min(L.stackCap, n);
   }
 
   auraSlowAt(x: number, z: number): number {

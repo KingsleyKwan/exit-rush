@@ -221,6 +221,13 @@ export const TUNING = {
     luggage: { caseRadius: 0.2, caseMass: 2.6, caseDamping: 7, rest: 0.4, k: 95, linkDamping: 8 },
     /** Squatting passenger: hard to shove over; lateral weave penalty. */
     squat: { shoveMul: 0.35, lateralDrag: 0.55 },
+    /**
+     * 大聲公 Loudmouth: stamina drain (per s) inside `radius`, scaling from `edge`×peak at the rim to
+     * peak at the centre (linear falloff); overlapping zones sum but are capped at `stackCap`× (=no
+     * stacking). Regen is ×`regenMul` while in the zone. ~3 s at 0.6 m costs ~54 of 100 stamina
+     * (≈24.5/s): painful, not instantly fatal. Unbothered (sta_t3c) ×`skills.unbotheredLoudMul`.
+     */
+    loud: { radius: 1.3, drainPeak: 40, edge: 0.08, stackCap: 1.0, regenMul: 0.5 },
   },
 
   /**
@@ -254,6 +261,8 @@ export const TUNING = {
     groundPoundLuggageMul: 2.6,
     /** STR 60 Stand Firm: angry shove impulse × this; stun × this. */
     standFirmMul: 0.15,
+    /** STA 60 Unbothered: loudmouth drain × this (≈ −70%). */
+    unbotheredLoudMul: 0.3,
     /** SPD 40 Hurdle: visual hop length (s) when passing through luggage. */
     hurdleHop: 0.32,
     /** Max-speed multiplier while mid-hop. */
