@@ -1993,6 +1993,8 @@ button {
 }
 .workshop-tabs button.on, .tray-item.on, .set-btn.on, .bag-tools .on { background: #ffb03a; color: #1b1408; }
 .tray-item.on .ico { color: #1b1408; }
+.tray-item.on .shape i.on { background: #1b1408; }
+.tray-item.on .shape i:not(.on) { background: rgba(27,20,8,.22); }
 .bag-grid {
   display: grid;
   grid-template-columns: repeat(var(--cols), minmax(52px, 64px));
@@ -2000,6 +2002,7 @@ button {
   justify-content: center;
 }
 .bag-cell {
+  position: relative;
   aspect-ratio: 1;
   border-radius: 10px;
   border: 1px dashed rgba(255,255,255,.28);
@@ -2008,6 +2011,19 @@ button {
   display: grid;
   place-items: center;
   padding: 0;
+}
+.cell-n {
+  position: absolute;
+  right: 3px;
+  bottom: 2px;
+  font-size: 11px;
+  font-style: normal;
+  font-weight: 800;
+  line-height: 1.2;
+  color: #1b1408;
+  background: rgba(255,255,255,.78);
+  border-radius: 4px;
+  padding: 0 3px;
 }
 .bag-cell .ico, .tray-item .ico { width: 28px; height: 28px; }
 .shop-card header .ico { width: 32px; height: 32px; }
@@ -2019,6 +2035,7 @@ button {
 .ico.it-consumable { color: #f48fb1; }
 .bag-cell.filled { border-style: solid; background: rgba(255,176,58,.22); }
 .bag-cell.on { outline: 2px solid #ffb03a; }
+.bag-cell.clash { outline: 2px solid #ff8a65; }
 .tray { display: flex; gap: 8px; overflow-x: auto; padding-bottom: 14px; }
 .tray-item span { white-space: nowrap; }
 .tray-item, .set-btn {
@@ -2055,3 +2072,28 @@ button {
 .trial-banner { background: rgba(90,210,255,.16); }
 .cons-row { display: flex; gap: 4px; justify-content: flex-end; }
 .place-hint { margin: 0; font-size: 13px; opacity: .8; }
+.place-hint.warn { color: #ffb74d; opacity: 1; font-weight: 700; }
+.shape {
+  display: inline-grid;
+  grid-template-columns: repeat(var(--sw), 8px);
+  grid-template-rows: repeat(var(--sh), 8px);
+  gap: 2px;
+  vertical-align: middle;
+}
+.shape i {
+  display: block;
+  width: 8px;
+  height: 8px;
+  border-radius: 2px;
+  background: rgba(255,255,255,.16);
+}
+.shape i.on { background: #ffb03a; }
+.piece-size, .shop-size {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+}
+.shop-size { margin: 2px 0 6px; }
+.shape-arrow { opacity: .7; }
+.bag-tools .shape { margin-left: 6px; }

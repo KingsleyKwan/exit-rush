@@ -37,6 +37,37 @@ function tierName(tier: number, dict: ReturnType<typeof t>): string {
   return dict.tierCheap;
 }
 
+function slotName(slot: string | undefined, dict: ReturnType<typeof t>): string {
+  if (slot === 'shoes') return dict.slotShoes;
+  if (slot === 'gloves') return dict.slotGloves;
+  if (slot === 'head') return dict.slotHead;
+  if (slot === 'core') return dict.slotCore;
+  return '';
+}
+
+function whyBlocked(reason: string, slot: string | undefined, dict: ReturnType<typeof t>): string {
+  if (reason === 'body') return dict.whyBody.replace('{slot}', slotName(slot, dict));
+  if (reason === 'once') return dict.whyOnce;
+  if (reason === 'active') return dict.whyActive;
+  if (reason === 'consumable') return dict.whyCons;
+  if (reason === 'stock') return dict.whyStock;
+  return dict.noRoom;
+}
+
+/** Amber polyomino. `count` adds the cell total next to it. */
+function shapeHtml(id: ItemId, tier: Tier, dict: ReturnType<typeof t>, count = false): string {
+  const cells = cellsFor(id, tier, 0);
+  const w = Math.max(1, ...cells.map((c) => c.x + 1));
+  const h = Math.max(1, ...cells.map((c) => c.y + 1));
+  const on = new Set(cells.map((c) => `${c.x},${c.y}`));
+  let bits = '';
+  for (let y = 0; y < h; y++) {
+    for (let x = 0; x < w; x++) bits += `<i class="${on.has(`${x},${y}`) ? 'on' : ''}"></i>`;
+  }
+  const n = count ? `<small>${cells.length} ${dict.cells}</small>` : '';
+  return `<span class="shape" style="--sw:${w};--sh:${h}" aria-hidden="true">${bits}</span>${n}`;
+}
+
 function nextUncleared(game: Game): number {
   const cleared = new Set(progressOf(game.save, 'tech').cleared);
   for (const lv of playableLevels()) if (!cleared.has(lv.id)) return lv.id;
@@ -64,6 +95,25 @@ export function renderWorkshop(game: Game, _rerender: (game: Game) => void): HTM
   });
   const cap = grid.cols * grid.rows;
 
+  let hint = dict.placeHint;
+  let hintWarn = false;
+  let clashSlot = '';
+  if (pick) {
+    const def = itemDef(pick.id);
+    const n = cellsFor(pick.id, pick.tier, 0).length;
+    const chk = placeCheck(placements as never, tech.gridTier, tech.items, tech.stock, {
+      id: pick.id, tier: pick.tier, x: 0, y: 0, rot: 0,
+    });
+    // bounds/overlap depend on the cell. body/once/active do not.
+    if (!chk.ok && chk.reason !== 'bounds' && chk.reason !== 'overlap') {
+      hint = whyBlocked(chk.reason, def?.slot, dict);
+      hintWarn = true;
+      if (chk.reason === 'body' && def) clashSlot = def.slot;
+    } else {
+      hint = dict.placeSize.replace('{n}', String(n));
+    }
+  }
+
   const cells: string[] = [];
   for (let y = 0; y < grid.rows; y++) {
     for (let x = 0; x < grid.cols; x++) {
@@ -72,9 +122,21 @@ export function renderWorkshop(game: Game, _rerender: (game: Game) => void): HTM
       const def = p && isItemId(p.id) ? itemDef(p.id) : undefined;
       const label = def ? (en ? def.nameEn : def.nameZh) : '';
       const on = hit === selected ? ' on' : '';
-      const mark = def && p ? gearIcon(p.id, def.slot) : '';
+      const clash = def && clashSlot && def.slot === clashSlot ? ' clash' : '';
+      let mark = '';
+      let size = '';
+      if (def && p && isItemId(p.id)) {
+        const tier = (p.tier === 2 || p.tier === 3 ? p.tier : 1) as Tier;
+        const rot = ((p.rot ?? 0) & 3) as Rot;
+        const shape = cellsFor(p.id, tier, rot);
+        const anchor = shape.reduce((a, c) => (c.y < a.y || (c.y === a.y && c.x < a.x) ? c : a), shape[0]);
+        if (anchor && x === p.x + anchor.x && y === p.y + anchor.y) {
+          mark = gearIcon(p.id, def.slot);
+          size = `<em class="cell-n">${shape.length}</em>`;
+        }
+      }
       cells.push(
-        `<button type="button" class="bag-cell${p ? ' filled' : ''}${on}" data-cell="${x},${y}" aria-label="${label || `${x},${y}`}">${mark}</button>`,
+        `<button type="button" class="bag-cell${p ? ' filled' : ''}${on}${clash}" data-cell="${x},${y}" aria-label="${label || `${x},${y}`}">${mark}${size}</button>`,
       );
     }
   }
@@ -87,17 +149,20 @@ export function renderWorkshop(game: Game, _rerender: (game: Game) => void): HTM
     const tier = Math.min(3, Math.max(1, owned)) as Tier;
     const on = pick?.id === it.id ? ' on' : '';
     const name = en ? it.nameEn : it.nameZh;
-    return `<button type="button" class="tray-item${on}" data-tray="${it.id}" data-tier="${tier}">${gearIcon(it.id, it.slot)}<span>${name}</span><small>${it.slot === 'consumable' ? `×${owned}` : tierName(owned, dict)}</small></button>`;
+    const size = isItemId(it.id) ? shapeHtml(it.id, tier, dict, true) : '';
+    const tag = it.slot === 'consumable' ? `×${owned}` : tierName(owned, dict);
+    return `<button type="button" class="tray-item${on}" data-tray="${it.id}" data-tier="${tier}">${gearIcon(it.id, it.slot)}<span>${name}</span><span class="piece-size">${size}<small>${tag}</small></span></button>`;
   }).join('');
 
   const sel = selected >= 0 ? placements[selected] : undefined;
-  const selDef = sel && isItemId(sel.id) ? itemDef(sel.id) : undefined;
-  const selTools = selDef && sel
+  const selId = sel && isItemId(sel.id) ? sel.id : null;
+  const selDef = selId ? itemDef(selId) : undefined;
+  const selTools = selDef && sel && selId
     ? `<div class="bag-tools">
         <button type="button" class="ghost" data-act="bag-rot">${dict.rotateItem}</button>
         <button type="button" class="ghost" data-act="bag-off">${dict.removeItem}</button>
-        ${([1, 2, 3] as Tier[]).filter((n) => (tech.items[sel.id] ?? 0) >= n && selDef.price.length >= n).map((n) =>
-          `<button type="button" class="ghost ${sel.tier === n ? 'on' : ''}" data-tier-set="${n}">${tierName(n, dict)}</button>`,
+        ${([1, 2, 3] as Tier[]).filter((n) => (tech.items[selId] ?? 0) >= n && selDef.price.length >= n).map((n) =>
+          `<button type="button" class="ghost ${sel.tier === n ? 'on' : ''}" data-tier-set="${n}">${tierName(n, dict)} ${shapeHtml(selId, n, dict)}</button>`,
         ).join('')}
       </div>`
     : '';
@@ -110,12 +175,20 @@ export function renderWorkshop(game: Game, _rerender: (game: Game) => void): HTM
     const price = next >= 0 ? it.price[next] : 0;
     const name = en ? it.nameEn : it.nameZh;
     const blurb = en ? it.blurbEn : it.blurbZh;
-    const have = it.slot === 'consumable' ? `${dict.ownedTier} ×${stock}` : owned > 0 ? `${dict.ownedTier} · ${tierName(owned, dict)}` : '';
+    const have = it.slot === 'consumable' ? (stock > 0 ? `${dict.ownedTier} ×${stock}` : '') : owned > 0 ? `${dict.ownedTier} · ${tierName(owned, dict)}` : '';
     const buyLabel = it.slot === 'consumable' || owned === 0 ? dict.buyItem : dict.upgradeItem;
+    const haveTier = (it.slot === 'consumable' ? (stock > 0 ? 1 : 0) : owned >= 1 ? Math.min(owned, it.shape.length, 3) : 0) as Tier | 0;
+    const buyTier = (next >= 0 ? Math.min(next + 1, it.shape.length, 3) : 0) as Tier | 0;
+    const nowShape = haveTier >= 1 && isItemId(it.id) ? shapeHtml(it.id, haveTier as Tier, dict, true) : '';
+    const nextShape = buyTier >= 1 && buyTier !== haveTier && isItemId(it.id) ? shapeHtml(it.id, buyTier as Tier, dict, true) : '';
+    const sizeRow = nowShape && nextShape
+      ? `${nowShape}<span class="shape-arrow">→</span>${nextShape}`
+      : (nowShape || nextShape);
     return `<article class="shop-card">
       <header>${gearIcon(it.id, it.slot)}<b>${name}</b></header>
       <p>${blurb}</p>
-      <p class="shop-meta">${have}</p>
+      ${have ? `<p class="shop-meta">${have}</p>` : ''}
+      <div class="shop-size">${sizeRow}</div>
       <div class="shop-actions">
         ${next >= 0 ? `<button type="button" class="primary" data-buy="${it.id}" ${coins < price ? 'disabled' : ''}>${buyLabel} · ${price}</button>` : ''}
         ${owned > 0 && it.slot !== 'consumable' ? `<button type="button" class="ghost" data-sell="${it.id}">${dict.sellItem}</button>` : ''}
@@ -129,7 +202,8 @@ export function renderWorkshop(game: Game, _rerender: (game: Game) => void): HTM
   }).join('');
 
   const body = tab === 'equip'
-    ? `<p class="place-hint">${dict.placeHint}</p>
+    ? `<p class="place-hint${hintWarn ? ' warn' : ''}">${hint}</p>
+       <p class="sfx-note">${dict.oneEach}</p>
        <div class="bag-grid" style="--cols:${grid.cols}">${cells.join('')}</div>
        ${selTools}
        <div class="tray">${tray || `<p class="sfx-note">${dict.tabShop}</p>`}</div>
@@ -194,16 +268,17 @@ export function renderWorkshop(game: Game, _rerender: (game: Game) => void): HTM
       const p = { id: pick.id, tier: pick.tier, x, y, rot: 0 as Rot };
       const chk = placeCheck(placements as never, tech.gridTier, tech.items, tech.stock, p);
       if (!chk.ok) {
-        game.toast(dict.noRoom);
+        game.toast(whyBlocked(chk.reason, itemDef(pick.id)?.slot, dict));
         return;
       }
-      game.techPlace(p);
+      pick = null;
       selected = -1;
+      game.techPlace(p);
     });
   });
 
   page.querySelector('[data-act="bag-rot"]')?.addEventListener('click', () => {
-    if (selected >= 0) game.techRotate(selected);
+    if (selected >= 0 && !game.techRotate(selected)) game.toast(dict.noRoom);
   });
   page.querySelector('[data-act="bag-off"]')?.addEventListener('click', () => {
     if (selected >= 0) {
@@ -214,7 +289,7 @@ export function renderWorkshop(game: Game, _rerender: (game: Game) => void): HTM
   page.querySelectorAll<HTMLElement>('[data-tier-set]').forEach((b) => {
     b.addEventListener('click', () => {
       const tier = Number(b.dataset.tierSet) as Tier;
-      if (selected >= 0) game.techSetTier(selected, tier);
+      if (selected >= 0 && !game.techSetTier(selected, tier)) game.toast(dict.noRoom);
     });
   });
   page.querySelectorAll('[data-act="bag-pack"]').forEach((b) => b.addEventListener('click', () => game.techAutoPack()));

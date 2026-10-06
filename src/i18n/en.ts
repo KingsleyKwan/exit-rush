@@ -198,6 +198,20 @@ export interface Dict {
   trialBanner: string;
   noRoom: string;
   ownedTier: string;
+  /** Standing workshop rule: one of each worn slot, and upgrades grow. */
+  oneEach: string;
+  /** {n} = cells this piece covers. */
+  placeSize: string;
+  /** {slot} = shoes / gloves / head / core. */
+  whyBody: string;
+  whyOnce: string;
+  whyActive: string;
+  whyCons: string;
+  whyStock: string;
+  slotShoes: string;
+  slotGloves: string;
+  slotHead: string;
+  slotCore: string;
 }
 
 export const en: Dict = {
@@ -395,5 +409,16 @@ export const en: Dict = {
   trialBanner: 'Trial · no rewards',
   noRoom: 'No space',
   ownedTier: 'Owned',
+  oneEach: 'Shoes, gloves, head and core: one each. Upgrades take more cells.',
+  placeSize: 'Covers {n} cells. Tap a cell to drop it.',
+  whyBody: 'Already wearing {slot}. Only one.',
+  whyOnce: 'Already in the bag.',
+  whyActive: 'Only 3 active pieces.',
+  whyCons: 'Only 3 drinks or snacks.',
+  whyStock: 'None left to place.',
+  slotShoes: 'shoes',
+  slotGloves: 'gloves',
+  slotHead: 'head',
+  slotCore: 'a core',
 };
 

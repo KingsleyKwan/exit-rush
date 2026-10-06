@@ -785,16 +785,20 @@ export class Game {
     this.hooks.onState();
   }
 
-  techRotate(index: number): void {
-    if (this.save.character !== 'tech') return;
-    if (rotateAt(this.save.tech, index)) this.persist();
+  techRotate(index: number): boolean {
+    if (this.save.character !== 'tech') return false;
+    const ok = rotateAt(this.save.tech, index);
+    if (ok) this.persist();
     this.hooks.onState();
+    return ok;
   }
 
-  techSetTier(index: number, tier: Tier): void {
-    if (this.save.character !== 'tech') return;
-    if (retierAt(this.save.tech, index, tier)) this.persist();
+  techSetTier(index: number, tier: Tier): boolean {
+    if (this.save.character !== 'tech') return false;
+    const ok = retierAt(this.save.tech, index, tier);
+    if (ok) this.persist();
     this.hooks.onState();
+    return ok;
   }
 
   techAutoPack(): void {
