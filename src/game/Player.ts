@@ -99,6 +99,8 @@ export class Player {
     let wob = 0;
     if (p.stunT > 0) wob = Math.sin(time * 40) * 0.12 * (p.stunT / TUNING.player.stunTime);
     this.mesh.position.set(x, bobY, z);
+    // Tier 3 Hurdle hop / Leap arc (body only; ring stays on the floor).
+    this.lean.position.y = p.airHeight(now);
 
     const tgtYaw = Math.atan2(p.faceX, p.faceZ);
     let d = tgtYaw - this.yaw;
@@ -126,7 +128,7 @@ export class Player {
     if (p.isCharging(now)) {
       this.bodyMat.emissive.setRGB(1, 0.45, 0.05);
       this.bodyMat.emissiveIntensity = 0.6 + Math.sin(time * 20) * 0.25;
-    } else if (p.isDashing(now)) {
+    } else if (p.isDashing(now) || p.isLeaping(now)) {
       this.bodyMat.emissive.setRGB(0.2, 0.9, 1);
       this.bodyMat.emissiveIntensity = 0.8;
     } else if (p.winded) {

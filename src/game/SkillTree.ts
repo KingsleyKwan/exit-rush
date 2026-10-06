@@ -1,4 +1,5 @@
 import type { SkillState } from './storage';
+import type { PassengerKind } from './PassengerTypes';
 import { TUNING } from './sim/tuning';
 
 /** Points to fill one branch before ultimate */
@@ -28,13 +29,15 @@ export type SkillNodeKind = 'passive' | 'active';
 export interface SkillNodeDef {
   id: string;
   branch: Branch;
-  /** 1 = Tier1, 2 = Tier2, 3 = Tier3 (TBD placeholders marked tbd). */
+  /** 1 = Tier1, 2 = Tier2, 3 = Tier3 (v0.6.2: counters to special passengers). */
   tier: 1 | 2 | 3;
   /** Points invested in the branch required to unlock. */
   at: number;
   kind: SkillNodeKind;
-  /** True when copy/numbers are provisional (「第三層暫定」). */
+  /** True when copy/numbers are provisional (unused since v0.6.2). */
   tbd?: boolean;
+  /** Tier 3: special passenger type(s) this skill counters (icon shown on the node). */
+  counters?: PassengerKind[];
   nameEn: string;
   nameZh: string;
   tipEn: string;
@@ -86,11 +89,11 @@ export const SKILL_NODES: SkillNodeDef[] = [
     tier: 3,
     at: 40,
     kind: 'passive',
-    tbd: true,
-    nameEn: 'Wide Cone',
-    nameZh: '開闊推角',
-    tipEn: 'Wider shove cone (TBD)',
-    tipZh: '推人範圍更闊（第三層暫定）',
+    counters: ['couple'],
+    nameEn: 'Split',
+    nameZh: '拆散情侶',
+    tipEn: 'Couple: a shove breaks their hand-hold for 4s',
+    tipZh: '情侶：推一下就拆開佢哋拖手（4秒）',
   },
   {
     id: 'str_t3b',
@@ -98,11 +101,11 @@ export const SKILL_NODES: SkillNodeDef[] = [
     tier: 3,
     at: 50,
     kind: 'active',
-    tbd: true,
+    counters: ['luggage'],
     nameEn: 'Ground Pound',
-    nameZh: '震地一擊',
-    tipEn: 'Full-charge shove adds a small shockwave (TBD)',
-    tipZh: '蓄滿推帶細震波（第三層暫定）',
+    nameZh: '震地',
+    tipEn: 'Full-charge shove → shockwave; shifts Luggage too',
+    tipZh: '蓄滿推人出震波，連行李喼都推開',
   },
   {
     id: 'str_t3c',
@@ -110,11 +113,11 @@ export const SKILL_NODES: SkillNodeDef[] = [
     tier: 3,
     at: 60,
     kind: 'passive',
-    tbd: true,
-    nameEn: 'Knockback',
-    nameZh: '擊退強化',
-    tipEn: 'Shove knockback ×1.25 (TBD)',
-    tipZh: '推人擊退 ×1.25（第三層暫定）',
+    counters: ['angry'],
+    nameEn: 'Stand Firm',
+    nameZh: '頂硬上',
+    tipEn: 'Angry man: his shove barely moves you, no stagger',
+    tipZh: '暴躁男：佢推你都推唔郁，唔會踉蹌',
   },
   // ---- SPD
   {
@@ -156,11 +159,11 @@ export const SKILL_NODES: SkillNodeDef[] = [
     tier: 3,
     at: 40,
     kind: 'passive',
-    tbd: true,
-    nameEn: 'Afterimage',
-    nameZh: '殘影',
-    tipEn: 'Dash leaves afterimages (TBD)',
-    tipZh: '衝刺留殘影（第三層暫定）',
+    counters: ['luggage'],
+    nameEn: 'Hurdle',
+    nameZh: '跨行李',
+    tipEn: 'Luggage: hop over suitcases, no blocking',
+    tipZh: '拉行李喼：直接跨過個喼，唔再擋路',
   },
   {
     id: 'spd_t3b',
@@ -168,11 +171,11 @@ export const SKILL_NODES: SkillNodeDef[] = [
     tier: 3,
     at: 50,
     kind: 'active',
-    tbd: true,
-    nameEn: 'Brief Dash',
-    nameZh: '短衝',
-    tipEn: 'Short dash (active, TBD)',
-    tipZh: '短距離衝刺（主動／第三層暫定）',
+    counters: ['squat', 'family'],
+    nameEn: 'Leap',
+    nameZh: '飛身',
+    tipEn: 'Button: leap past Squatters + Family kids (6s cd)',
+    tipZh: '按鍵：飛身跨過踎低客同細路（冷卻6秒）',
   },
   {
     id: 'spd_t3c',
@@ -180,11 +183,11 @@ export const SKILL_NODES: SkillNodeDef[] = [
     tier: 3,
     at: 60,
     kind: 'passive',
-    tbd: true,
-    nameEn: 'Weave Slip',
-    nameZh: '閃身滑過',
-    tipEn: 'Stronger shoulder slip past bodies (TBD)',
-    tipZh: '擦身滑過更順（第三層暫定）',
+    counters: ['couple'],
+    nameEn: 'Thread',
+    nameZh: '穿插',
+    tipEn: 'Couple: slip through the gap between their hands',
+    tipZh: '情侶：喺佢哋拖手中間穿過去',
   },
   // ---- STA (replaces Wisdom)
   {
@@ -226,11 +229,11 @@ export const SKILL_NODES: SkillNodeDef[] = [
     tier: 3,
     at: 40,
     kind: 'passive',
-    tbd: true,
-    nameEn: 'Shrug Stench',
+    counters: ['stench'],
+    nameEn: 'Hold Breath',
     nameZh: '忍臭',
-    tipEn: 'Stronger aura resist (TBD)',
-    tipZh: '更耐惡臭光環（第三層暫定）',
+    tipEn: 'Stench: their stink cloud no longer slows you',
+    tipZh: '惡臭人：臭氣唔再拖慢你',
   },
   {
     id: 'sta_t3b',
@@ -238,11 +241,11 @@ export const SKILL_NODES: SkillNodeDef[] = [
     tier: 3,
     at: 50,
     kind: 'active',
-    tbd: true,
+    counters: ['brat'],
     nameEn: 'Second Wind',
-    nameZh: '回魂一擊',
-    tipEn: 'Burst-restore stamina (active, TBD)',
-    tipZh: '瞬間回一大口體力（主動／第三層暫定）',
+    nameZh: '回魂',
+    tipEn: 'Button: +45 stamina and knock Brats away (dazed 3s)',
+    tipZh: '按鍵：即回45體力，彈開百厭仔（暈3秒）',
   },
   {
     id: 'sta_t3c',
@@ -250,11 +253,11 @@ export const SKILL_NODES: SkillNodeDef[] = [
     tier: 3,
     at: 60,
     kind: 'passive',
-    tbd: true,
-    nameEn: 'Iron Lungs',
-    nameZh: '鐵肺',
-    tipEn: 'Less stamina drain while pushing (TBD)',
-    tipZh: '推人時少耗體力（第三層暫定）',
+    counters: ['family'],
+    nameEn: 'Unbothered',
+    nameZh: '好脾氣',
+    tipEn: 'Family: pushing through them costs no stamina or drag',
+    tipZh: '一家大細：擠過佢哋唔耗體力、唔拖慢',
   },
 ];
 
@@ -311,24 +314,31 @@ export interface SkillModifiers {
   frontPush: number;
   /** STR T2b: multiplier on shove impulse when charge was high. */
   chargeShoveMul: number;
-  /** STR T3a: shove cone cos (lower = wider). */
-  shoveConeCos: number;
-  /** STR T3c: shove impulse multiplier. */
-  knockbackMul: number;
   /** SPD T2a: speed mul when not in contact. */
   clearSpeed: number;
   /** SPD T2b: fraction of crowd-drag removed. */
   blockedDragCut: number;
-  /** SPD T3c: slip force mul. */
-  weaveSlip: number;
-  /** STA T3c: drain reduction while pushing. */
-  drainResist: number;
   /** Unlocked actives (derived from nodes). */
   hasChargedShove: boolean;
+  // ---- v0.6.2 Tier 3 counters
+  /** STR 40 拆散情侶: shove hits break couple links. */
+  splitCouples: boolean;
+  /** STR 50 震地: full-charge shove shockwave (stronger on luggage). */
   hasGroundPound: boolean;
-  hasBriefDash: boolean;
-  hasAfterimage: boolean;
+  /** STR 60 頂硬上: angry shoves barely move / stun you. */
+  standFirm: boolean;
+  /** SPD 40 跨行李: pass through suitcases (owner still blocks). */
+  hurdle: boolean;
+  /** SPD 50 飛身 (active): leap over squatters + kids. */
+  hasLeap: boolean;
+  /** SPD 60 穿插: couple link doesn't block you. */
+  threadCouples: boolean;
+  /** STA 40 忍臭: immune to stench slow. */
+  holdBreath: boolean;
+  /** STA 50 回魂 (active): stamina burst + shake off brats. */
   hasSecondWind: boolean;
+  /** STA 60 好脾氣: family contacts cost no stamina / drag. */
+  unbothered: boolean;
 }
 
 function hasNode(s: SkillState, id: string): boolean {
@@ -354,21 +364,22 @@ export function modifiersFromSkills(s: SkillState): SkillModifiers {
       + (hasNode(s, 'sta_t2a') ? K.regenNodeBonus : 0),
     staminaBuffer: hasNode(s, 'sta_t2b') ? K.staminaBuffer : 0,
     resist: strT * K.resist,
-    auraResist: staT * K.auraResist * (hasNode(s, 'sta_t3a') ? 1.35 : 1),
+    auraResist: staT * K.auraResist,
     gapSense: spdT * K.gapSense,
     frontPush: hasNode(s, 'str_t2a') ? K.frontPush : 0,
     chargeShoveMul: hasNode(s, 'str_t2b') ? K.chargeShoveMul : 1,
-    shoveConeCos: hasNode(s, 'str_t3a') ? K.wideConeCos : TUNING.player.shove.coneCos,
-    knockbackMul: hasNode(s, 'str_t3c') ? K.knockbackMul : 1,
     clearSpeed: hasNode(s, 'spd_t2a') ? K.clearSpeed : 1,
     blockedDragCut: hasNode(s, 'spd_t2b') ? K.blockedDragCut : 0,
-    weaveSlip: hasNode(s, 'spd_t3c') ? K.weaveSlip : 1,
-    drainResist: hasNode(s, 'sta_t3c') ? K.drainResist : 0,
     hasChargedShove: hasNode(s, 'str_t2b'),
+    splitCouples: hasNode(s, 'str_t3a'),
     hasGroundPound: hasNode(s, 'str_t3b'),
-    hasBriefDash: hasNode(s, 'spd_t3b'),
-    hasAfterimage: hasNode(s, 'spd_t3a'),
+    standFirm: hasNode(s, 'str_t3c'),
+    hurdle: hasNode(s, 'spd_t3a'),
+    hasLeap: hasNode(s, 'spd_t3b'),
+    threadCouples: hasNode(s, 'spd_t3c'),
+    holdBreath: hasNode(s, 'sta_t3a'),
     hasSecondWind: hasNode(s, 'sta_t3b'),
+    unbothered: hasNode(s, 'sta_t3c'),
   };
 }
 

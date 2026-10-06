@@ -352,6 +352,14 @@ export class Game {
     return p ? p.ultCd[kind] / TUNING.ult.cooldown : 0;
   }
 
+  /** 0–1 remaining cooldown of a Tier-3 active ('leap' | 'wind'). */
+  activeCooldown(id: 'leap' | 'wind'): number {
+    const p = this.sim?.player;
+    if (!p) return 0;
+    const K = TUNING.skills;
+    return id === 'leap' ? p.activeCd.leap / K.leapCd : p.activeCd.wind / K.secondWindCd;
+  }
+
   ultActive(kind: UltKind): boolean {
     const p = this.sim?.player;
     if (!p || !this.sim) return false;
@@ -561,9 +569,9 @@ export class Game {
     }
   }
 
-  tryBriefDash(): void {
+  tryLeap(): void {
     if (this.screen !== 'playing' || !this.sim || this.sim.ambient) return;
-    if (this.sim.player.tryBriefDash(this.sim.time)) {
+    if (this.sim.tryLeap()) {
       this.audio.dash();
       this.hooks.onState();
     }
@@ -571,7 +579,7 @@ export class Game {
 
   trySecondWind(): void {
     if (this.screen !== 'playing' || !this.sim || this.sim.ambient) return;
-    if (this.sim.player.trySecondWind()) {
+    if (this.sim.trySecondWind()) {
       this.audio.skillPoint();
       this.hooks.onState();
     }
