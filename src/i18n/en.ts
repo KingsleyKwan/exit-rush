@@ -139,6 +139,24 @@ export interface Dict {
   doorBannerEnOne: string;
   doorOpenIcon: string;
   doorClosedIcon: string;
+  charTitle: string;
+  charSelect: string;
+  charSelected: string;
+  charBuy: string;
+  charTry: string;
+  charRestore: string;
+  charNote: string;
+  charIapStub: string;
+  charTryStub: string;
+  manaEmpty: string;
+  mana: string;
+  spells: string;
+  fire: string;
+  ice: string;
+  volt: string;
+  chars: string;
+  comingSoon: string;
+  youOffice: string;
 }
 
 export const en: Dict = {
@@ -276,5 +294,24 @@ export const en: Dict = {
   doorBannerEnOne: 'Only 1 door open',
   doorOpenIcon: 'Open',
   doorClosedIcon: 'Closed',
+  // v0.8 characters
+  charTitle: 'Characters',
+  charSelect: 'Select',
+  charSelected: 'Selected',
+  charBuy: 'Buy',
+  charTry: 'Try',
+  charRestore: 'Restore Purchases',
+  charNote: 'Shared level progress. Web demo: all characters unlocked.',
+  charIapStub: 'IAP hooks land in the iOS build (Grok Build).',
+  charTryStub: 'Trial car (L6 / L20) comes with the iOS build.',
+  manaEmpty: 'Not enough mana!',
+  mana: 'Mana',
+  spells: 'Spells',
+  fire: 'Fire',
+  ice: 'Ice',
+  volt: 'Lightning',
+  chars: 'Characters',
+  comingSoon: 'Coming soon',
+  youOffice: 'Office Worker',
 };
 
