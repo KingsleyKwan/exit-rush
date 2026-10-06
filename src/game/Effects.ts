@@ -106,7 +106,7 @@ export class Effects {
     const geo = new THREE.SphereGeometry(0.12, 10, 8);
     for (let i = 0; i < MAX_PARTICLES; i++) {
       const mat = new THREE.MeshBasicMaterial({
-        color: 0xff7043,
+        color: 0xff1744,
         transparent: true,
         opacity: 0,
         depthWrite: false,
@@ -149,7 +149,7 @@ export class Effects {
     const ghostGeo = heroGeometry();
     for (let i = 0; i < 10; i++) {
       const mat3 = new THREE.MeshBasicMaterial({
-        color: 0x4dd0e1, transparent: true, opacity: 0, depthWrite: false,
+        color: 0x0d47a1, transparent: true, opacity: 0, depthWrite: false,
       });
       const mesh = new THREE.Mesh(ghostGeo, mat3);
       mesh.visible = false;
@@ -176,22 +176,23 @@ export class Effects {
     }
 
     // Fireball: ~0.5 m glowing sphere + thick trail + point light (iso-readable).
-    this.fireLight = new THREE.PointLight(0xff9100, 0, 6, 2);
+    this.fireLight = new THREE.PointLight(0xe0201a, 0, 5, 2);
     this.fireLight.visible = false;
     this.group.add(this.fireLight);
     for (let i = 0; i < MAX_BOLTS; i++) {
       const coreMat = new THREE.MeshBasicMaterial({
-        color: 0xfff8e1, transparent: false, opacity: 1,
+        // Small hot core — orange-red, NOT white (white+additive → pink on light floors).
+        color: 0xff6a00, transparent: false, opacity: 1,
         depthWrite: false, depthTest: false, toneMapped: false,
       });
       const glowMat = new THREE.MeshBasicMaterial({
-        color: 0xff6d00, transparent: true, opacity: 0.95,
+        color: 0xe0201a, transparent: true, opacity: 0.92,
         depthWrite: false, depthTest: false, toneMapped: false,
-        blending: THREE.AdditiveBlending,
+        blending: THREE.NormalBlending,
       });
-      // Core ~0.5 m; bright white-hot centre, saturated orange mantle.
-      const mesh = new THREE.Mesh(new THREE.SphereGeometry(0.26, 16, 14), coreMat);
-      const glow = new THREE.Mesh(new THREE.SphereGeometry(0.55, 14, 12), glowMat);
+      // ~0.5 m deep-red ball; small orange core.
+      const mesh = new THREE.Mesh(new THREE.SphereGeometry(0.16, 14, 12), coreMat);
+      const glow = new THREE.Mesh(new THREE.SphereGeometry(0.5, 14, 12), glowMat);
       mesh.visible = false;
       glow.visible = false;
       mesh.renderOrder = 40;
@@ -202,8 +203,8 @@ export class Effects {
         const tm = new THREE.Mesh(
           new THREE.SphereGeometry(0.16 - t * 0.008, 10, 8),
           new THREE.MeshBasicMaterial({
-            color: 0xff9100, transparent: true, opacity: 0.85,
-            depthWrite: false, depthTest: false, blending: THREE.AdditiveBlending,
+            color: 0xe0201a, transparent: true, opacity: 0.9,
+            depthWrite: false, depthTest: false, blending: THREE.NormalBlending,
             toneMapped: false,
           }),
         );
@@ -215,15 +216,15 @@ export class Effects {
       this.bolts.push({
         mesh, glow, trail,
         x: 0, y: 0, z: 0, dx: 0, dz: 1, speed: 8, dist: 2.5,
-        travelled: 0, life: 0, max: 1, color: 0xff9100,
+        travelled: 0, life: 0, max: 1, color: 0xff1744,
       });
     }
 
     // Lightning: thick bright boxes (core + soft glow twin via scale).
     for (let i = 0; i < MAX_ARCS; i++) {
       const matA = new THREE.MeshBasicMaterial({
-        color: 0xfff59d, transparent: true, opacity: 0,
-        depthWrite: false, depthTest: false, blending: THREE.AdditiveBlending,
+        color: 0xffd400, transparent: true, opacity: 0,
+        depthWrite: false, depthTest: false, blending: THREE.NormalBlending,
         toneMapped: false,
       });
       const mesh = new THREE.Mesh(new THREE.BoxGeometry(1, 0.35, 0.35), matA);
@@ -237,7 +238,7 @@ export class Effects {
     const cryGeo = new THREE.OctahedronGeometry(0.18, 0);
     for (let i = 0; i < MAX_CRYSTALS; i++) {
       const mat = new THREE.MeshBasicMaterial({
-        color: 0x4dd0e1, transparent: true, opacity: 0,
+        color: 0x0d47a1, transparent: true, opacity: 0,
         depthWrite: false, depthTest: false, toneMapped: false,
         blending: THREE.AdditiveBlending,
       });
@@ -253,7 +254,7 @@ export class Effects {
     // Ice cube shells around frozen targets.
     for (let i = 0; i < MAX_SHELLS; i++) {
       const mat = new THREE.MeshBasicMaterial({
-        color: 0xb2ebf2, transparent: true, opacity: 0,
+        color: 0x42a5f5, transparent: true, opacity: 0,
         depthWrite: false, depthTest: false, toneMapped: false,
         wireframe: false, blending: THREE.AdditiveBlending,
       });
@@ -268,7 +269,7 @@ export class Effects {
     const ringGeo2 = new THREE.RingGeometry(0.4, 1.15, 48);
     for (let i = 0; i < 4; i++) {
       const mat2 = new THREE.MeshBasicMaterial({
-        color: 0x4dd0e1, transparent: true, opacity: 0,
+        color: 0x0d47a1, transparent: true, opacity: 0,
         side: THREE.DoubleSide, depthWrite: false, depthTest: false,
         blending: THREE.AdditiveBlending, toneMapped: false,
       });
@@ -284,6 +285,7 @@ export class Effects {
   puff(
     x: number, y: number, z: number, count: number, color: number,
     speed = 1.5, size = 1, life = 0.45, up = 0.8, grav = -1.5,
+    additive = true,
   ): void {
     for (let i = 0; i < count; i++) {
       const p = this.free.pop();
@@ -302,6 +304,7 @@ export class Effects {
       p.drag = 4;
       p.mat.color.setHex(color);
       p.mat.opacity = 1;
+      p.mat.blending = additive ? THREE.AdditiveBlending : THREE.NormalBlending;
       p.mesh.visible = true;
       this.parts.push(p);
     }
@@ -338,7 +341,7 @@ export class Effects {
    * Fireball: ~0.5 m orange-yellow sphere, thick trail, ~0.4 s flight, boom on impact.
    * Always depthTest:false / high renderOrder so it reads above the crowd.
    */
-  boltTrail(x: number, z: number, dx: number, dz: number, range: number, color = 0xff9100): void {
+  boltTrail(x: number, z: number, dx: number, dz: number, range: number, color = 0xe0201a): void {
     const len = Math.hypot(dx, dz) || 1;
     const ndx = dx / len;
     const ndz = dz / len;
@@ -354,37 +357,37 @@ export class Effects {
     b.travelled = 0;
     b.life = b.max = 0.48;
     b.color = color;
-    (b.mesh.material as THREE.MeshBasicMaterial).color.setHex(0xfffde7);
-    (b.glow.material as THREE.MeshBasicMaterial).color.setHex(0xff6d00);
+    (b.mesh.material as THREE.MeshBasicMaterial).color.setHex(0xff6a00);
+    (b.glow.material as THREE.MeshBasicMaterial).color.setHex(0xe0201a);
     b.mesh.visible = true;
     b.glow.visible = true;
     b.mesh.scale.setScalar(1);
     b.glow.scale.setScalar(1);
     b.mesh.position.set(b.x, b.y, b.z);
     b.glow.position.set(b.x, b.y, b.z);
-    this.fireLight.intensity = 6.5;
-    this.fireLight.color.setHex(0xff9100);
+    this.fireLight.intensity = 3.2;
+    this.fireLight.color.setHex(0xe0201a);
     this.fireLight.position.set(b.x, b.y, b.z);
     this.fireLight.visible = true;
     for (const t of b.trail) {
       t.visible = true;
-      (t.material as THREE.MeshBasicMaterial).color.setHex(0xffab40);
+      (t.material as THREE.MeshBasicMaterial).color.setHex(0xc62828);
       (t.material as THREE.MeshBasicMaterial).opacity = 0.9;
       t.position.set(b.x, b.y, b.z);
     }
     // Tiny muzzle puff only — keep mid-flight sphere+trail readable from iso cam.
-    this.puff(b.x, b.y, b.z, 6, 0xffe082, 1.4, 1.2, 0.22, 0.55, -0.8);
+    this.puff(b.x, b.y, b.z, 5, 0xe0201a, 1.2, 1.0, 0.2, 0.45, -0.8, false);
   }
 
   /** Ice: saturated cyan floor rings + flying crystals + freeze shells on targets. */
   iceBurst(x: number, z: number, radius: number, forward = false, dx = 0, dz = -1): void {
     const R = Math.max(radius, 2.4);
-    this.shockwave(x, z, R, 0x00e5ff, 0.7);
-    this.shockwave(x, z, R * 0.65, 0xb2ebf2, 0.55);
-    this.shockwave(x, z, R * 0.35, 0xffffff, 0.4);
-    this.puff(x, 0.55, z, 32, 0x00e5ff, 3.6, 2.8, 0.75, 1.8, -0.4);
-    this.puff(x, 0.75, z, 22, 0xe0f7fa, 2.6, 2.2, 0.6, 1.4, -0.25);
-    this.puff(x, 0.35, z, 16, 0xffffff, 1.8, 1.6, 0.5, 0.9, -0.15);
+    this.shockwave(x, z, R, 0x1565c0, 0.7);
+    this.shockwave(x, z, R * 0.65, 0x42a5f5, 0.55);
+    this.shockwave(x, z, R * 0.35, 0xbbdefb, 0.4);
+    this.puff(x, 0.55, z, 32, 0x1565c0, 3.6, 2.8, 0.75, 1.8, -0.4);
+    this.puff(x, 0.75, z, 22, 0xbbdefb, 2.6, 2.2, 0.6, 1.4, -0.25);
+    this.puff(x, 0.35, z, 16, 0x90caf9, 1.8, 1.6, 0.5, 0.9, -0.15, false);
     // Flying ice crystals
     for (let i = 0; i < 16; i++) {
       const c = this.freeCrystals.pop();
@@ -397,13 +400,13 @@ export class Effects {
       c.vy = 2.5 + Math.random() * 3;
       c.life = c.max = 0.55 + Math.random() * 0.25;
       c.spin = (Math.random() - 0.5) * 10;
-      c.mat.color.setHex(i % 2 ? 0x00e5ff : 0xe0f7fa);
+      c.mat.color.setHex(i % 2 ? 0x1565c0 : 0xbbdefb);
       c.mat.opacity = 1;
       c.mesh.visible = true;
       c.mesh.scale.setScalar(0.9 + Math.random() * 1.1);
       this.crystals.push(c);
     }
-    if (forward) this.spray(x, z, dx, dz, 24, 0x00e5ff, 4.5);
+    if (forward) this.spray(x, z, dx, dz, 24, 0x1565c0, 4.5);
   }
 
   /** Place a translucent ice cube shell over a frozen passenger (iso-readable). */
@@ -411,7 +414,7 @@ export class Effects {
     const s = this.shells.find((sh) => sh.t >= sh.dur) ?? this.shells[0];
     s.t = 0;
     s.dur = dur;
-    s.mat.color.setHex(0x80deea);
+    s.mat.color.setHex(0x42a5f5);
     s.mat.opacity = 0.7;
     s.mesh.position.set(x, 0.55 * scale, z);
     s.mesh.scale.set(scale, scale, scale);
@@ -441,26 +444,17 @@ export class Effects {
     }
     for (let i = 0; i < path.length; i++) {
       const p = path[i];
-      this.puff(p.x, 1.45, p.z, 10, 0xffd54f, 2.8, 2.4, 0.4, 0.7, -2);
-      this.puff(p.x, 1.45, p.z, 6, 0xffffff, 1.8, 1.8, 0.3, 0.5, -1.5);
+      this.puff(p.x, 1.45, p.z, 6, 0xffd400, 2.2, 1.8, 0.3, 0.55, -2, false);
       if (i + 1 < path.length) {
         const a = path[i], b = path[i + 1];
-        this.spawnArc(a, b, 0xffffff, 0.85, 1.15);
-        this.spawnArc(a, b, 0xfff176, 0.75, 2.0);
-        this.spawnArc(
-          { x: a.x + 0.1, z: a.z - 0.08 },
-          { x: b.x + 0.1, z: b.z - 0.08 },
-          0xffee58, 0.65, 3.2,
-        );
-        this.spawnArc(
-          { x: a.x - 0.08, z: a.z + 0.06 },
-          { x: b.x - 0.08, z: b.z + 0.06 },
-          0xffffff, 0.55, 1.6,
-        );
+        // Fat saturated yellow body + thin white core only.
+        this.spawnArc(a, b, 0xffd400, 0.8, 2.6);
+        this.spawnArc(a, b, 0xffcc00, 0.7, 1.6);
+        this.spawnArc(a, b, 0xffffff, 0.6, 0.55);
       }
     }
-    for (const p of pts) this.shockwave(p.x, p.z, 1.4, 0xffd54f, 0.35);
-    this.shockwave(pts[0].x, pts[0].z, 2.0, 0xffecb3, 0.4);
+    for (const p of pts) this.shockwave(p.x, p.z, 1.4, 0xffd400, 0.35);
+    this.shockwave(pts[0].x, pts[0].z, 2.0, 0xffc400, 0.35);
   }
 
   private spawnArc(
@@ -488,11 +482,11 @@ export class Effects {
   }
 
   private explodeBolt(b: Bolt): void {
-    this.puff(b.x, b.y, b.z, 28, 0xff9100, 4.5, 2.8, 0.55, 1.6, -2);
-    this.puff(b.x, b.y, b.z, 20, 0xffe082, 3.5, 2.2, 0.45, 1.2, -1.5);
-    this.puff(b.x, b.y, b.z, 12, 0xffffff, 2.5, 1.6, 0.35, 0.8, -1);
-    this.shockwave(b.x, b.z, 2.4, 0xff9100, 0.5);
-    this.shockwave(b.x, b.z, 1.4, 0xffe082, 0.35);
+    this.puff(b.x, b.y, b.z, 26, 0xe0201a, 4.2, 2.6, 0.55, 1.5, -2, false);
+    this.puff(b.x, b.y, b.z, 16, 0xff3d00, 3.2, 2.0, 0.4, 1.1, -1.5, false);
+    this.puff(b.x, b.y, b.z, 8, 0xff6a00, 2.0, 1.4, 0.28, 0.7, -1, false);
+    this.shockwave(b.x, b.z, 2.4, 0xe0201a, 0.5);
+    this.shockwave(b.x, b.z, 1.4, 0xff3d00, 0.35);
     this.fireLight.intensity = 0;
     this.fireLight.visible = false;
   }
@@ -637,7 +631,7 @@ export class Effects {
       b.mesh.position.set(b.x, b.y, b.z);
       b.glow.position.set(b.x, b.y, b.z);
       this.fireLight.position.set(b.x, b.y, b.z);
-      this.fireLight.intensity = 6.5;
+      this.fireLight.intensity = 3.2;
       this.fireLight.visible = true;
       const pulse = 1.15 + 0.2 * Math.sin(b.travelled * 16);
       b.mesh.scale.setScalar(pulse);

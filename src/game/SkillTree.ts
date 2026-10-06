@@ -1,4 +1,4 @@
-import { LOADOUT_SLOTS, SP_PER_CLEAR, defaultSkills, earnedFrom, reconcileSlot, spentOf, type SaveData, type SkillState } from './storage';
+import { LOADOUT_SLOTS, SP_PER_CLEAR, defaultSkills, earnedFrom, progressOf, reconcileSlot, spentOf, type SaveData, type SkillState } from './storage';
 import type { PassengerKind } from './PassengerTypes';
 import { TUNING } from './sim/tuning';
 
@@ -430,9 +430,9 @@ export function nextNodeAt(filled: number): number | null {
 
 // ------------------------------------------------------------------ v0.7 respec + loadouts
 
-/** Total points earned (1 per distinct first clear). */
-export function earnedPoints(save: Pick<SaveData, 'cleared'>): number {
-  return earnedFrom(save.cleared);
+/** Total points earned for the active character (1 per that character's first clear). */
+export function earnedPoints(save: SaveData): number {
+  return earnedFrom(progressOf(save).cleared);
 }
 export { spentOf as spentPoints };
 

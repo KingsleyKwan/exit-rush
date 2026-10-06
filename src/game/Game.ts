@@ -13,7 +13,7 @@ import { CHARACTERS, characterOf, modsFor, activeTreeState, type CharacterId, ty
 import { defaultSpellBar } from './SpellTree';
 import { initEntitlements, entitlements } from './entitlements';
 import { warmCharPortraits } from './charPortraits';
-import { earnedFrom } from './storage';
+import { earnedFrom, progressOf, recordClear, syncTopLevelProgress } from './storage';
 import type { IntroKind } from './intros';
 import type { PassengerKind } from './PassengerTypes';
 import { loadSave, writeSave, type QualityLevel, type QualitySetting, type SaveData, type SkillState } from './storage';
@@ -197,7 +197,7 @@ export class Game {
   }
 
   selectCharacter(id: CharacterId): boolean {
-    // Gear L ships in v0.8.1 — not selectable yet.
+    // Gear L still Coming soon — not selectable yet.
     if (id === 'tech') return false;
     if (!entitlements().canPlay(id)) return false;
     this.save.character = id;
@@ -206,12 +206,12 @@ export class Game {
       this.save.skills = { ...this.save.loadouts[this.save.activeLoadout] };
     } else if (id === 'mage') {
       const slot = this.save.mage.loadouts[this.save.mage.active] ?? this.save.mage.loadouts[0];
-      // Ensure points match shared earned total.
-      const earned = earnedFrom(this.save.cleared);
+      const earned = earnedFrom(progressOf(this.save, 'mage').cleared);
       const spent = slot.str + slot.spd + slot.sta + 10 * ((slot.ultStr?1:0)+(slot.ultSpd?1:0)+(slot.ultSta?1:0));
       slot.points = Math.max(0, earned - spent);
       this.save.mage.loadouts[this.save.mage.active] = slot;
     }
+    syncTopLevelProgress(this.save);
     this.persist();
     this.hooks.onState();
     return true;
@@ -506,7 +506,7 @@ export class Game {
     // v0.7: boss levels open on the entrance cutscene (full length the first time only).
     this.bossCut = null;
     if (level.boss?.length) {
-      const full = !this.save.seenBosses.includes(level.id);
+      const full = !progressOf(this.save).seenBosses.includes(level.id);
       this.bossCut = { t: 0, start: performance.now(), dur: full ? BOSS_CUT_FULL : BOSS_CUT_SHORT, full, slammed: false };
       this.screen = 'boss';
     }
@@ -516,8 +516,9 @@ export class Game {
   /** Tap to skip (or natural end) of the boss cutscene → intro card or play. */
   skipBossCut(): void {
     if (this.screen !== 'boss' || !this.bossCut || !this.level) return;
-    if (!this.save.seenBosses.includes(this.level.id)) {
-      this.save.seenBosses.push(this.level.id);
+    if (!progressOf(this.save).seenBosses.includes(this.level.id)) {
+      progressOf(this.save).seenBosses.push(this.level.id);
+      syncTopLevelProgress(this.save);
       this.persist();
     }
     this.bossCut = null;
@@ -678,7 +679,7 @@ export class Game {
     if (this.save.character === 'mage') {
       if (!Number.isInteger(idx) || idx < 0 || idx >= 3 || idx === this.save.mage.active) return;
       this.save.mage.active = idx;
-      const earned = earnedFrom(this.save.cleared);
+      const earned = earnedFrom(progressOf(this.save, 'mage').cleared);
       const slot = this.save.mage.loadouts[idx];
       const spent = slot.str + slot.spd + slot.sta + 10 * ((slot.ultStr?1:0)+(slot.ultSpd?1:0)+(slot.ultSta?1:0));
       slot.points = Math.max(0, earned - spent);
@@ -693,7 +694,7 @@ export class Game {
   /** v0.7: free instant respec of the active loadout (refunds everything incl. ultimates). */
   resetSkills(): void {
     if (this.save.character === 'mage') {
-      const earned = earnedFrom(this.save.cleared);
+      const earned = earnedFrom(progressOf(this.save, 'mage').cleared);
       const empty = { str: 0, spd: 0, sta: 0, ultStr: false, ultSpd: false, ultSta: false, points: earned };
       this.save.mage.loadouts[this.save.mage.active] = { ...empty };
       this.save.mage.spellBars[this.save.mage.active] = [];
@@ -704,8 +705,14 @@ export class Game {
     this.hooks.onState();
   }
 
-  /** v0.7: one-time 「技能點已重新計算」 notice after the 3→1 SP economy migration. */
+  /** v0.7 / v0.8.1: one-time SP recalculation notices. */
   consumeRespecNotice(): boolean {
+    if (this.save.progressSplitNotice) {
+      this.save.progressSplitNotice = false;
+      this.persist();
+      this.hooks.onToast?.(t().progressSplitNotice);
+      return true;
+    }
     if (!this.save.respecNotice) return false;
     this.save.respecNotice = false;
     this.persist();
@@ -781,16 +788,16 @@ export class Game {
     haptic([20, 40, 20, 40, 80], 0);
     this.train.addTrauma(0.2);
     const id = this.level.id;
-    const count = (this.save.clears[id] ?? 0) + 1;
-    this.save.clears[id] = count;
-    if (!this.save.cleared.includes(id)) this.save.cleared.push(id);
-    this.save.highestCleared = Math.max(this.save.highestCleared, id);
-    // v0.5: first clear only, POINTS_PER_FIRST_CLEAR each (no replay SP).
-    const awarded = count <= MAX_POINTS_PER_LEVEL;
+    const { count, first } = recordClear(this.save, id);
+    // v0.8.1: SP only for the active character's first clears.
+    const awarded = first && count <= MAX_POINTS_PER_LEVEL;
     if (awarded) {
-      this.save.skills.points += POINTS_PER_FIRST_CLEAR;
-      for (const lo of this.save.loadouts) lo.points += POINTS_PER_FIRST_CLEAR;
-      for (const lo of this.save.mage.loadouts) lo.points += POINTS_PER_FIRST_CLEAR;
+      if (this.save.character === 'mage') {
+        for (const lo of this.save.mage.loadouts) lo.points += POINTS_PER_FIRST_CLEAR;
+      } else if (this.save.character === 'hero') {
+        this.save.skills.points += POINTS_PER_FIRST_CLEAR;
+        for (const lo of this.save.loadouts) lo.points += POINTS_PER_FIRST_CLEAR;
+      }
       this.audio.skillPoint();
     }
     {
@@ -886,7 +893,7 @@ export class Game {
         if (e.kind === 'str') {
           fx.shockwave(e.x, e.z, TUNING.ult.str.radius, 0xffb74d, 0.55);
           fx.shockwave(e.x, e.z, TUNING.ult.str.radius * 0.6, 0xffffff, 0.3);
-          fx.puff(e.x, 0.3, e.z, 28, 0xffcc80, 5, 1.4, 0.6, 0.6);
+          fx.puff(e.x, 0.3, e.z, 28, 0xff8a80, 5, 1.4, 0.6, 0.6);
           cam.addTrauma(0.85);
           cam.punchFov(6);
           this.hitStop = Math.max(this.hitStop, 0.09);
@@ -901,7 +908,7 @@ export class Game {
           haptic(30, 0);
         } else {
           // STA Iron Stance
-          fx.shockwave(e.x, e.z, 2.8, 0xffd54f, 0.7);
+          fx.shockwave(e.x, e.z, 2.8, 0xffd400, 0.7);
           fx.puff(e.x, 0.4, e.z, 16, 0xffe082, 2.2, 1.0, 0.5);
           this.vg.b = 0.85;
           this.audio.sense();
@@ -936,14 +943,14 @@ export class Game {
         const dx = e.dx / len;
         const dz = e.dz / len;
         if (e.ability === 'fire_t1' || e.ability === 'ultFire') {
-          fx.boltTrail(e.x, e.z, dx, dz, e.ability === 'ultFire' ? 2.6 : TUNING.spells.fireBolt.range, 0xff7043);
-          if (e.ability === 'ultFire') fx.shockwave(e.x, e.z, TUNING.ult.str.radius * 0.85, 0xff7043, 0.5);
+          fx.boltTrail(e.x, e.z, dx, dz, e.ability === 'ultFire' ? 2.6 : TUNING.spells.fireBolt.range, 0xe0201a);
+          if (e.ability === 'ultFire') fx.shockwave(e.x, e.z, TUNING.ult.str.radius * 0.85, 0xe0201a, 0.5);
           cam.addTrauma(0.18);
           this.audio.shockwave();
         } else if (e.ability === 'fire_t3b') {
-          fx.shockwave(e.x, e.z, TUNING.spells.flameBurst.radius, 0xff5722, 0.5);
-          fx.puff(e.x, 0.5, e.z, 28, 0xff7043, 4.2, 1.5, 0.55, 0.9);
-          fx.puff(e.x, 0.8, e.z, 16, 0xffcc80, 3.0, 1.2, 0.45, 1.2);
+          fx.shockwave(e.x, e.z, TUNING.spells.flameBurst.radius, 0xd50000, 0.5);
+          fx.puff(e.x, 0.5, e.z, 28, 0xe0201a, 4.2, 1.5, 0.55, 0.9);
+          fx.puff(e.x, 0.8, e.z, 16, 0xff8a80, 3.0, 1.2, 0.45, 1.2);
           cam.addTrauma(0.35);
           this.audio.shockwave();
         } else if (e.ability === 'ice_t1') {
@@ -957,11 +964,11 @@ export class Game {
           cam.addTrauma(0.28);
           this.audio.shockwave();
         } else if (e.ability === 'volt_t1' || e.ability === 'volt_t3b' || e.ability === 'ultVolt') {
-          fx.puff(e.x, 1.0, e.z, 12, 0xffd54f, 2.2, 1.2, 0.35, 0.5);
-          fx.shockwave(e.x, e.z, e.ability === 'volt_t3b' ? TUNING.spells.thunderclap.radius : 1.1, 0xffd54f, 0.3);
+          fx.puff(e.x, 1.0, e.z, 12, 0xffd400, 2.2, 1.2, 0.35, 0.5);
+          fx.shockwave(e.x, e.z, e.ability === 'volt_t3b' ? TUNING.spells.thunderclap.radius : 1.1, 0xffd400, 0.3);
           cam.addTrauma(0.16);
         } else {
-          const colors: Record<string, number> = { fire: 0xff7043, ice: 0x4dd0e1, volt: 0xffd54f };
+          const colors: Record<string, number> = { fire: 0xe0201a, ice: 0x2196f3, volt: 0xffd400 };
           fx.puff(e.x, 0.9, e.z, 10, colors[e.el] ?? 0xce93d8, 1.6, 1.1, 0.45);
           cam.addTrauma(0.1);
         }
@@ -1199,7 +1206,7 @@ export class Game {
     }
     // STR charge dust trail.
     if (p.isCharging(now) && Math.random() < dt * 25) {
-      this.effects.puff(b.x, 0.1, b.z, 1, 0xffcc80, 0.8, 0.9, 0.4, 0.4);
+      this.effects.puff(b.x, 0.1, b.z, 1, 0xff8a80, 0.8, 0.9, 0.4, 0.4);
     }
     // WIS path highlight.
     this.effects.setPath([], this.clock);

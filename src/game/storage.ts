@@ -36,6 +36,14 @@ export interface TechProgress {
 
 export type CharacterIdSave = 'hero' | 'mage' | 'tech';
 
+/** v0.8.1: per-character run progress (clears / unlocks / boss cutscenes). */
+export interface CharRunProgress {
+  cleared: number[];
+  clears: Record<string, number>;
+  highestCleared: number;
+  seenBosses: number[];
+}
+
 /** User-facing graphics setting. `auto` picks low/high from device hints + an FPS probe. */
 export type QualitySetting = 'auto' | 'low' | 'high';
 /** Resolved render tier. */
@@ -45,9 +53,13 @@ export interface SaveData {
   version: 1;
   lang: Lang;
   skills: SkillState;
+  /**
+   * Top-level clear mirrors of the *active* character (kept in sync by syncTopLevelProgress).
+   * Prefer progressOf(save) / save.progress[id] for reads that care about a specific character.
+   */
   highestCleared: number;
   cleared: number[];
-  /** v0.2.2: clears per level id (for the capped replay bonus). Old saves: derived from `cleared`. */
+  /** Clears per level id (active character mirror). */
   clears: Record<string, number>;
   /** v0.2.2: graphics setting (default `auto`). */
   quality: QualitySetting;
@@ -62,7 +74,7 @@ export interface SaveData {
   muted: boolean;
   /** v0.5: passenger kinds whose intro card has been shown (or re-viewed from legend). */
   seenIntros: string[];
-  /** v0.7: boss levels whose full entrance cutscene has played (repeats get the short cut). */
+  /** Active-character mirror of boss cutscene flags (see progress[id].seenBosses). */
   seenBosses: number[];
   /** v0.5: first-run FTUE (auto L1 + ghost hand) completed. */
   ftueDone: boolean;
@@ -75,16 +87,20 @@ export interface SaveData {
   /** v0.7: one-time 「技能點已重新計算」 notice pending (economy change refunded a save). */
   respecNotice: boolean;
   /**
-   * v0.8: selected character. Shared `cleared` / SP; per-character tree in `skills` (hero) / `mage` / `tech`.
+   * v0.8: selected character. v0.8.1: each character has its own clears / SP (see `progress`).
    */
   character: CharacterIdSave;
   /** Cache only — StoreKit / RevenueCat is the truth on iOS. */
   entitlementCache: { mage: boolean; tech: boolean; noAds: boolean; at: number };
   mage: MageProgress;
   tech: TechProgress;
-  /** Cosmetic "cleared with" marks per level. */
+  /** Cosmetic "cleared with" marks per level (completionist; not unlock gates). */
   clearedWith: Record<string, CharacterIdSave[]>;
   trialsPlayed: Record<string, number>;
+  /** v0.8.1: per-character cleared / unlocks / boss intros. */
+  progress: Record<CharacterIdSave, CharRunProgress>;
+  /** v0.8.1: one-time notice after mage spell points were refunded to match mage-only clears. */
+  progressSplitNotice: boolean;
 }
 
 /** v0.7 economy: 1 skill point per first clear (was 3). Kept here so storage can migrate without importing SkillTree. */
@@ -103,6 +119,61 @@ export function reconcileSlot(s: SkillState, earned: number): [SkillState, boole
   const spent = spentOf(s);
   if (spent > earned) return [{ ...defaultSkills(), points: earned }, true];
   return [{ ...s, points: earned - spent }, false];
+}
+
+export function emptyProgress(): CharRunProgress {
+  return { cleared: [], clears: {}, highestCleared: 0, seenBosses: [] };
+}
+
+function normalizeProgress(raw: Partial<CharRunProgress> | null | undefined): CharRunProgress {
+  const cleared = Array.isArray(raw?.cleared)
+    ? [...new Set(raw!.cleared!.filter((n): n is number => typeof n === 'number' && Number.isFinite(n)))]
+    : [];
+  const clears: Record<string, number> = {};
+  if (raw?.clears && typeof raw.clears === 'object') {
+    for (const [k, v] of Object.entries(raw.clears)) {
+      if (typeof v === 'number' && Number.isFinite(v) && v > 0) clears[k] = Math.floor(v);
+    }
+  }
+  for (const id of cleared) if (!clears[String(id)]) clears[String(id)] = 1;
+  const highestCleared = Math.max(
+    typeof raw?.highestCleared === 'number' && Number.isFinite(raw.highestCleared) ? raw.highestCleared : 0,
+    ...cleared,
+    0,
+  );
+  const seenBosses = Array.isArray(raw?.seenBosses)
+    ? [...new Set(raw!.seenBosses!.filter((n): n is number => Number.isInteger(n) && n >= 1 && n <= 100))]
+    : [];
+  return { cleared, clears, highestCleared, seenBosses };
+}
+
+/** Active (or named) character's run progress. */
+export function progressOf(save: Pick<SaveData, 'progress' | 'character'>, id?: CharacterIdSave): CharRunProgress {
+  const key = id ?? save.character;
+  return save.progress[key] ?? emptyProgress();
+}
+
+/** Copy active character progress into top-level mirrors (cleared / clears / highest / seenBosses). */
+export function syncTopLevelProgress(save: SaveData): void {
+  const p = progressOf(save);
+  save.cleared = [...p.cleared];
+  save.clears = { ...p.clears };
+  save.highestCleared = p.highestCleared;
+  save.seenBosses = [...p.seenBosses];
+}
+
+/** Record a clear for the active character. Returns clear count + whether it was a first clear. */
+export function recordClear(save: SaveData, levelId: number): { count: number; first: boolean } {
+  const p = progressOf(save);
+  const key = String(levelId);
+  const count = (p.clears[key] ?? 0) + 1;
+  p.clears[key] = count;
+  const first = !p.cleared.includes(levelId);
+  if (first) p.cleared.push(levelId);
+  p.highestCleared = Math.max(p.highestCleared, levelId);
+  save.progress[save.character] = p;
+  syncTopLevelProgress(save);
+  return { count, first };
 }
 
 /** Save key (v0.6.3: renamed with the repo → `exit-rush`). */
@@ -220,6 +291,8 @@ export function defaultSave(): SaveData {
     },
     clearedWith: {},
     trialsPlayed: {},
+    progress: { hero: emptyProgress(), mage: emptyProgress(), tech: emptyProgress() },
+    progressSplitNotice: false,
   };
 }
 
@@ -244,7 +317,7 @@ export function normalizeSave(parsed: Partial<SaveData> | null | undefined): Sav
       if (typeof v === 'number' && Number.isFinite(v) && v > 0) clears[k] = Math.floor(v);
     }
   }
-  for (const id of cleared) if (!clears[id]) clears[id] = 1;
+  for (const id of cleared) if (!clears[String(id)]) clears[String(id)] = 1;
   const q = parsed.quality;
   const aq = parsed.autoQuality;
   // v0.6: Wisdom → Stamina. Prefer `sta` / `ultSta`; fall back to old `wis` / `ultWis`.
@@ -260,15 +333,57 @@ export function normalizeSave(parsed: Partial<SaveData> | null | undefined): Sav
     ultSta: bool(o.ultSta) || bool(o.ultWis),
     points: 0,
   });
-  // v0.7: loadouts. Old saves → current allocation becomes slot 1; points re-derived (1 per cleared level).
-  const earned = earnedFrom(cleared);
+  // v0.8.1: build per-character progress BEFORE reconciling SP.
+  const rawCwEarly = (parsed as { clearedWith?: Record<string, unknown> }).clearedWith;
+  const clearedWithEarly: Record<string, CharacterIdSave[]> = {};
+  if (rawCwEarly && typeof rawCwEarly === 'object') {
+    for (const [k, v] of Object.entries(rawCwEarly)) {
+      if (Array.isArray(v)) {
+        clearedWithEarly[k] = [...new Set(v.filter((c): c is CharacterIdSave => c === 'hero' || c === 'mage' || c === 'tech'))];
+      }
+    }
+  }
+  const rawProgress = (parsed as { progress?: Partial<Record<CharacterIdSave, Partial<CharRunProgress>>> }).progress;
+  const migratingSplit = !(rawProgress && typeof rawProgress === 'object' && rawProgress.hero);
+  let progress: Record<CharacterIdSave, CharRunProgress>;
+  if (!migratingSplit) {
+    progress = {
+      hero: normalizeProgress(rawProgress!.hero),
+      mage: normalizeProgress(rawProgress!.mage),
+      tech: normalizeProgress(rawProgress!.tech),
+    };
+  } else {
+    // Pre-0.8.1: all top-level clears belong to hero. Mage/tech seed only from clearedWith marks.
+    const heroProg = normalizeProgress({
+      cleared,
+      clears,
+      highestCleared: num(parsed.highestCleared, 0),
+      seenBosses: Array.isArray(parsed.seenBosses) ? parsed.seenBosses as number[] : [],
+    });
+    const fromMarks = (id: CharacterIdSave): CharRunProgress => {
+      const ids: number[] = [];
+      for (const [k, chars] of Object.entries(clearedWithEarly)) {
+        if (chars.includes(id)) {
+          const n = Number(k);
+          if (Number.isFinite(n)) ids.push(n);
+        }
+      }
+      const clearsMap: Record<string, number> = {};
+      for (const idn of ids) clearsMap[String(idn)] = clears[String(idn)] ?? 1;
+      return normalizeProgress({ cleared: ids, clears: clearsMap, highestCleared: ids.length ? Math.max(...ids) : 0, seenBosses: [] });
+    };
+    progress = { hero: heroProg, mage: fromMarks('mage'), tech: fromMarks('tech') };
+  }
+
+  // Hero SP from hero clears (not shared).
+  const heroEarned = earnedFrom(progress.hero.cleared);
   const active = Number.isInteger(parsed.activeLoadout) && (parsed.activeLoadout as number) >= 0 && (parsed.activeLoadout as number) < LOADOUT_SLOTS ? (parsed.activeLoadout as number) : 0;
   const rawSlots = Array.isArray(parsed.loadouts) ? parsed.loadouts : [];
   let refunded = false;
   const loadouts: SkillState[] = [];
   for (let i = 0; i < LOADOUT_SLOTS; i++) {
     const src = i === active ? { ...sk, sta, ultSta } : ((rawSlots[i] ?? {}) as Partial<SkillState>);
-    const [slot, r] = reconcileSlot(toSkills(src), earned);
+    const [slot, r] = reconcileSlot(toSkills(src), heroEarned);
     loadouts.push(slot);
     refunded ||= r;
   }
@@ -286,15 +401,20 @@ export function normalizeSave(parsed: Partial<SaveData> | null | undefined): Sav
   const rawMage = (parsed as { mage?: Partial<MageProgress> }).mage ?? {};
   const mageActive = Number.isInteger(rawMage.active) && (rawMage.active as number) >= 0 && (rawMage.active as number) < LOADOUT_SLOTS ? (rawMage.active as number) : 0;
   const mageRawSlots = Array.isArray(rawMage.loadouts) ? rawMage.loadouts : [];
+  const mageEarned = earnedFrom(progress.mage.cleared);
+  let mageRefunded = false;
   const mageLoadouts: SkillState[] = [];
   for (let i = 0; i < LOADOUT_SLOTS; i++) {
-    const [slot] = reconcileSlot(toSkills((mageRawSlots[i] ?? {}) as Partial<SkillState>), earned);
+    const [slot, r] = reconcileSlot(toSkills((mageRawSlots[i] ?? {}) as Partial<SkillState>), mageEarned);
     mageLoadouts.push(slot);
+    mageRefunded ||= r;
   }
   const rawBars = Array.isArray(rawMage.spellBars) ? rawMage.spellBars : [];
   const spellBars: string[][] = [];
   for (let i = 0; i < LOADOUT_SLOTS; i++) {
-    const bar = Array.isArray(rawBars[i]) ? rawBars[i].filter((s): s is string => typeof s === 'string').slice(0, 3) : [];
+    let bar = Array.isArray(rawBars[i]) ? rawBars[i].filter((s): s is string => typeof s === 'string').slice(0, 3) : [];
+    // Fresh mage after refund: clear bars so defaults re-apply on next open.
+    if (mageRefunded && mageEarned === 0) bar = [];
     spellBars.push(bar);
   }
   const rawTech = (parsed as { tech?: Partial<TechProgress> }).tech ?? {};
@@ -312,15 +432,7 @@ export function normalizeSave(parsed: Partial<SaveData> | null | undefined): Sav
     coinNotice: rawTech.coinNotice === true,
   };
   while (tech.sets.length < 3) tech.sets.push({ placements: [] });
-  const clearedWith: Record<string, CharacterIdSave[]> = {};
-  const rawCw = (parsed as { clearedWith?: Record<string, unknown> }).clearedWith;
-  if (rawCw && typeof rawCw === 'object') {
-    for (const [k, v] of Object.entries(rawCw)) {
-      if (Array.isArray(v)) {
-        clearedWith[k] = [...new Set(v.filter((c): c is CharacterIdSave => c === 'hero' || c === 'mage' || c === 'tech'))];
-      }
-    }
-  }
+  const clearedWith = clearedWithEarly;
   const trialsPlayed: Record<string, number> = {};
   const rawTr = (parsed as { trialsPlayed?: Record<string, unknown> }).trialsPlayed;
   if (rawTr && typeof rawTr === 'object') {
@@ -328,13 +440,17 @@ export function normalizeSave(parsed: Partial<SaveData> | null | undefined): Sav
       if (typeof v === 'number' && Number.isFinite(v) && v > 0) trialsPlayed[k] = Math.floor(v);
     }
   }
-  return {
+  const progressSplitNotice =
+    (parsed as { progressSplitNotice?: boolean }).progressSplitNotice === true
+    || (migratingSplit && mageRefunded);
+
+  const out: SaveData = {
     version: 1,
     lang: parsed.lang === 'en' || parsed.lang === 'zh-HK' ? parsed.lang : d.lang,
     skills: { ...loadouts[active] },
-    highestCleared: num(parsed.highestCleared, 0),
-    cleared,
-    clears,
+    highestCleared: 0,
+    cleared: [],
+    clears: {},
     quality: q === 'low' || q === 'high' || q === 'auto' ? q : 'auto',
     autoQuality: aq === 'low' || aq === 'high' ? aq : null,
     typeIcons: typeof parsed.typeIcons === 'boolean' ? parsed.typeIcons : true,
@@ -345,9 +461,7 @@ export function normalizeSave(parsed: Partial<SaveData> | null | undefined): Sav
     seenIntros: Array.isArray(parsed.seenIntros)
       ? [...new Set(parsed.seenIntros.filter((s): s is string => typeof s === 'string'))]
       : [],
-    seenBosses: Array.isArray(parsed.seenBosses)
-      ? [...new Set(parsed.seenBosses.filter((n): n is number => Number.isInteger(n) && n >= 1 && n <= 100))]
-      : [],
+    seenBosses: [],
     ftueDone: parsed.ftueDone === true,
     loadouts,
     activeLoadout: active,
@@ -358,7 +472,11 @@ export function normalizeSave(parsed: Partial<SaveData> | null | undefined): Sav
     tech,
     clearedWith,
     trialsPlayed,
+    progress,
+    progressSplitNotice,
   };
+  syncTopLevelProgress(out);
+  return out;
 }
 
 function readRaw(): string | null {
@@ -389,6 +507,8 @@ export function loadSave(): SaveData {
 export function writeSave(data: SaveData): boolean {
   // v0.7: the active loadout slot mirrors `skills`.
   if (Array.isArray(data.loadouts) && data.loadouts[data.activeLoadout]) data.loadouts[data.activeLoadout] = { ...data.skills };
+  // v0.8.1: keep top-level cleared mirrors equal to the active character.
+  if (data.progress) syncTopLevelProgress(data);
   let json: string;
   try {
     json = JSON.stringify(data);
