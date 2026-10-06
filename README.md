@@ -1,6 +1,6 @@
 # 逼落車 | Exit Rush (香城鐵路)
 
-Mobile-first 3D crowd-exit game set on the fictional **香城鐵路 / Hong City Rail (HCR)**: get **off** the train while rush-hour crowds **force on** (逼上車). **Parody** of Hong Kong metro vibes (coloured stations, bilingual signs) — **original art & audio only**; not affiliated with MTR Corporation or any real railway. Station names are playful parodies (see [`docs/STATIONS.md`](docs/STATIONS.md)).
+Mobile-first 3D crowd-exit game set on the fictional **香城鐵路 / Hong City Rail (HCR)**: get **off** the train while rush-hour crowds **force on** (逼上車). **Parody** of Hong Kong metro vibes (coloured stations, bilingual signs) — **original art & audio only**; not affiliated with the real-world operator or any real railway. Station names are playful parodies (see [`docs/STATIONS.md`](docs/STATIONS.md)).
 
 > Vertical slice (**v0.5.0**). Steam-store polish is the aspiration; v0.2 added real crowd physics, counterflow boarding, joystick + shove controls and a juice pass; v0.2.1 was a balance pass (see [`docs/BALANCE.md`](docs/BALANCE.md)); v0.2.2 was a bug-fix / mobile-robustness pass; **v0.3.0 was the art & icon pass**; **v0.5.0 short levels + special intros**; v0.4.1 added audio, per-station themes, and HK-style side-wall sliding doors** (car ends are gangways only — see below).
 
@@ -12,6 +12,12 @@ Mobile-first 3D crowd-exit game set on the fictional **香城鐵路 / Hong City 
 <p align="center"><img src="docs/screens/desktop-l100.jpg" width="640" alt="Level 100, landscape"></p>
 
 <p align="center"><em>v0.4.1 — exits on the <strong>side wall</strong> (left); car ends are gangways. Screenshots: mid-run crowds boarding through open doors.</em></p>
+
+## v0.6.3 — 大聲公 Loudmouth
+
+New special passenger **大聲公 / Loudmouth**: a rider shouting into the phone (phone-to-ear pose, open mouth, 「喂！！」 bubble). A translucent **orange noise ring** (r 1.3 m) with expanding sound-wave rings marks the zone; inside it your stamina drains continuously (up to 40/s at the centre, ~8% at the rim) and regen is halved — ~3 s pressed against one costs about half your stamina. While draining, the stamina bar pulses orange and a 「好嘈！」 / “Noise!” chip with the loudmouth icon appears; muffled synth chatter blips play. Intro card at **L26** (「講電話車廂」), tip reinforce on L27, mixed into L29 / L30 / L100. Counter: **STA 60 好脾氣 Unbothered** now also cuts loudmouth drain by 70%. Also fixes idle regen creeping stamina above max.
+
+**Repo rename:** the project is now **`exit-rush`** (GitHub `KingsleyKwan/exit-rush`, Pages <https://kingsleykwan.github.io/exit-rush/>, `BASE_PATH=/exit-rush/`). The save key is now `exit-rush-v1`; on first load any pre-rename save/settings keys are copied to the new keys and removed (same origin, so progress carries over). The 「好嘈！」 noise chip now sits in the station row (left of pause) so it never covers the stamina bar.
 
 ## v0.6.2 — Tier 3 counter skills
 
@@ -69,7 +75,8 @@ Closed door bays stay visibly shut with a red indicator + 「此門不開」 / �
 
 
 ```bash
-cd hk-mtr-exit-rush
+git clone https://github.com/KingsleyKwan/exit-rush.git
+cd exit-rush
 npm install
 npm run dev      # http://localhost:5173 — best on phone or Chrome device toolbar
 npm run build    # production bundle → dist/
@@ -83,14 +90,14 @@ Touch / mouse: **drag anywhere** (floating joystick) to steer, **hold the fist b
 
 ## Play on iPhone
 
-Live build (GitHub Pages): **https://kingsleykwan.github.io/hk-mtr-exit-rush/**
+Live build (GitHub Pages): **https://kingsleykwan.github.io/exit-rush/**
 
 1. Open the link in **Safari** on your iPhone.
 2. Tap the **Share** button → **Add to Home Screen**.
 3. Keep the name **逼落車** (or rename) → **Add**.
 4. Launch from the home-screen icon for a full-screen standalone app (notch-safe, `viewport-fit=cover`).
 
-The Pages deploy builds with `BASE_PATH=/hk-mtr-exit-rush/` so assets resolve under that subpath. Local `npm run dev` still serves at `/`.
+The Pages deploy builds with `BASE_PATH=/exit-rush/` so assets resolve under that subpath. Local `npm run dev` still serves at `/`.
 
 ## Controls
 
@@ -102,7 +109,7 @@ The Pages deploy builds with `BASE_PATH=/hk-mtr-exit-rush/` so assets resolve un
 | Keyboard | WASD / arrows steer · Space = shove · 1/2/3 = ults · P / Esc = pause |
 | 粵 / EN glyph | Language toggle EN ↔ 粵 |
 | Skill-tree icon | Skill tree — from the menu, or from the pause / result overlay (returns to the run) |
-| Passenger-card icon | Passenger legend (portrait + name + tip for all 8 types) |
+| Passenger-card icon | Passenger legend (portrait + name + tip for all 9 types) |
 | Gem button | Graphics quality: Auto / Low / High (menu) |
 | Tag button | Floating passenger-type icons on / off (menu, legend) |
 
