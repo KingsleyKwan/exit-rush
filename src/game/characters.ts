@@ -384,19 +384,41 @@ function buildCharacter(s: Spec): { geo: THREE.BufferGeometry; shell: THREE.Buff
 
   // ---- hair
   const H = s.hair;
-  const hairTop = (): void => {
-    // The head dome peaks near 0.94R. A cap that stops around 0.6R leaves bare skin on top.
-    // Three smaller slabs step in, so the crown reads as hair instead of one flat brick.
-    b.add(new THREE.BoxGeometry(R * 1.9, R * 0.34, R * 1.6), H, [0, HY + R * 0.4, -0.05], undefined, undefined, O);
-    b.add(new THREE.BoxGeometry(R * 1.45, R * 0.26, R * 1.2), shade(H, 1.18), [0, HY + R * 0.66, -0.03], undefined, undefined, O);
-    b.add(new THREE.BoxGeometry(R * 0.9, R * 0.24, R * 0.78), shade(H, 1.4), [0, HY + R * 0.9, -0.02], undefined, undefined, O);
-    b.add(new THREE.BoxGeometry(R * 1.7, R * 0.8, R * 0.46), H, [0, HY - 0.01, -R * 0.72], undefined, undefined, O);
+  // Head is an ellipsoid, radii (R, 0.94R, 0.92R), peak at 0.94R. Brows sit near 0.32R.
+  // Each band is sized to the widest slice in that band (its bottom), so the crown
+  // is inside the hair instead of showing a skin ring from the high camera.
+  const crownBands = (color: number): void => {
+    const bands: { y0: number; y1: number; k: number; front: number; back: number; side: number }[] = [
+      { y0: 0.34, y1: 0.72, k: 1, front: 1.08, back: 1.26, side: 1.13 },
+      { y0: 0.58, y1: 0.88, k: 1.16, front: 1.12, back: 1.16, side: 1.13 },
+      { y0: 0.74, y1: 1.08, k: 1.42, front: 1.16, back: 1.16, side: 1.16 },
+    ];
+    for (const band of bands) {
+      const v = band.y0 / 0.94;
+      const wide = Math.sqrt(Math.max(0, 1 - v * v));
+      const xHalf = R * wide * band.side;
+      const zFront = 0.92 * R * wide * band.front;
+      const zBack = 0.92 * R * wide * band.back;
+      b.add(
+        new THREE.BoxGeometry(xHalf * 2, (band.y1 - band.y0) * R, zFront + zBack),
+        shade(color, band.k),
+        [0, HY + ((band.y0 + band.y1) / 2) * R, (zFront - zBack) / 2],
+        undefined,
+        undefined,
+        O,
+      );
+    }
+  };
+  const nape = (): void => {
+    b.add(new THREE.BoxGeometry(R * 1.65, R * 0.7, R * 0.46), H, [0, HY - 0.005, -R * 0.78], undefined, undefined, O);
+  };
+  const sideburns = (): void => {
     for (const sx of [-1, 1]) {
-      b.add(new THREE.BoxGeometry(R * 0.34, R * 0.48, R * 0.95), H, [sx * R * 0.8, HY + R * 0.38, -0.05], undefined, undefined, O);
+      b.add(new THREE.BoxGeometry(R * 0.42, R * 0.5, R * 1.0), H, [sx * R * 0.8, HY + R * 0.1, -R * 0.12], undefined, undefined, O);
     }
   };
   const fringe = (): void => {
-    b.add(new THREE.BoxGeometry(R * 1.62, R * 0.3, R * 0.5), H, [0, HY + R * 0.66, R * 0.5], [-0.42, 0, 0]);
+    b.add(new THREE.BoxGeometry(R * 1.45, R * 0.22, R * 0.55), shade(H, 1.05), [0, HY + R * 0.52, R * 0.72], [-0.7, 0, 0]);
   };
   const spikes = (n: number, seed: number): void => {
     let r = seed;
@@ -411,22 +433,23 @@ function buildCharacter(s: Spec): { geo: THREE.BufferGeometry; shell: THREE.Buff
     }
   };
   if (s.cap !== undefined) {
-    const crown = new THREE.SphereGeometry(R * 1.1, 8, 4, 0, Math.PI * 2, 0, Math.PI * 0.5);
-    b.add(crown, s.cap, [0, HY + 0.03, -0.01], [-0.12, 0, 0], [1, 0.82, 1], O);
-    b.add(new THREE.BoxGeometry(R * 1.35, 0.026, R * 0.95), s.cap, [0, HY + R * 0.42, R * 0.98], [0.12, 0, 0], undefined, O);
-    b.add(new THREE.BoxGeometry(R * 1.75, R * 0.55, R * 0.5), H, [0, HY - 0.02, -R * 0.68]);
+    crownBands(s.cap);
+    // Brim tips down toward +Z. +rotX sends the front of a bar forward and down.
+    b.add(new THREE.BoxGeometry(R * 1.9, 0.03, R * 0.7), s.cap, [0, HY + R * 0.46, R * 0.78], [0.22, 0, 0], undefined, O);
+    nape();
+    sideburns();
   } else if (s.hat !== undefined) {
-    hairTop();
-    // Boxy straw hat — CylinderGeometry tops read as black octagons under flat Lambert + iso cam.
+    // The hat crown is the seal. Hair only shows at the nape and temples.
+    crownBands(s.hat);
     const hatCol = s.hat;
-    const band = shade(hatCol, 0.85);
-    b.add(new THREE.BoxGeometry(R * 2.4, 0.035, R * 2.4), hatCol, [0, HY + R * 0.58, -0.01], [-0.08, 0, 0], undefined, O);
-    b.add(new THREE.BoxGeometry(R * 1.55, R * 0.55, R * 1.55), hatCol, [0, HY + R * 0.88, -0.02], [-0.08, 0, 0], undefined, O);
-    b.add(new THREE.BoxGeometry(R * 1.65, 0.04, R * 1.65), band, [0, HY + R * 0.68, -0.015], [-0.08, 0, 0]);
-    // Light top plane so the crown never collapses to black
-    b.add(new THREE.BoxGeometry(R * 1.4, 0.02, R * 1.4), shade(hatCol, 1.35), [0, HY + R * 1.12, -0.02], [-0.08, 0, 0]);
+    b.add(new THREE.BoxGeometry(R * 2.55, 0.04, R * 2.4), hatCol, [0, HY + R * 0.38, 0], [-0.06, 0, 0], undefined, O);
+    b.add(new THREE.BoxGeometry(R * 1.5, 0.04, R * 1.35), shade(hatCol, 0.78), [0, HY + R * 0.55, -0.01]);
+    nape();
+    sideburns();
   } else {
-    hairTop();
+    crownBands(H);
+    nape();
+    sideburns();
     switch (s.style) {
       case 'spiky':
         fringe();
