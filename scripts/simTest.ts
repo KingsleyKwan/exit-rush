@@ -33,7 +33,7 @@ import { LEVELS } from '../src/game/levels';
 import { BRANCH_FILL, modifiersFromSkills } from '../src/game/SkillTree';
 import { CHARACTERS, modsFor, type CharacterId } from '../src/game/charactersDef';
 import { defaultSpellBar } from '../src/game/SpellTree';
-import { defaultSkills, migrateLegacyKeys, normalizeSave, SAVE_KEY, type KeyValueStore, type SaveData, type SkillState } from '../src/game/storage';
+import { defaultSkills, earnedFrom, migrateLegacyKeys, normalizeSave, progressOf, recordClear, SAVE_KEY, spentOf, type KeyValueStore, type SaveData, type SkillState } from '../src/game/storage';
 import { earnedPoints, resetActiveLoadout, spendPoint, spentPoints, switchLoadout, POINTS_PER_FIRST_CLEAR } from '../src/game/SkillTree';
 import type { PlayerInput } from '../src/game/sim/PlayerSim';
 import type { PassengerKind } from '../src/game/PassengerTypes';
@@ -1078,6 +1078,51 @@ async function main(): Promise<void> {
     }
     if (!old.mage || old.mage.loadouts.length !== 3) { console.error('save migrate mage defaults'); process.exit(1); }
     console.log('save migration character fields ok');
+
+    // v0.8.1: shared → per-character progress. Hero keeps clears; mage refunds if no mage clears.
+    {
+      const spentMage = { str: 50, spd: 10, sta: 10, ultStr: true, ultSpd: false, ultSta: false, points: 0 };
+      const heroFit = { str: 20, spd: 10, sta: 0, ultStr: false, ultSpd: false, ultSta: false, points: 0 };
+      const ids = Array.from({ length: 40 }, (_, i) => i + 1);
+      const mig = normalizeSave({
+        version: 1,
+        lang: 'zh-HK',
+        skills: heroFit,
+        highestCleared: 40,
+        cleared: ids,
+        clears: Object.fromEntries(ids.map((id) => [String(id), 1])),
+        quality: 'auto', autoQuality: null, typeIcons: true,
+        masterVol: 0.8, musicVol: 0.5, sfxVol: 0.8, muted: false,
+        seenIntros: [], seenBosses: [20], ftueDone: true,
+        loadouts: [heroFit, defaultSkills(), defaultSkills()],
+        activeLoadout: 0, respecNotice: false,
+        character: 'hero',
+        mage: { loadouts: [spentMage, defaultSkills(), defaultSkills()], active: 0, spellBars: [['fire_t1'], [], []] },
+        clearedWith: { '6': ['mage'], '20': ['mage'] },
+      } as unknown as SaveData);
+      const heroP = progressOf(mig, 'hero');
+      const mageP = progressOf(mig, 'mage');
+      if (heroP.cleared.length !== 40) { console.error('081 migrate hero clears', heroP.cleared.length); process.exit(1); }
+      if (heroP.seenBosses.includes(20) !== true) { console.error('081 migrate hero seenBosses'); process.exit(1); }
+      if (mig.skills.str !== 20) { console.error('081 hero skills drifted', mig.skills); process.exit(1); }
+      // Mage seeded from clearedWith marks (6,20) → earned 2; spent 50+10+10+10=80 > 2 → refund
+      if (mageP.cleared.length !== 2 || !mageP.cleared.includes(6) || !mageP.cleared.includes(20)) {
+        console.error('081 mage clears from marks', mageP.cleared); process.exit(1);
+      }
+      if (spentOf(mig.mage.loadouts[0]) !== 0 || mig.mage.loadouts[0].points !== earnedFrom(mageP.cleared)) {
+        console.error('081 mage should refund to earned', mig.mage.loadouts[0]); process.exit(1);
+      }
+      if (!mig.progressSplitNotice) { console.error('081 expected progressSplitNotice'); process.exit(1); }
+      // Isolation: mage clear of a level hero never beat must not unlock for hero
+      mig.character = 'mage';
+      recordClear(mig, 99);
+      if (progressOf(mig, 'hero').cleared.includes(99)) { console.error('081 mage clear leaked to hero'); process.exit(1); }
+      if (!progressOf(mig, 'mage').cleared.includes(99)) { console.error('081 mage clear missing'); process.exit(1); }
+      // SP derivation: hero earned = 40, mage earned = 3 after L99 (marks 6+20 + 99)
+      if (earnedFrom(progressOf(mig, 'hero').cleared) !== 40) { console.error('081 hero SP'); process.exit(1); }
+      if (earnedFrom(progressOf(mig, 'mage').cleared) !== 3) { console.error('081 mage SP', progressOf(mig, 'mage').cleared); process.exit(1); }
+      console.log('save migration per-character progress ok');
+    }
   }
 
   // Seat AABB: benches must not overlap any door vestibule [bayZ ± doorHalf].
