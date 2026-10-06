@@ -335,10 +335,15 @@ function buildCharacter(s: Spec): { geo: THREE.BufferGeometry; shell: THREE.Buff
   // ---- hair
   const H = s.hair;
   const hairTop = (): void => {
-    // Boxy cap — SphereGeometry(8 seg) read as black octagons from the iso camera.
-    b.add(new THREE.BoxGeometry(R * 1.7, R * 0.55, R * 1.5), H, [0, HY + R * 0.35, -0.02], undefined, undefined, O);
-    b.add(new THREE.BoxGeometry(R * 1.55, R * 0.35, R * 1.35), shade(H, 1.25), [0, HY + R * 0.55, 0.02], undefined, undefined, O);
-    b.add(new THREE.BoxGeometry(R * 1.75, R * 0.85, R * 0.55), H, [0, HY - 0.035, -R * 0.66], undefined, undefined, O);
+    // The head dome peaks near 0.94R. A cap that stops around 0.6R leaves bare skin on top.
+    // Three smaller slabs step in, so the crown reads as hair instead of one flat brick.
+    b.add(new THREE.BoxGeometry(R * 1.9, R * 0.34, R * 1.6), H, [0, HY + R * 0.4, -0.05], undefined, undefined, O);
+    b.add(new THREE.BoxGeometry(R * 1.45, R * 0.26, R * 1.2), shade(H, 1.18), [0, HY + R * 0.66, -0.03], undefined, undefined, O);
+    b.add(new THREE.BoxGeometry(R * 0.9, R * 0.24, R * 0.78), shade(H, 1.4), [0, HY + R * 0.9, -0.02], undefined, undefined, O);
+    b.add(new THREE.BoxGeometry(R * 1.7, R * 0.8, R * 0.46), H, [0, HY - 0.01, -R * 0.72], undefined, undefined, O);
+    for (const sx of [-1, 1]) {
+      b.add(new THREE.BoxGeometry(R * 0.34, R * 0.48, R * 0.95), H, [sx * R * 0.8, HY + R * 0.38, -0.05], undefined, undefined, O);
+    }
   };
   const fringe = (): void => {
     b.add(new THREE.BoxGeometry(R * 1.62, R * 0.3, R * 0.5), H, [0, HY + R * 0.66, R * 0.5], [-0.42, 0, 0]);
