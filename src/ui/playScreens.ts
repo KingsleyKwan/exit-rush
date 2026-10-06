@@ -5,7 +5,7 @@ import { playableLevels } from '../game/levels';
 import { POINTS_PER_FIRST_CLEAR, MAX_POINTS_PER_LEVEL, modifiersFromSkills } from '../game/SkillTree';
 import { linesFor, lineColor } from '../game/lines';
 import { icon, langIcon } from './icons';
-import { el, portrait, iconBtn, langBtn, qualityLabel, stationName } from './uiShared';
+import { el, portrait, iconBtn, langBtn, qualityLabel, stationName, loadoutStrip, wireLoadoutStrip } from './uiShared';
 
 export function renderPlayHud(game: Game): HTMLElement {
   const dict = t();
@@ -203,6 +203,7 @@ export function renderEnd(game: Game, win: boolean): HTMLElement {
         <h2>${win ? dict.win : dict.lose}</h2>
         ${lv ? `<p class="end-station"><span class="lv-badge sm" style="--line:${lineColor(lv.stationEn)}">${lv.id}</span>${stationName(lv)}</p>` : ''}
         ${win ? endBonus(game) : `<p class="howto">${dict.loseHint}</p>`}
+        ${loadoutStrip(game, { cls: 'on-end' })}
         ${
           hasNext
             ? `<button type="button" class="primary" id="btn-next">${icon('next', 'sm')}<span>${dict.next}</span></button>`
@@ -216,6 +217,7 @@ export function renderEnd(game: Game, win: boolean): HTMLElement {
       </div>
     </div>
   `);
+  wireLoadoutStrip(p, game);
   p.querySelectorAll('#btn-retry').forEach((b) =>
     b.addEventListener('click', () => {
       if (game.level) game.startLevel(game.level.id);

@@ -70,3 +70,38 @@ export function nextLevel(game: Game): LevelDef {
   const list = playableLevels();
   return list.find((l) => !game.save.cleared.includes(l.id)) ?? list[list.length - 1];
 }
+
+/**
+ * v0.7: skill loadout strip (配點1/2/3). Tap a slot to make it active — applies from the next run.
+ * `edit` adds the 改技能 shortcut (data-act="skills"), `reset` the 重置配點 button (skill tree only).
+ */
+export function loadoutStrip(game: Game, opts: { edit?: boolean; reset?: boolean; cls?: string } = {}): string {
+  const dict = t();
+  const slots = game.save.loadouts
+    .map((s, i) => {
+      const on = i === game.save.activeLoadout;
+      const sk = on ? game.save.skills : s;
+      const name = dict.loadoutN.replace('{n}', String(i + 1));
+      const u = (sk.ultStr ? 1 : 0) + (sk.ultSpd ? 1 : 0) + (sk.ultSta ? 1 : 0);
+      return `<button type="button" class="lo-slot ${on ? 'on' : ''}" data-slot="${i}" aria-pressed="${on}" aria-label="${name}: ${dict.strength} ${sk.str}, ${dict.speed} ${sk.spd}, ${dict.staminaBranch} ${sk.sta}">
+        <b>${name}</b><small>${sk.str}·${sk.spd}·${sk.sta}${u ? `<i class="lo-ult">${'★'.repeat(u)}</i>` : ''}</small>
+      </button>`;
+    })
+    .join('');
+  return `<div class="loadout-strip ${opts.cls ?? ''}" role="group" aria-label="${dict.loadoutLbl}">
+    <span class="lo-lbl" aria-hidden="true">${icon('skills', 'xs')}</span>
+    <div class="lo-slots">${slots}</div>
+    ${opts.edit ? `<button type="button" class="lo-btn lo-edit" data-act="skills" title="${dict.editSkills}" aria-label="${dict.editSkills}">${icon('skills', 'xs')}<span>${dict.editSkills}</span></button>` : ''}
+    ${opts.reset ? `<button type="button" class="lo-btn lo-reset" data-lo-reset="1" title="${dict.resetSkills}" aria-label="${dict.resetSkills}">${icon('restart', 'xs')}<span>${dict.resetSkills}</span></button>` : ''}
+  </div>`;
+}
+
+/** Wire slot taps inside `scope` (rerender happens through Game hooks). */
+export function wireLoadoutStrip(scope: ParentNode, game: Game): void {
+  scope.querySelectorAll<HTMLElement>('.lo-slot[data-slot]').forEach((b) =>
+    b.addEventListener('click', () => {
+      game.audio.ui();
+      game.setLoadout(Number(b.dataset.slot));
+    }),
+  );
+}

@@ -1,6 +1,7 @@
 import { t, toggleLang, getLang } from '../i18n';
 import type { Game } from '../game/Game';
 import { INTROS } from '../game/intros';
+import { BOSSES } from '../game/bosses';
 import { icon } from './icons';
 import { renderSkills } from './constellationSkills';
 import {
@@ -80,6 +81,8 @@ export function renderUI(root: HTMLElement, game: Game): void {
     wrap.appendChild(renderLevels(game));
   } else if (game.screen === 'legend') {
     wrap.appendChild(renderLegend(game));
+  } else if (game.screen === 'boss') {
+    wrap.appendChild(renderBossCut(game));
   } else if (game.screen === 'intro') {
     if (game.level) wrap.appendChild(renderPlayHud(game));
     else wrap.insertAdjacentHTML('afterbegin', backdrop());
@@ -152,4 +155,41 @@ function renderIntroCard(game: Game): HTMLElement {
   });
   // Also tap overlay backdrop
   return panel;
+}
+
+/** v0.7 boss entrance: letterbox bars + title card (粵 + EN + tagline + counter skills). Tap to skip. */
+function renderBossCut(game: Game): HTMLElement {
+  const dict = t();
+  const lv = game.level;
+  const cut = game.bossCut;
+  const kinds = lv?.boss ?? [];
+  const en = getLang() === 'en';
+  const all = kinds.length > 1;
+  const b = BOSSES[kinds[0] ?? 'luggage'];
+  const zh = all ? dict.bossAllZh : b.zh;
+  const enName = all ? dict.bossAllEn : b.en;
+  const tagline = all ? dict.bossAllTagline : en ? b.taglineEn : b.taglineZh;
+  const counter = all ? '' : en ? b.counterEn : b.counterZh;
+  const dur = cut?.dur ?? 2.6;
+  const crowns = all ? `<div class="boss-crowns">${kinds.map((k) => `<span style="--acc:${BOSSES[k].accent}">${icon('crown', 'xs')}</span>`).join('')}</div>` : '';
+  const node = el(`
+    <div class="boss-cut ${cut?.full ? 'full' : 'short'}" data-ui="1" style="--dur:${dur}s;--acc:${all ? '#ffcc33' : b.accent}" role="dialog" aria-label="${zh} ${enName}">
+      <div class="lb lb-top"></div>
+      <div class="lb lb-bot"></div>
+      <div class="boss-card">
+        <p class="boss-kicker">${icon('crown', 'sm')}<span>${dict.bossKicker} · ${dict.level} ${lv?.id ?? ''}</span></p>
+        <h1 class="boss-zh" lang="zh-HK">${zh}</h1>
+        <p class="boss-en" lang="en">${enName}</p>
+        <p class="boss-tagline">${tagline}</p>
+        ${counter ? `<p class="boss-counter">${icon('star', 'xs')}<span>${dict.bossCounter}: ${counter}</span></p>` : ''}
+        ${crowns}
+      </div>
+      <button type="button" class="boss-skip" aria-label="${dict.bossSkip}"><span>${dict.bossSkip}</span>${icon('play', 'xs')}</button>
+    </div>
+  `);
+  node.addEventListener('pointerdown', (e) => {
+    e.preventDefault();
+    game.skipBossCut();
+  });
+  return node;
 }

@@ -1,6 +1,8 @@
 import { t, getLang, fmt } from '../i18n';
 import type { Game } from '../game/Game';
 import { icon } from './icons';
+import { loadoutStrip, wireLoadoutStrip } from './uiShared';
+import { spentPoints } from '../game/SkillTree';
 import {
   BRANCH_FILL,
   ULTIMATE_COST,
@@ -103,6 +105,7 @@ export function renderSkills(game: Game, rerender: (game: Game) => void): HTMLEl
       <div class="${overRun ? 'skills-body' : 'sub-body skills-body'}">
         ${overRun ? `<p class="points">${pointsChip(game)}</p>` : ''}
         <p class="howto skill-howto">${fmt(dict.skillHowto, { fill: BRANCH_FILL, ult: ULTIMATE_COST })}</p>
+        ${loadoutStrip(game, { reset: true, cls: 'in-tree' })}
         ${overRun ? `<p class="howto">${dict.skillsApplyNext}</p>` : ''}
         <div class="constellation" role="group" aria-label="${dict.skills}">
           <div class="cst-core" title="${dict.skillPoints}">${icon('skills')}<b>${s.points}</b></div>
@@ -130,6 +133,31 @@ export function renderSkills(game: Game, rerender: (game: Game) => void): HTMLEl
       game.audio.ui();
       rerender(game);
     });
+  });
+  // v0.7 respec + loadouts.
+  wireLoadoutStrip(panel, game);
+  panel.querySelector('[data-lo-reset]')?.addEventListener('click', () => {
+    game.audio.ui();
+    const spent = spentPoints(game.save.skills);
+    const slot = fmt(dict.loadoutN, { n: game.save.activeLoadout + 1 });
+    const veil = el(`
+      <div class="confirm-veil" role="dialog" aria-modal="true" aria-labelledby="cf-title">
+        <div class="confirm-card">
+          <div class="confirm-ico">${icon('restart')}</div>
+          <h3 id="cf-title">${dict.resetTitle}</h3>
+          <p>${fmt(dict.resetBody, { n: spent, slot })}</p>
+          <div class="confirm-row">
+            <button type="button" class="ghost" data-cf="no">${icon('close', 'xs')}<span>${dict.cancel}</span></button>
+            <button type="button" class="primary" data-cf="yes" ${spent ? '' : 'disabled'}>${icon('restart', 'xs')}<span>${dict.resetYes}</span></button>
+          </div>
+        </div>
+      </div>`);
+    const close = () => veil.remove();
+    veil.addEventListener('click', (e) => { if (e.target === veil) close(); });
+    veil.querySelector('[data-cf="no"]')!.addEventListener('click', () => { game.audio.ui(); close(); });
+    veil.querySelector('[data-cf="yes"]')!.addEventListener('click', () => { close(); game.resetSkills(); });
+    panel.appendChild(veil);
+    (veil.querySelector('[data-cf="no"]') as HTMLElement).focus();
   });
   const detail = panel.querySelector('#cst-detail') as HTMLElement | null;
   const showDetail = (btn: HTMLElement) => {

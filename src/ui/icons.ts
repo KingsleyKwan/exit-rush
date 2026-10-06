@@ -50,6 +50,8 @@ const P: Record<string, string> = {
   kind_squat: `<path d="M10 42c0-6 4-8 8-10V22a6 6 0 0 1 12 0v10c4 2 8 4 8 10z" fill="currentColor"/><circle cx="24" cy="14" r="7" fill="currentColor"/><path d="M14 42h20M12 38h24" class="ws" stroke-width="3" stroke-linecap="round" fill="none"/>`,
   // 大聲公 Loudmouth: phone + sound waves.
   kind_loud: `<rect x="6" y="6" width="17" height="36" rx="4.5" fill="currentColor"/><rect x="9.5" y="11" width="10" height="21.5" rx="1.5" class="w"/><circle cx="14.5" cy="37.3" r="2.1" class="w"/><path d="M28.5 18.5c2.4 3 2.4 8 0 11M34 13.5c4.8 5.4 4.8 15.6 0 21M39.5 8.5c7 8 7 23 0 31" stroke="currentColor" ${S(3.8)}/>`,
+  // v0.7 boss crown (boss levels, cutscene, stubbornness hint).
+  crown: `<path d="M5 15l9.5 8.5L24 9l9.5 14.5L43 15l-3.5 21h-31z" fill="currentColor" stroke="currentColor" stroke-width="3" stroke-linejoin="round"/><rect x="8" y="37.5" width="32" height="6" rx="2.5" fill="currentColor"/><circle cx="24" cy="27.5" r="3.6" class="a"/><circle cx="14.5" cy="29" r="2.4" class="w"/><circle cx="33.5" cy="29" r="2.4" class="w"/>`,
 };
 
 export type IconName = keyof typeof P;
