@@ -1348,10 +1348,12 @@ button {
   font-weight: 700;
 }
 .tip-chip {
+  /* Default: top-under-meters (bottom placement removed — overlaps action buttons). */
   position: absolute;
-  left: 50%;
-  bottom: calc(118px + env(safe-area-inset-bottom, 0px));
-  transform: translateX(-50%);
+  left: max(10px, env(safe-area-inset-left));
+  top: calc(108px + env(safe-area-inset-top, 0px));
+  bottom: auto;
+  transform: none;
   display: inline-flex;
   align-items: center;
   gap: 6px;
@@ -1769,4 +1771,85 @@ button {
   .boss-cut .lb {
     animation-timing-function: linear;
   }
+}
+
+
+/* ---- v0.8 characters / mage ---- */
+.char-select .char-body { display: flex; flex-direction: column; gap: 10px; padding-bottom: 12px; }
+.char-stack { display: flex; flex-direction: column; gap: 10px; }
+.char-row {
+  display: flex; align-items: stretch; gap: 12px;
+  background: linear-gradient(165deg, rgba(30,36,52,.96), rgba(18,22,34,.98));
+  border: 2px solid rgba(255,255,255,.12); border-radius: 16px;
+  padding: 10px; box-shadow: 0 8px 22px rgba(0,0,0,.32);
+  min-height: 132px;
+}
+.char-row.selected { border-color: #5ad2ff; box-shadow: 0 0 0 2px rgba(90,210,255,.35), 0 8px 22px rgba(0,0,0,.32); }
+.char-row.char-mage.selected { border-color: #b388ff; box-shadow: 0 0 0 2px rgba(179,136,255,.4), 0 8px 22px rgba(0,0,0,.32); }
+.char-row.coming { opacity: .72; filter: grayscale(.35); }
+.char-port-wrap {
+  flex: 0 0 112px; width: 112px; height: 126px; border-radius: 14px; overflow: hidden;
+  background: #0e1520; box-shadow: inset 0 0 0 1px rgba(255,255,255,.08);
+}
+.char-port-img { width: 112px; height: 126px; object-fit: cover; display: block; }
+.char-port-fallback { display: grid; place-items: center; width: 112px; height: 126px; }
+.char-info { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.char-name { margin: 0; font-size: 1.15rem; line-height: 1.2; }
+.char-other { margin: 0; opacity: .65; font-size: .8rem; }
+.char-styles { display: flex; gap: 8px; margin: 4px 0; }
+.char-styles .ico { width: 22px; height: 22px; }
+.char-pitch { margin: 0 0 6px; font-size: .88rem; opacity: .9; flex: 1; }
+.char-actions { display: flex; flex-direction: column; gap: 6px; }
+.char-actions .primary { padding: 8px 12px; font-size: .9rem; }
+.char-footer { display: flex; justify-content: center; padding: 2px 0 6px; }
+.char-chip {
+  display: inline-flex; align-items: center; gap: 4px;
+  background: rgba(255,255,255,.08); border: 1px solid rgba(255,255,255,.14);
+  border-radius: 999px; padding: 4px 10px; color: inherit; font: inherit; font-size: .8rem;
+}
+.meter.mana-meter .meter-bar { background: rgba(100,60,160,.25); }
+.meter.mana-meter .meter-bar > i { background: linear-gradient(90deg, #7e57c2, #ce93d8); }
+.meter.mana-meter.denied { animation: pulse-deny .35s ease; }
+.meter.mana-meter.low .meter-bar > i { background: linear-gradient(90deg, #ab47bc, #f48fb1); }
+@keyframes pulse-deny { 50% { filter: brightness(1.6); } }
+.skill-use.el-fire { color: #fff; background: linear-gradient(180deg, #ff8a65, #e64a19); --ico-ink: #4e1a00; }
+.skill-use.el-ice { color: #fff; background: linear-gradient(180deg, #4dd0e1, #00838f); --ico-ink: #00363a; }
+.skill-use.el-volt { color: #1a1200; background: linear-gradient(180deg, #ffd54f, #f9a825); --ico-ink: #5d4037; }
+.skill-use.cooling { opacity: .45; }
+.skill-use.ult-mage {
+  width: 58px; height: 58px;
+  box-shadow: 0 0 0 3px #ffd54f, 0 0 12px rgba(255,213,79,.55);
+  background: linear-gradient(180deg, #ffe082, #ff8f00);
+  color: #3e2723;
+}
+.constellation.mage .arm-str { --arm: #ff7043; }
+.constellation.mage .arm-spd { --arm: #ffd54f; }
+.constellation.mage .arm-sta { --arm: #4dd0e1; }
+/* Tip chip: top-left under meters — never overlaps action buttons on the right. */
+.tip-chip {
+  left: max(10px, env(safe-area-inset-left));
+  right: auto;
+  top: calc(102px + env(safe-area-inset-top, 0px));
+  bottom: auto;
+  transform: none;
+  max-width: min(220px, calc(100vw - 120px));
+  z-index: 6;
+}
+
+.tip-chip.tip-under-meters {
+  position: relative;
+  left: auto; right: auto; top: auto; bottom: auto;
+  transform: none;
+  align-self: flex-start;
+  max-width: min(240px, 70vw);
+  margin-top: 2px;
+  z-index: 6;
+}
+.skill-use.ult-mage {
+  width: 62px !important;
+  height: 62px !important;
+  box-shadow: 0 0 0 3px #ffd54f, 0 0 14px rgba(255,213,79,.65) !important;
+  background: linear-gradient(180deg, #ffe082, #ff8f00) !important;
+  color: #3e2723 !important;
+  transform: scale(1.08);
 }
