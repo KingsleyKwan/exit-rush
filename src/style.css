@@ -1985,6 +1985,7 @@ button {
   font: inherit;
 }
 .workshop-tabs button.on, .tray-item.on, .set-btn.on, .bag-tools .on { background: #ffb03a; color: #1b1408; }
+.tray-item.on .ico { color: #1b1408; }
 .bag-grid {
   display: grid;
   grid-template-columns: repeat(var(--cols), minmax(52px, 64px));
@@ -1997,7 +1998,18 @@ button {
   border: 1px dashed rgba(255,255,255,.28);
   background: rgba(255,255,255,.04);
   color: inherit;
+  display: grid;
+  place-items: center;
+  padding: 0;
 }
+.bag-cell .ico, .tray-item .ico { width: 28px; height: 28px; }
+.shop-card header .ico { width: 32px; height: 32px; }
+.ico.it-shoes { color: #4fc3f7; }
+.ico.it-gloves { color: #ff8a65; }
+.ico.it-head { color: #81c784; }
+.ico.it-gadget { color: #ffd54f; }
+.ico.it-core { color: #ce93d8; }
+.ico.it-consumable { color: #f48fb1; }
 .bag-cell.filled { border-style: solid; background: rgba(255,176,58,.22); }
 .bag-cell.on { outline: 2px solid #ffb03a; }
 .tray { display: flex; gap: 8px; overflow-x: auto; padding-bottom: 14px; }

@@ -19,7 +19,7 @@ import {
   type Rot,
   type Tier,
 } from '../game/techKit';
-import { icon } from './icons';
+import { icon, itemIcon } from './icons';
 import { el, screenBar } from './uiShared';
 
 type Tab = 'equip' | 'shop' | 'sets';
@@ -27,14 +27,9 @@ let tab: Tab = 'equip';
 let pick: { id: ItemId; tier: Tier } | null = null;
 let selected = -1;
 
-const SLOT_ICON: Record<string, string> = {
-  shoes: 'spd',
-  gloves: 'str',
-  head: 'sta',
-  gadget: 'shop',
-  core: 'star',
-  consumable: 'bag',
-};
+function gearIcon(id: string, slot: string): string {
+  return icon(itemIcon(id), `it it-${slot}`);
+}
 
 function tierName(tier: number, dict: ReturnType<typeof t>): string {
   if (tier >= 3) return dict.tierLux;
@@ -77,10 +72,9 @@ export function renderWorkshop(game: Game, _rerender: (game: Game) => void): HTM
       const def = p && isItemId(p.id) ? itemDef(p.id) : undefined;
       const label = def ? (en ? def.nameEn : def.nameZh) : '';
       const on = hit === selected ? ' on' : '';
+      const mark = def && p ? gearIcon(p.id, def.slot) : '';
       cells.push(
-        `<button type="button" class="bag-cell${p ? ' filled' : ''}${on}" data-cell="${x},${y}" aria-label="${label || `${x},${y}`}">${
-          def ? icon(SLOT_ICON[def.slot] ?? 'bag', 'xs') : ''
-        }</button>`,
+        `<button type="button" class="bag-cell${p ? ' filled' : ''}${on}" data-cell="${x},${y}" aria-label="${label || `${x},${y}`}">${mark}</button>`,
       );
     }
   }
@@ -93,7 +87,7 @@ export function renderWorkshop(game: Game, _rerender: (game: Game) => void): HTM
     const tier = Math.min(3, Math.max(1, owned)) as Tier;
     const on = pick?.id === it.id ? ' on' : '';
     const name = en ? it.nameEn : it.nameZh;
-    return `<button type="button" class="tray-item${on}" data-tray="${it.id}" data-tier="${tier}">${icon(SLOT_ICON[it.slot] ?? 'bag', 'sm')}<span>${name}</span><small>${it.slot === 'consumable' ? `×${owned}` : tierName(owned, dict)}</small></button>`;
+    return `<button type="button" class="tray-item${on}" data-tray="${it.id}" data-tier="${tier}">${gearIcon(it.id, it.slot)}<span>${name}</span><small>${it.slot === 'consumable' ? `×${owned}` : tierName(owned, dict)}</small></button>`;
   }).join('');
 
   const sel = selected >= 0 ? placements[selected] : undefined;
@@ -119,7 +113,7 @@ export function renderWorkshop(game: Game, _rerender: (game: Game) => void): HTM
     const have = it.slot === 'consumable' ? `${dict.ownedTier} ×${stock}` : owned > 0 ? `${dict.ownedTier} · ${tierName(owned, dict)}` : '';
     const buyLabel = it.slot === 'consumable' || owned === 0 ? dict.buyItem : dict.upgradeItem;
     return `<article class="shop-card">
-      <header>${icon(SLOT_ICON[it.slot] ?? 'bag', 'sm')}<b>${name}</b></header>
+      <header>${gearIcon(it.id, it.slot)}<b>${name}</b></header>
       <p>${blurb}</p>
       <p class="shop-meta">${have}</p>
       <div class="shop-actions">

@@ -6,7 +6,7 @@ import { POINTS_PER_FIRST_CLEAR, MAX_POINTS_PER_LEVEL, modifiersFromSkills } fro
 import { spellById } from '../game/SpellTree';
 import { itemDef, previewCoins } from '../game/techKit';
 import { linesFor, lineColor } from '../game/lines';
-import { icon, langIcon } from './icons';
+import { icon, itemIcon, langIcon } from './icons';
 import { el, iconBtn, langBtn, qualityLabel, stationName, loadoutStrip, wireLoadoutStrip } from './uiShared';
 import { charPortraitUrl } from '../game/charPortraits';
 
@@ -49,23 +49,29 @@ function mageActions(game: Game, dict: ReturnType<typeof t>): string {
 function techActions(game: Game, dict: ReturnType<typeof t>): string {
   const mods = game.runMods;
   const en = getLang() === 'en';
-  const gadget = (mods.techActives ?? []).filter((id) => id !== 'S2').map((id) => {
+  const piece = (id: string) => {
     const def = itemDef(id);
     const name = def ? (en ? def.nameEn : def.nameZh) : id;
-    return `<button type="button" class="skill-use act-gadget" data-gadget="${id}" title="${name}" aria-label="${name}">${icon('shop')}</button>`;
+    // Slot tint disappears on the coloured leap and core buttons, so these stay white.
+    return { name, mark: icon(itemIcon(id)) };
+  };
+  const gadget = (mods.techActives ?? []).filter((id) => id !== 'S2').map((id) => {
+    const { name, mark } = piece(id);
+    return `<button type="button" class="skill-use act-gadget" data-gadget="${id}" title="${name}" aria-label="${name}">${mark}</button>`;
   });
   if (mods.hasLeap) {
-    gadget.push(`<button type="button" class="skill-use act-leap" data-act-skill="leap" title="${dict.skLeap}" aria-label="${dict.skLeap}">${icon('kind_squat')}</button>`);
+    const { name, mark } = piece('S2');
+    gadget.push(`<button type="button" class="skill-use act-leap" data-act-skill="leap" title="${name}" aria-label="${name}">${mark}</button>`);
   }
   if (mods.techCore) {
     const k = mods.techCore;
-    const title = k === 'str' ? dict.ultStr : k === 'spd' ? dict.ultSpd : dict.ultSta;
-    gadget.push(`<button type="button" class="skill-use ult-${k}" data-ult="${k}" title="${title}" aria-label="${title}">${icon(k)}</button>`);
+    const id = k === 'str' ? 'C1' : k === 'spd' ? 'C2' : 'C3';
+    const { name, mark } = piece(id);
+    gadget.push(`<button type="button" class="skill-use ult-${k}" data-ult="${k}" title="${name}" aria-label="${name}">${mark}</button>`);
   }
   const drinks = (mods.techConsumables ?? []).map((id) => {
-    const def = itemDef(id);
-    const name = def ? (en ? def.nameEn : def.nameZh) : id;
-    return `<button type="button" class="skill-use act-cons" data-cons="${id}" title="${name}" aria-label="${name}">${icon('bag', 'xs')}</button>`;
+    const { name, mark } = piece(id);
+    return `<button type="button" class="skill-use act-cons" data-cons="${id}" title="${name}" aria-label="${name}">${mark}</button>`;
   }).join('');
   return `${drinks ? `<div class="cons-row">${drinks}</div>` : ''}${gadget.join('')}`;
 }

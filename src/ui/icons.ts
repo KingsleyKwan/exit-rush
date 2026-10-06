@@ -96,9 +96,44 @@ const P: Record<string, string> = {
   sk_clap: `<circle cx="24" cy="26" r="6" fill="currentColor"/><path d="M24 4l4 12h-8zM6 38l12-8-2 10zM42 38L30 30l2 10z" fill="currentColor"/>`,
   sk_tstep: `<path d="M4 14h8M2 24h8M4 34h8" stroke="currentColor" ${S(3.4)} opacity=".65"/><path d="M30 6l-8 14h8l-4 18 16-22h-8z" fill="currentColor"/>`,
   sk_blink: `<rect x="2" y="12" width="12" height="24" rx="2.5" fill="currentColor"/><rect x="34" y="12" width="12" height="24" rx="2.5" fill="currentColor"/><path d="M16 24h12" stroke="currentColor" ${S(4.5)}/><path d="M24 16l10 8-10 8z" fill="currentColor"/>`,
+  // Gear L — one picture per piece, so the shop and the weapon buttons aren't all the same bag.
+  it_sneaker: `<path d="M2 24h6M1 31h7" stroke="currentColor" ${S(3)}/><path d="M12 34V20l6-4 8 1 10 6 8 8v3H12z" fill="currentColor"/><rect x="6" y="32" width="38" height="9" rx="3" fill="currentColor"/><path d="M14 33h24" class="ks" ${S(2.2)}/><path d="M20 21h6M22 26h6" class="ks" ${S(2)}/>`,
+  it_boot: `<path d="M16 2h10v16l16 8v8H10v-8l6-8z" fill="currentColor"/><path d="M17 10h8" class="ks" ${S(2.4)}/><path d="M8 40q5-8 10 0t10 0 10 0 10 0" stroke="currentColor" ${S(3.4)}/>`,
+  it_skate: `<path d="M16 4h8c2 0 4 2 5 4l7 5c2 1 3 3 2 5H14V9c0-3 1-5 2-5z" fill="currentColor"/><path d="M18 19v7M32 19v7" stroke="currentColor" ${S(3.2)}/><rect x="4" y="26" width="40" height="7" rx="3" fill="currentColor"/><circle cx="12" cy="40" r="4.5" fill="currentColor"/><circle cx="36" cy="40" r="4.5" fill="currentColor"/>`,
+  it_hydro: `<rect x="8" y="4" width="6.5" height="14" rx="3" fill="currentColor"/><rect x="16.5" y="1" width="6.5" height="17" rx="3" fill="currentColor"/><rect x="25" y="4" width="6.5" height="14" rx="3" fill="currentColor"/><path d="M31 16c7 0 12 4 11 9-1 4-6 6-11 4" fill="currentColor"/><path d="M8 14h24v12c0 7-5 12-13 12S8 33 8 26z" fill="currentColor"/><rect x="4" y="34" width="20" height="9" rx="3" fill="currentColor"/><rect x="8" y="36.5" width="8" height="4" rx="1" class="k"/><path d="M24 38.5h8" stroke="currentColor" ${S(3.4)}/>`,
+  it_shock: `<path d="M6 20h20v18H6z" fill="currentColor"/><path d="M10 20V12h12v8" fill="currentColor"/><path d="M28 6l-7 14h7l-5 16 16-20h-8z" fill="currentColor"/>`,
+  it_buzz: `<rect x="7" y="6" width="6" height="13" rx="3" fill="currentColor"/><rect x="15" y="3" width="6" height="16" rx="3" fill="currentColor"/><rect x="23" y="6" width="6" height="13" rx="3" fill="currentColor"/><path d="M29 18c6 0 11 4 10 9-1 5-6 7-11 4" fill="currentColor"/><path d="M6 16h24v13c0 8-5 13-13 13S6 37 6 29z" fill="currentColor"/><circle cx="17" cy="29" r="6" fill="none" class="ks" stroke-width="2.8"/><circle cx="17" cy="29" r="2" class="k"/>`,
+  it_mask: `<path d="M8 16c0-7 7-10 16-10s16 3 16 10v10c0 9-7 16-16 16S8 35 8 26z" fill="currentColor"/><circle cx="17" cy="24" r="4.2" class="k"/><circle cx="31" cy="24" r="4.2" class="k"/><rect x="36" y="26" width="10" height="9" rx="2" fill="currentColor"/>`,
+  it_phones: `<path d="M14 24v-4c0-7 4-12 10-12s10 5 10 12v4h-6v-4c0-4-2-6-4-6s-4 2-4 6v4z" fill="currentColor"/><rect x="4" y="20" width="10" height="18" rx="4" fill="currentColor"/><rect x="34" y="20" width="10" height="18" rx="4" fill="currentColor"/>`,
+  it_visor: `<path d="M2 26h7M39 26h7" stroke="currentColor" ${S(4)}/><circle cx="16" cy="26" r="9" fill="currentColor"/><circle cx="32" cy="26" r="9" fill="currentColor"/><rect x="22" y="22" width="4" height="8" fill="currentColor"/><circle cx="16" cy="26" r="4.2" class="k"/><circle cx="32" cy="26" r="4.2" class="k"/><path d="M32 17V6" stroke="currentColor" ${S(3.2)}/><circle cx="32" cy="5" r="2.4" fill="currentColor"/>`,
+  it_bank: `<rect x="16" y="3" width="16" height="6" rx="2" fill="currentColor"/><rect x="8" y="8" width="32" height="34" rx="6" fill="currentColor"/><path d="M27 16l-8 12h7l-3 12 13-16h-8z" class="k"/>`,
+  it_exo: `<rect x="13" y="3" width="14" height="15" rx="3" fill="currentColor"/><circle cx="20" cy="22" r="6.5" fill="currentColor"/><circle cx="20" cy="22" r="2.3" class="k"/><rect x="13" y="28" width="14" height="16" rx="3" fill="currentColor"/><rect x="31" y="6" width="6" height="32" rx="3" fill="currentColor"/><rect x="16" y="8" width="8" height="3" rx="1" class="k"/><rect x="16" y="34" width="8" height="3" rx="1" class="k"/>`,
+  it_drone: `<rect x="16" y="18" width="16" height="12" rx="3" fill="currentColor"/><path d="M20 22L8 8M28 22l12-14M20 26L8 40M28 26l12 14" stroke="currentColor" ${S(4)}/><circle cx="8" cy="8" r="6.5" fill="currentColor"/><circle cx="40" cy="8" r="6.5" fill="currentColor"/><circle cx="8" cy="40" r="6.5" fill="currentColor"/><circle cx="40" cy="40" r="6.5" fill="currentColor"/><circle cx="8" cy="8" r="2" class="k"/><circle cx="40" cy="8" r="2" class="k"/><circle cx="8" cy="40" r="2" class="k"/><circle cx="40" cy="40" r="2" class="k"/>`,
+  it_tab: `<rect x="8" y="4" width="32" height="40" rx="4" fill="currentColor"/><rect x="12" y="8" width="24" height="26" rx="2" class="k"/><circle cx="19" cy="17" r="2.1" fill="currentColor"/><circle cx="29" cy="17" r="2.1" fill="currentColor"/><path d="M18 26c2.2 3 9.8 3 12 0" stroke="currentColor" ${S(2.4)} fill="none"/>`,
+  it_fan: `<circle cx="22" cy="18" r="14" fill="currentColor"/><path d="M22 18V6M22 18l11 7M22 18L11 25" class="ks" ${S(3.6)}/><circle cx="22" cy="18" r="3" class="k"/><path d="M22 32v12" stroke="currentColor" ${S(5)}/>`,
+  it_arms: `<path d="M2 12h14l4 10-4 10H2l4-10z" fill="currentColor"/><path d="M28 12h18l-4 10 4 10H28l4-10z" fill="currentColor"/><path d="M16 22h12" stroke="currentColor" ${S(5)}/>`,
+  it_jet: `<rect x="12" y="4" width="24" height="24" rx="5" fill="currentColor"/><path d="M18 8v14M30 8v14" class="ks" ${S(3.2)}/><path d="M15 28h8l-1.5 8h-5z" fill="currentColor"/><path d="M25 28h8l-1.5 8h-5z" fill="currentColor"/><path d="M16.5 37c1.2 6 3.6 6 4.6 0M26.5 37c1.2 6 3.6 6 4.6 0" stroke="currentColor" ${S(2.6)}/>`,
+  it_field: `<path d="M24 3l17 7v12c0 11-7.5 17-17 22C14.5 39 7 33 7 22V10z" fill="currentColor"/><path d="M24 12l10 4v8c0 6-4.2 10-10 13-5.8-3-10-7-10-13v-8z" class="k"/><path d="M24 17l6 2.4V25c0 3.6-2.4 6-6 7.6-3.6-1.6-6-4-6-7.6v-5.6z" fill="currentColor"/>`,
+  it_can: `<ellipse cx="24" cy="12" rx="11" ry="4.2" fill="currentColor"/><rect x="13" y="12" width="22" height="22" fill="currentColor"/><ellipse cx="24" cy="34" rx="11" ry="4.2" fill="currentColor"/><ellipse cx="24" cy="8" rx="3.2" ry="1.6" fill="currentColor"/><path d="M24 6.4V3" stroke="currentColor" ${S(2.4)}/><path d="M27 18l-6 7h5l-2 7 8-9h-5z" class="k"/>`,
+  it_cup: `<path d="M8 16h22v12a9 9 0 0 1-18 0v-1H8a5 5 0 0 1 0-11z" fill="currentColor"/><path d="M30 18h5a5 5 0 0 1 0 10h-5" stroke="currentColor" ${S(3.6)} fill="none"/><path d="M14 10c1.2-4 3.2-4 2-8M23 10c1.2-4 3.2-4 2-8" stroke="currentColor" ${S(2.8)} fill="none"/>`,
+  it_gum: `<rect x="10" y="8" width="6" height="13" rx="1.5" fill="currentColor"/><rect x="18" y="4" width="6" height="17" rx="1.5" fill="currentColor"/><rect x="26" y="8" width="6" height="13" rx="1.5" fill="currentColor"/><rect x="5" y="18" width="32" height="22" rx="3.5" fill="currentColor"/><rect x="11" y="23" width="4" height="12" rx="1" class="k"/><rect x="19" y="23" width="4" height="12" rx="1" class="k"/><rect x="27" y="23" width="4" height="12" rx="1" class="k"/><path d="M38 6c7-2 10 5 5 9-4 3-8 0-5-9z" fill="currentColor"/><path d="M41 9c.5 2 .5 4 0 6" class="ks" ${S(1.6)}/>`,
 };
 
 export type IconName = keyof typeof P;
+
+/** One icon per Gear L piece. Unknown ids fall back to the bag. */
+export const ITEM_ICON: Record<string, IconName> = {
+  S1: 'it_sneaker', S2: 'it_boot', S3: 'it_skate',
+  G1: 'it_hydro', G2: 'it_shock', G3: 'it_buzz',
+  H1: 'it_mask', H2: 'it_phones', H3: 'it_visor',
+  D1: 'it_bank', D2: 'it_exo', D3: 'it_drone', D4: 'it_tab', D5: 'it_fan',
+  C1: 'it_arms', C2: 'it_jet', C3: 'it_field',
+  K1: 'it_can', K2: 'it_cup', K3: 'it_gum',
+};
+
+export function itemIcon(id: string): IconName {
+  return ITEM_ICON[id] ?? 'bag';
+}
 
 /** Inline SVG markup for one icon. `cls` adds classes (e.g. size modifiers). */
 export function icon(name: IconName | string, cls = ''): string {
