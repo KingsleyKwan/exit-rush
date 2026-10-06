@@ -1,3 +1,60 @@
+# Balance — v0.7.0 (history below)
+
+## v0.7.0 — 100 levels, 1 SP per clear, bosses
+
+**Method:**
+
+- `COUNTERS=0 LOADOUTS=earned RUNS=60 npm run test:sim`, run on every level.
+- The "earned" build is what a player who first-cleared every earlier level would have: **id − 1 points at 1 SP per clear**, spent on the band's natural branch, with T3 counters once they're reachable.
+- Seeds are deterministic: body and agent ids are reset per `Sim`, so results match for any `WORKERS` count.
+- Levels 6–99 were tuned by `tune.py`, a timer/pressure/density search against the band midpoints. Boss timers are capped at 28 s with an 18 s floor.
+
+**Result: every level 6–99 is inside its band (94/94).** L1–5 keep their v0.6 parameters. L5 sits at 93% against a ≥95% target, the same as v0.6.3 (bot noise on a 12 s normals-only level).
+
+| Lv | Dens | Press | Sec | Earned clear | Band |
+|---:|----:|-----:|----:|------:|------|
+| 5 | 7 | 0.25 | 12 | 93% | ≥95% |
+| 10 | 7 | 0.35 | 18 | 87% | 75–90% |
+| 15 | 7 | 0.79 | 14 | 82% | 75–90% |
+| 20 👑 | 8 | 0.47 | 20 | 65% | 55–75% |
+| 25 | 9 | 0.65 | 16 | 60% | 55–75% |
+| 30 👑 | 10 | 0.39 | 28 | 58% | 55–75% |
+| 35 | 9 | 0.53 | 22 | 67% | 50–70% |
+| 40 👑 | 9 | 0.35 | 28 | 53% | 50–70% |
+| 45 | 9 | 0.63 | 23 | 65% | 50–70% |
+| 50 👑 | 9 | 0.73 | 20 | 53% | 50–70% |
+| 55 | 9 | 0.78 | 19 | 58% | 50–70% |
+| 60 👑 | 9 | 0.98 | 18 | 68% | 50–70% |
+| 65 | 10 | 0.82 | 15 | 40% | 35–60% |
+| 70 👑 | 9 | 0.80 | 21 | 53% | 35–60% |
+| 75 | 10 | 0.92 | 18 | 47% | 35–60% |
+| 80 👑 | 9 | 0.98 | 17 | 40% | 35–60% |
+| 85 | 9 | 0.91 | 14 | 45% | 35–60% |
+| 90 👑 | 9 | 0.92 | 21 | 38% | 35–60% |
+| 95 | 10 | 0.92 | 16 | 43% | 35–60% |
+| 99 (exam) | 10 | 0.80 | 17 | 43% | 35–60% |
+
+The v0.6.3 band misses (L10 30%, L16 40%, L22 33%, L23 3%, L24 17%, L27–30 13–32%) are all fixed.
+
+**L100** (`RUNS=80`, density 8, pressure 0.90, 30 s, all eight kings):
+
+| Build | Clear | Band |
+|---|---:|---|
+| 20-point | 0% | 0–5% |
+| ult-str | 26% | 30–50% (just under; v0.6.3 was 12%) |
+| ult-spd | 45% | 30–50% |
+| ult-sta | 34% | 30–50% |
+
+ult-str loses its time in the door/platform crush. Density 7 lifts it only to 29% while pushing ult-spd to 65%, and pressure and timer sweeps barely move it.
+
+**Bosses**, with counter value measured in isolation: see [`BOSSES.md`](BOSSES.md).
+
+**Economy note:** at 1 SP per first clear, the T3 counters (40/50/60 points in a branch) aren't reachable on a first attempt at L20–L50, so the early kings are tuned to be worn down without them. Counters pay off on replays, via free respec and the three loadouts, and from L60 on.
+
+**Determinism fix:** results used to differ between `WORKERS` counts and test order, because body and agent id counters leaked across sims and shifted wander phases. `Sim` now calls `resetBodyIds()` and `resetAgentIds()`. The old *Thread (couple)* micro-test only passed through that leak. It now measures Thread directly: the pair opens 0.49 → 0.87 m and crossing time drops 1.58 → 1.40 s.
+
+---
+
 # Balance — v0.6.0
 
 Short-session retune: timers ≈ **12–18 s** (L100 **24 s**), staged specials, first-clear SP economy. Physics knobs in `src/game/sim/tuning.ts` are largely unchanged from v0.2.1; **level table** and **points** changed.

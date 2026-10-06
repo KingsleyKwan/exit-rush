@@ -93,10 +93,10 @@ REPORT BACK WITH:
 
 | Item | Status |
 |------|--------|
-| Version | **0.6.3** (`package.json`), the 大聲公 Loudmouth passenger (noise ring drains stamina; intro L26). Repo renamed to `exit-rush` (save key `exit-rush-v1`, legacy key migrated on load) |
+| Version | **0.7.0** (`package.json`): L31–99 playable (100 levels), eight boss kings (L20–90, all at L100) with entrance cutscenes, 1 SP per first clear, free respec + 3 loadouts. Repo `exit-rush` (save key `exit-rush-v1`) |
 | Live web | <https://kingsleykwan.github.io/exit-rush/> (GitHub Pages, auto-deploy from `main`, Node 20, `BASE_PATH=/exit-rush/`) |
-| Content | Levels **1–30 + 100** playable (~10–20 s each). 9 passenger types. L100 unlocks after L30. Levels 31–99 not built yet |
+| Content | Levels **1–100** playable (~10–28 s each). 9 passenger types + 8 boss kings. L100 unlocks after L99 |
 | Systems done | Pure-TS 60 Hz crowd sim + headless bot (`npm run test:sim`), constellation skill tree STR/SPD/STA with Tier-3 counters + ults, intro cards + FTUE ghost hand, side-door bays with closed-door signage, per-station themes, original Web Audio SFX + mixer, EN/粵 i18n, quality tiers + FPS probe, auto-pause lifecycle, save migration, PWA manifest + icons, 1024 store icon (`store/app-icon-1024.png`) |
 | Native / App Store | **Not started.** No Capacitor, no `ios/` (and `.gitignore` currently ignores `ios/`). No Apple Developer account yet (owner) |
 | Monetisation | None. Plan in `docs/APP_STORE.md` §E (recommend v1 without ads) |
-| Known issues | **L27–30 may be too hard**: bot clear rates ≈ 13–32 % vs target 55–75 % (L28 ≈ 25–32 %). L8 (squat intro) may be below band. **iPhone performance not yet profiled in WKWebView**: DPR 3 devices render at pixelRatio 2 on high, PCF 1024² shadows. `haptics.ts` is a no-op on iOS (needs the native plugin). README Controls still mention WIS (now STA). `scripts/capture-*.mjs` hard-code `/workspace/...` paths and need Playwright, which isn't a dependency |
+| Known issues | Bot balance in band for L6–99; L100 ult-str 26 % (band 30–50 %). Not yet human-playtested past L30. **iPhone performance not yet profiled in WKWebView**: DPR 3 devices render at pixelRatio 2 on high, PCF 1024² shadows. `haptics.ts` is a no-op on iOS (needs the native plugin). `scripts/capture-*.mjs` hard-code `/workspace/...` paths and need Playwright, which isn't a dependency |

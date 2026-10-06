@@ -1,17 +1,26 @@
-# Skill tree — v0.6.2 constellation
+# Skill tree — v0.7.0 constellation
 
 Assassin’s Creed Valhalla–style **constellation**: three coloured arms from a centre hub (**力量 Strength** · **速度 Speed** · **體力 Stamina**). Wisdom (智慧) was **replaced by Stamina** in v0.6; old saves migrate `wis` / `ultWis` → `sta` / `ultSta`.
 
-## Economy
+## Economy (v0.7)
 
 | Rule | Value |
 |------|-------|
-| Points on **first** clear | **3** |
+| Points on **first** clear | **1** (`SP_PER_CLEAR`, was 3 in v0.5–v0.6) |
 | Replay | **0** |
+| Max from content | 100 levels × 1 = **100** |
 | Branch fill | **60** |
 | Ultimate after fill | **+10** |
-| Full branch + ult | **70** |
-| Major skill icons | every **~10** points (10 / 20 / 30 / 40 / 50 / 60) |
+| Full branch + ult | **70** (reachable around L71) |
+| Major skill icons | every **10** points (10 / 20 / 30 / 40 / 50 / 60) |
+| Respec | **Free and instant**: refunds every point (incl. ultimates) in the active build, after a confirm dialog |
+| Loadouts | **3 builds** (配點1/2/3), each its own allocation of the **same** earned total; switch from the skill tree, level select or result card; applies from the next run |
+
+Hint line under the tree title: 「每關首次通關 +1 點 · 每10點解鎖大技 · 滿60再加10解鎖必殺」.
+
+**Points are derived, not stored.** On load, each build's spare points are recomputed as *earned (distinct cleared levels × 1) − spent*. If an old save spent more than it now earns (every v0.6 save with 3 SP per clear), that build is **fully refunded**, and a one-time notice 「技能點已重新計算 — 請重新配點 / Skill points recalculated — please re-allocate」 shows. A v0.6 save's existing allocation becomes build 1.
+
+What a first-time player has at each boss: L20 → 19 pts, L40 → 39, L60 → 59, L80 → 79. One branch's T3 counters (40/50/60) come online between L41 and L61, so the early kings are designed to be worn down without them (see [`BOSSES.md`](BOSSES.md)). A respec into the right branch, or a dedicated loadout per king, is the intended replay tool.
 
 Per branch: **4 passive + 2 active + 1 ultimate** (6 major skills + ult).
 

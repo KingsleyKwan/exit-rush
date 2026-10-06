@@ -41,7 +41,7 @@ Player exits through an **open side door** onto the platform (green floor marker
 
 ## Stations & levels
 
-See [`LEVELS.md`](LEVELS.md). **Levels 1–30 + 100** playable (v0.5 short exits + staged specials). 31–99 TBD. Naming is bilingual (EN + 粵) and **inspired by** real stations — not an official map product.
+See [`LEVELS.md`](LEVELS.md). **Levels 1–100** playable (v0.7): short exits, staged specials, boss kings every 10 from L20 ([`BOSSES.md`](BOSSES.md)), L99 final exam, L100 finale. Naming is bilingual (EN + 粵) and **inspired by** real stations — not an official map product.
 
 ## Passenger types
 
