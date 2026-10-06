@@ -85,7 +85,7 @@ export class Player {
     const shell = skin === 'mage' ? mageShellGeometry() : heroShellGeometry();
     this.bodyMesh.geometry = geo;
     this.glowMesh.geometry = shell;
-    const col = skin === 'mage' ? 0xb388ff : 0x5ad2ff;
+    const col = skin === 'mage' ? 0xb388ff : skin === 'tech' ? 0xffb03a : 0x5ad2ff;
     this.glowMat.color.setHex(col);
     this.xrayMat.color.setHex(col);
     this.ringMat.color.setHex(skin === 'mage' ? 0xce93d8 : 0x4fc3f7);

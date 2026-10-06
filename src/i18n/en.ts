@@ -150,6 +150,14 @@ export interface Dict {
   charRestore: string;
   charNote: string;
   charIapStub: string;
+  charIapOk: string;
+  charIapCancelled: string;
+  charIapPending: string;
+  charIapError: string;
+  charIapUnavailable: string;
+  charRestoreDone: string;
+  charRestoreEmpty: string;
+  charBundle: string;
   charTryStub: string;
   manaEmpty: string;
   mana: string;
@@ -160,6 +168,34 @@ export interface Dict {
   chars: string;
   comingSoon: string;
   youOffice: string;
+  gear: string;
+  workshop: string;
+  tabEquip: string;
+  tabShop: string;
+  tabSets: string;
+  coins: string;
+  coinGain: string;
+  cells: string;
+  tierCheap: string;
+  tierMid: string;
+  tierLux: string;
+  buyItem: string;
+  upgradeItem: string;
+  sellItem: string;
+  expandBag: string;
+  autoPack: string;
+  recommendKit: string;
+  removeItem: string;
+  rotateItem: string;
+  placeHint: string;
+  coinNotice: string;
+  coinPreview: string;
+  replayCoins: string;
+  fastExit: string;
+  charNoteIos: string;
+  trialBanner: string;
+  noRoom: string;
+  ownedTier: string;
 }
 
 export const en: Dict = {
@@ -309,6 +345,14 @@ export const en: Dict = {
   charCleared: 'Cleared',
   charProgressOf: 'Progress for',
   charIapStub: 'IAP hooks land in the iOS build (Grok Build).',
+  charIapOk: 'Unlocked.',
+  charIapCancelled: 'Purchase cancelled.',
+  charIapPending: 'Waiting for approval.',
+  charIapError: 'Purchase failed. Try again.',
+  charIapUnavailable: 'The store is not available yet.',
+  charRestoreDone: 'Purchases restored.',
+  charRestoreEmpty: 'No purchases to restore.',
+  charBundle: 'Both characters',
   charTryStub: 'Trial car (L6 / L20) comes with the iOS build.',
   manaEmpty: 'Not enough mana!',
   mana: 'Mana',
@@ -319,5 +363,33 @@ export const en: Dict = {
   chars: 'Characters',
   comingSoon: 'Coming soon',
   youOffice: 'Office Worker',
+  gear: 'Gear',
+  workshop: 'Workshop',
+  tabEquip: 'Equip',
+  tabShop: 'Shop',
+  tabSets: 'Sets',
+  coins: 'Coins',
+  coinGain: '+{n} coins',
+  cells: 'cells',
+  tierCheap: 'Cheap',
+  tierMid: 'Mid',
+  tierLux: 'Luxury',
+  buyItem: 'Buy',
+  upgradeItem: 'Upgrade',
+  sellItem: 'Sell',
+  expandBag: 'Expand bag',
+  autoPack: 'Auto-pack',
+  recommendKit: 'Suggested kit',
+  removeItem: 'Take off',
+  rotateItem: 'Rotate',
+  placeHint: 'Tap an item, then a cell',
+  coinNotice: 'Coins were recalculated',
+  coinPreview: 'This run',
+  replayCoins: 'Replay coins {n}/5',
+  fastExit: 'Fast exit',
+  charNoteIos: 'Each character keeps their own level progress. Mage and Gear L are optional characters.',
+  trialBanner: 'Trial · no rewards',
+  noRoom: 'No space',
+  ownedTier: 'Owned',
 };
 

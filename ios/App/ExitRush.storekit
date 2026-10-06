@@ -1,0 +1,114 @@
+{
+  "identifier" : "ExitRush",
+  "nonRenewingSubscriptions" : [
+
+  ],
+  "products" : [
+    {
+      "displayPrice" : "2.99",
+      "familyShareable" : false,
+      "internalID" : "E7A1C0MAGE0001",
+      "localizations" : [
+        {
+          "description" : "Unlock the mage character.",
+          "displayName" : "Mage",
+          "locale" : "en_US"
+        },
+        {
+          "description" : "解鎖凱婷呢個角色。",
+          "displayName" : "凱婷",
+          "locale" : "zh_HK"
+        }
+      ],
+      "productID" : "exitrush.char.mage",
+      "referenceName" : "Mage",
+      "type" : "NonConsumable"
+    },
+    {
+      "displayPrice" : "2.99",
+      "familyShareable" : false,
+      "internalID" : "E7A1C0TECH0001",
+      "localizations" : [
+        {
+          "description" : "Unlock the gear character.",
+          "displayName" : "Gear L",
+          "locale" : "en_US"
+        },
+        {
+          "description" : "解鎖裝備L呢個角色。",
+          "displayName" : "裝備L",
+          "locale" : "zh_HK"
+        }
+      ],
+      "productID" : "exitrush.char.tech",
+      "referenceName" : "Gear L",
+      "type" : "NonConsumable"
+    },
+    {
+      "displayPrice" : "4.99",
+      "familyShareable" : false,
+      "internalID" : "E7A1C0PACK0001",
+      "localizations" : [
+        {
+          "description" : "Unlock both extra characters.",
+          "displayName" : "Both characters",
+          "locale" : "en_US"
+        },
+        {
+          "description" : "兩個額外角色一齊解鎖。",
+          "displayName" : "兩個角色",
+          "locale" : "zh_HK"
+        }
+      ],
+      "productID" : "exitrush.pack.chars",
+      "referenceName" : "Character pack",
+      "type" : "NonConsumable"
+    },
+    {
+      "displayPrice" : "2.99",
+      "familyShareable" : false,
+      "internalID" : "E7A1C0NOADS001",
+      "localizations" : [
+        {
+          "description" : "Turn off interstitial ads.",
+          "displayName" : "No ads",
+          "locale" : "en_US"
+        },
+        {
+          "description" : "關掉插頁廣告。",
+          "displayName" : "冇廣告",
+          "locale" : "zh_HK"
+        }
+      ],
+      "productID" : "exitrush.noads",
+      "referenceName" : "No ads",
+      "type" : "NonConsumable"
+    }
+  ],
+  "settings" : {
+    "_applicationInternalID" : "0",
+    "_developerTeamID" : "",
+    "_failTransactionsEnabled" : false,
+    "_locale" : "en_US",
+    "_storefront" : "USA",
+    "_storeKitErrors" : [
+      {
+        "current" : null,
+        "enabled" : false,
+        "name" : "Load Products"
+      },
+      {
+        "current" : null,
+        "enabled" : false,
+        "name" : "Purchase"
+      }
+    ]
+  },
+  "subscriptionGroups" : [
+
+  ],
+  "version" : {
+    "major" : 4,
+    "minor" : 0
+  }
+}

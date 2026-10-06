@@ -57,6 +57,12 @@ export interface Agent {
   callOffUntil: number;
   /** Chill Out: angry wind-up suppressed until. */
   chillWindupUntil: number;
+  /** Gear L decoy: brat steers here until this time. */
+  lureUntil: number;
+  lureX: number;
+  lureZ: number;
+  /** Gear L tablet: family stops (no collision) until this time. */
+  huddleUntil: number;
   /** v0.7 boss state (shared by both halves of the couple boss); null for ordinary passengers. */
   boss: BossState | null;
   /** Original standing spot (bosses step aside from it while yielding, then return). */
@@ -116,6 +122,8 @@ export interface CrowdCtx {
   pushForce?: number;
   /** SPD Thread: the couple hand-hold link does not block the player. */
   threadCouples?: boolean;
+  /** When false, hurdle does not skip the giant boss suitcase. Hero default: allow. */
+  passBossLuggage?: boolean;
   emit: Emit;
   /** `heavy` = a boss shove (longer stun unless Stand Firm). */
   onPlayerShoved: (dx: number, dz: number, power: number, heavy?: boolean) => void;
@@ -236,6 +244,10 @@ export class CrowdSim {
       auraOffUntil: -1,
       callOffUntil: -1,
       chillWindupUntil: -1,
+      lureUntil: -1,
+      lureX: 0,
+      lureZ: 0,
+      huddleUntil: -1,
       boss: null,
       originX: x,
       originZ: z,
@@ -577,7 +589,8 @@ export class CrowdSim {
       const dx = pl.x - b.x;
       const dz = pl.z - b.z;
       const d = Math.hypot(dx, dz) || 1e-6;
-      if (s.kind === 'luggage' && a.caseBody && s.hitCd <= 0 && !(pl.passMask & PASS_LUGGAGE)) {
+      const passBossCase = (pl.passMask & PASS_LUGGAGE) !== 0 && ctx.passBossLuggage !== false;
+      if (s.kind === 'luggage' && a.caseBody && s.hitCd <= 0 && !passBossCase) {
         // Giant suitcase: bouncy — walking into it springs you back.
         const c = a.caseBody;
         const cx = pl.x - c.x;
@@ -806,6 +819,12 @@ export class CrowdSim {
         }
         continue;
       }
+      if (a.huddleUntil > ctx.time) {
+        b.vx *= 0.15;
+        b.vz *= 0.15;
+        b.enabled = false;
+        continue;
+      }
       if (a.baseR) {
         b.r = a.baseR;
         a.baseR = 0;
@@ -851,8 +870,9 @@ export class CrowdSim {
         }
       } else {
         // Rider (or boarder still waiting): spring to standing spot.
-        const dx = a.homeX - b.x;
-        const dz = a.homeZ - b.z;
+        const lured = a.lureUntil > ctx.time && a.kind === 'brat';
+        const dx = (lured ? a.lureX : a.homeX) - b.x;
+        const dz = (lured ? a.lureZ : a.homeZ) - b.z;
         const bossYield = !!a.boss && a.boss.yieldUntil > ctx.time;
         const anchorMul = (a.boss ? Math.max(1.3, def.anchorMul) * (bossYield ? TUNING.boss.yieldAnchor : TUNING.boss.anchorMul) : def.anchorMul) * statusAnchor;
         const k = C.anchorK * anchorMul * m;

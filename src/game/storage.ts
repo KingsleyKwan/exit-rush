@@ -504,6 +504,13 @@ export function loadSave(): SaveData {
  * Persist the save. Never throws: on failure the data is kept in memory for this
  * session and `false` is returned so the caller can warn the player once.
  */
+let mirrorSave: ((json: string) => void) | null = null;
+
+/** Native shell registers a Preferences mirror. Web leaves this unset. */
+export function setSaveMirror(fn: ((json: string) => void) | null): void {
+  mirrorSave = fn;
+}
+
 export function writeSave(data: SaveData): boolean {
   // v0.7: the active loadout slot mirrors `skills`.
   if (Array.isArray(data.loadouts) && data.loadouts[data.activeLoadout]) data.loadouts[data.activeLoadout] = { ...data.skills };
@@ -518,6 +525,7 @@ export function writeSave(data: SaveData): boolean {
   memory = json;
   try {
     localStorage.setItem(KEY, json);
+    mirrorSave?.(json);
     return true;
   } catch {
     return false;

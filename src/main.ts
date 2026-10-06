@@ -1,6 +1,10 @@
 import { Game } from './game/Game';
 import { renderUI } from './ui/renderUI';
 import { loadGameFonts } from './game/fonts';
+import { setSaveMirror } from './game/storage';
+import { entitlements, setEntitlementPersister } from './game/entitlements';
+import { hydrateNativeSave, mirrorSaveToNative } from './native/saveBridge';
+import { startNativeShell, syncKeepAwake } from './native/shell';
 
 void loadGameFonts();
 
@@ -21,39 +25,55 @@ function showToast(msg: string): void {
   window.setTimeout(() => el.remove(), ms + 600);
 }
 
-const game = new Game(canvas, {
-  onState: () => {
-    // Throttle HUD updates while playing to avoid thrashing DOM every frame
-    if (game.screen === 'playing') {
-      if (uiScheduled) return;
-      uiScheduled = true;
-      requestAnimationFrame(() => {
-        uiScheduled = false;
-        renderUI(uiRoot, game);
-      });
-      return;
-    }
-    renderUI(uiRoot, game);
-  },
-  onToast: showToast,
-});
+async function boot(): Promise<void> {
+  await hydrateNativeSave();
+  setSaveMirror(mirrorSaveToNative);
 
-renderUI(uiRoot, game);
+  const game = new Game(canvas, {
+    onState: () => {
+      syncKeepAwake(game.screen);
+      // Throttle HUD updates while playing to avoid thrashing DOM every frame
+      if (game.screen === 'playing') {
+        if (uiScheduled) return;
+        uiScheduled = true;
+        requestAnimationFrame(() => {
+          uiScheduled = false;
+          renderUI(uiRoot, game);
+        });
+        return;
+      }
+      renderUI(uiRoot, game);
+    },
+    onToast: showToast,
+  });
 
-// v0.5 FTUE: first launch jumps into L1 (ghost-hand teach).
-queueMicrotask(() => {
-  game.tryAutoFtue();
-  // v0.7: economy change (1 SP per clear) may have refunded the save → tell the player once.
-  window.setTimeout(() => game.consumeRespecNotice(), 600);
-  if (game.screen !== 'menu') renderUI(uiRoot, game);
-});
+  setEntitlementPersister((cache) => {
+    game.save.entitlementCache = { ...cache, at: Date.now() };
+    if (!entitlements().canPlay(game.save.character)) game.save.character = 'hero';
+    game.persist();
+  });
 
-// Unlock audio on the first gesture, and re-resume it on later gestures if the
-// OS suspended / interrupted it (iOS after calls, backgrounding, etc.).
-window.addEventListener(
-  'pointerdown',
-  () => {
-    game.audio.unlock();
-  },
-  { passive: true },
-);
+  renderUI(uiRoot, game);
+  void startNativeShell(game);
+  void entitlements().refresh();
+
+  // v0.5 FTUE: first launch jumps into L1 (ghost-hand teach).
+  queueMicrotask(() => {
+    game.tryAutoFtue();
+    // v0.7: economy change (1 SP per clear) may have refunded the save → tell the player once.
+    window.setTimeout(() => game.consumeRespecNotice(), 600);
+    if (game.screen !== 'menu') renderUI(uiRoot, game);
+  });
+
+  // Unlock audio on the first gesture, and re-resume it on later gestures if the
+  // OS suspended / interrupted it (iOS after calls, backgrounding, etc.).
+  window.addEventListener(
+    'pointerdown',
+    () => {
+      game.audio.unlock();
+    },
+    { passive: true },
+  );
+}
+
+void boot();

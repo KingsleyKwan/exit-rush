@@ -2,15 +2,15 @@ import { t, getLang } from '../i18n';
 import type { Game } from '../game/Game';
 import { CHARACTER_ORDER, CHARACTERS, type CharacterId } from '../game/charactersDef';
 import { charPortraitUrl } from '../game/charPortraits';
-import { entitlements } from '../game/entitlements';
+import { entitlements, type BuyResult } from '../game/entitlements';
 import { IS_STORE_BUILD } from '../game/platform';
 import { icon } from './icons';
 import { el, screenBar } from './uiShared';
 import { progressOf } from '../game/storage';
 import { playableLevels, getLevel } from '../game/levels';
 
-/** Gear L is not playable yet (v0.8.1). */
-const COMING_SOON: Partial<Record<CharacterId, boolean>> = { tech: true };
+/** No character is gated as coming-soon. Store locks use entitlements. */
+const COMING_SOON: Partial<Record<CharacterId, boolean>> = {};
 
 export function renderCharacters(game: Game): HTMLElement {
   const dict = t();
@@ -78,8 +78,13 @@ export function renderCharacters(game: Game): HTMLElement {
       </article>`;
   }).join('');
 
+  const bothLocked = showStore && !ents.canPlay('mage') && !ents.canPlay('tech');
+  const bundle = bothLocked
+    ? `<button type="button" class="primary char-buy" data-buy-product="exitrush.pack.chars">${icon('star', 'sm')}<span>${dict.charBundle}</span></button>`
+    : '';
   const footer = showStore
     ? `<div class="char-footer">
+        ${bundle}
         <button type="button" class="ghost" data-act="restore">${icon('star', 'xs')}<span>${dict.charRestore}</span></button>
       </div>`
     : '';
@@ -90,7 +95,8 @@ export function renderCharacters(game: Game): HTMLElement {
       <div class="sub-body char-body">
         <div class="char-stack">${cards}</div>
         ${footer}
-        <p class="sfx-note">${dict.charNote}</p>
+        ${game.trial ? `<p class="trial-banner">${dict.trialBanner}</p>` : ''}
+        <p class="sfx-note">${IS_STORE_BUILD ? dict.charNoteIos : dict.charNote}</p>
       </div>
     </div>
   `);
@@ -103,27 +109,56 @@ export function renderCharacters(game: Game): HTMLElement {
       game.selectCharacter(id);
     });
   });
-  page.querySelectorAll<HTMLElement>('[data-buy]').forEach((b) => {
+  const toastFor = (result: BuyResult) => {
+    if (result === 'ok') game.toast(dict.charIapOk);
+    else if (result === 'cancelled') game.toast(dict.charIapCancelled);
+    else if (result === 'pending') game.toast(dict.charIapPending);
+    else if (result === 'unavailable') game.toast(dict.charIapUnavailable);
+    else game.toast(dict.charIapError);
+  };
+  const wireBuy = (b: HTMLElement, productId: string) => {
     b.addEventListener('click', async () => {
       game.audio.ui();
-      const id = b.dataset.buy as CharacterId;
-      if (COMING_SOON[id]) return;
-      const productId = id === 'mage' ? 'exitrush.char.mage' : 'exitrush.char.tech';
-      await entitlements().buy(productId);
-      game.toast(dict.charIapStub);
+      const result = await entitlements().buy(productId);
+      toastFor(result);
+      if (result === 'ok') renderUINeedsRefresh(game);
     });
+  };
+  page.querySelectorAll<HTMLElement>('[data-buy]').forEach((b) => {
+    const id = b.dataset.buy as CharacterId;
+    if (COMING_SOON[id]) return;
+    wireBuy(b, id === 'mage' ? 'exitrush.char.mage' : 'exitrush.char.tech');
+  });
+  page.querySelectorAll<HTMLElement>('[data-buy-product]').forEach((b) => {
+    wireBuy(b, b.dataset.buyProduct || '');
   });
   page.querySelectorAll<HTMLElement>('[data-try]').forEach((b) => {
     b.addEventListener('click', () => {
       game.audio.ui();
-      game.toast(dict.charTryStub);
+      if (!IS_STORE_BUILD) return;
+      game.startTrial(b.dataset.try as CharacterId);
     });
   });
-  page.querySelector('[data-act="restore"]')?.addEventListener('click', async () => {
-    game.audio.ui();
-    await entitlements().restore();
-    game.toast(dict.charIapStub);
-  });
+  if (showStore) {
+    void entitlements().products().then((list) => {
+      const price = new Map(list.map((p) => [p.id, p.localizedPriceString]));
+      const label = (id: string, name: string) => {
+        const p = price.get(id);
+        return p ? `${name} ${p}` : name;
+      };
+      page.querySelectorAll<HTMLElement>('[data-buy]').forEach((b) => {
+        const id = b.dataset.buy === 'mage' ? 'exitrush.char.mage' : 'exitrush.char.tech';
+        const span = b.querySelector('span');
+        if (span) span.textContent = label(id, dict.charBuy);
+      });
+      const bundleBtn = page.querySelector<HTMLElement>('[data-buy-product="exitrush.pack.chars"] span');
+      if (bundleBtn) bundleBtn.textContent = label('exitrush.pack.chars', dict.charBundle);
+    });
+  }
 
   return page;
+}
+
+function renderUINeedsRefresh(game: Game): void {
+  game.openCharacters();
 }

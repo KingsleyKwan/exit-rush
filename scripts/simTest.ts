@@ -31,7 +31,9 @@ import { PASSENGER_DEFS } from '../src/game/PassengerTypes';
 import { DOOR_BAYS, DOOR_Z, TUNING, doorWallX, nearestDoorBay, openDoorBays } from '../src/game/sim/tuning';
 import { LEVELS } from '../src/game/levels';
 import { BRANCH_FILL, modifiersFromSkills } from '../src/game/SkillTree';
-import { CHARACTERS, modsFor, type CharacterId } from '../src/game/charactersDef';
+import { CHARACTERS, modsFor, type CharacterId, type PlayerMods } from '../src/game/charactersDef';
+import { kitForBot, resolveKit, techKitSelfTest } from '../src/game/techKit';
+import { grantsForProductIds } from '../src/game/entitlements';
 import { defaultSpellBar } from '../src/game/SpellTree';
 import { defaultSkills, earnedFrom, migrateLegacyKeys, normalizeSave, progressOf, recordClear, SAVE_KEY, spentOf, type KeyValueStore, type SaveData, type SkillState } from '../src/game/storage';
 import { earnedPoints, resetActiveLoadout, spendPoint, spentPoints, switchLoadout, POINTS_PER_FIRST_CLEAR } from '../src/game/SkillTree';
@@ -103,10 +105,10 @@ function mageBarForLevel(id: number, skills: SkillState): string[] {
   return bar.length ? bar : defaultSpellBar(skills);
 }
 
-function modsForChar(char: CharacterId, skills: SkillState, levelId = 1) {
-  if (char === 'hero') return modifiersFromSkills(skills);
+function modsForChar(char: CharacterId, skills: SkillState, levelId = 1, loadoutName = 'earned'): PlayerMods {
+  if (char === 'hero') return modsFor(CHARACTERS.hero, skills);
   if (char === 'mage') return modsFor(CHARACTERS.mage, skills, mageBarForLevel(levelId, skills));
-  return modsFor(CHARACTERS[char], skills, []);
+  return modsFor(CHARACTERS.tech, skills, [], resolveKit(kitForBot(loadoutName, levelId)));
 }
 
 const DT = 1 / TUNING.physics.hz;
@@ -280,6 +282,18 @@ function parseBuild(name: string): ((levelId: number) => SkillState) | null {
 }
 const loadout = (name: string): ((levelId: number) => SkillState) => LOADOUTS[name] ?? parseBuild(name)!;
 
+function knownLoadout(lo: string): boolean {
+  if (LOADOUTS[lo] || parseBuild(lo)) return true;
+  if (lo === 'tech:earned' || lo === 'tech:grid4' || lo === 'tech:max') return true;
+  return /^tech:kit:([A-Z]\d@[123])([,+][A-Z]\d@[123])*$/.test(lo);
+}
+
+function skillsForJob(char: CharacterId, name: string, levelId: number): SkillState {
+  if (char === 'tech' || name.startsWith('tech:')) return defaultSkills();
+  const key = char === 'mage' && name === 'earned' ? 'earned-mage' : name;
+  return loadout(key)(levelId);
+}
+
 const DEFAULT_LOADOUTS = (id: number): string[] =>
   id === 100 ? ['pts20', 'ult-str', 'ult-spd', 'ult-sta'] : ['none', 'earned'];
 
@@ -305,9 +319,9 @@ interface Run {
   bossHits: number;
 }
 
-function runLevel(levelId: number, skills: SkillState, seed: number, char: CharacterId = 'hero'): Run {
+function runLevel(levelId: number, skills: SkillState, seed: number, char: CharacterId = 'hero', loadoutName = 'earned'): Run {
   const level = LEVELS.find((l) => l.id === levelId)!;
-  const sim = new Sim(level, modsForChar(char, skills, levelId), mulberry32(seed));
+  const sim = new Sim(level, modsForChar(char, skills, levelId, loadoutName), mulberry32(seed));
   const p = sim.player;
   let held = false;
   let heldT = 0;
@@ -372,11 +386,16 @@ function runLevel(levelId: number, skills: SkillState, seed: number, char: Chara
       heldT += DT;
       if (heldT > 0.3) held = false;
     }
+    const pm = sim.playerMods as PlayerMods;
     // Ults: fire when stuck for a moment (WIS: as soon as the crowd closes in).
     if (sim.time > 1.5) {
-      if (skills.ultSpd && blockedT > 0.25 && sim.tryUltimate('spd')) ults++;
-      if (skills.ultStr && blockedT > 0.25 && sim.tryUltimate('str')) ults++;
-      if (skills.ultSta && (blockedT > 0.1 || b.contacts > 0) && sim.tryUltimate('sta')) ults++;
+      const core = pm.techCore;
+      const ultSpd = skills.ultSpd || core === 'spd';
+      const ultStr = skills.ultStr || core === 'str';
+      const ultSta = skills.ultSta || core === 'sta';
+      if (ultSpd && blockedT > 0.25 && sim.tryUltimate('spd')) ults++;
+      if (ultStr && blockedT > 0.25 && sim.tryUltimate('str')) ults++;
+      if (ultSta && (blockedT > 0.1 || b.contacts > 0) && sim.tryUltimate('sta')) ults++;
     }
     // Tier-3 actives (v0.6.2): leap when jammed, second wind when low.
     if (sim.time > 1 && blockedT > 0.3 && sim.tryLeap()) blockedT = 0;
@@ -435,6 +454,29 @@ function runLevel(levelId: number, skills: SkillState, seed: number, char: Chara
         else if (skills.ultSpd && sim.tryUltimate('spd')) ults++;
       }
     }
+    if (char === 'tech' && sim.time > 0.5) {
+      const actives = pm.techActives ?? [];
+      if (p.stamina < p.staminaMax * 0.3) sim.tryAbility('K1');
+      let near: string | null = null;
+      let nearD = 99;
+      for (const a of sim.crowd.agents) {
+        if (a.kind === 'normal') continue;
+        const d = Math.hypot(a.body.x - b.x, a.body.z - b.z);
+        if (d < nearD && d < (a.boss ? 4 : 3)) { nearD = d; near = a.kind; }
+      }
+      const prefer = near === 'brat' ? ['D3', 'D5']
+        : near === 'family' ? ['D4', 'D5']
+        : near === 'stench' ? ['D5', 'K3']
+        : near === 'loud' ? ['K3', 'D5']
+        : ['D5', 'D3', 'D4'];
+      if (blockedT > 0.2 || near) {
+        for (const id of prefer) {
+          if (!actives.includes(id) && id !== 'K3' && id !== 'K1') continue;
+          if (id.startsWith('K') && !(pm.techConsumables ?? []).includes(id) && !p.consumables.includes(id)) continue;
+          if (sim.tryAbility(id)) { blockedT = 0; break; }
+        }
+      }
+    }
     const input: PlayerInput = { x: dx, z: -dz, mag: 1, shoveHeld: held };
     sim.step(DT, input);
     steps++;
@@ -460,6 +502,8 @@ function runLevel(levelId: number, skills: SkillState, seed: number, char: Chara
           const a = bs[i];
           const c = bs[j];
           if (a.group && a.group === c.group) continue;
+          // Huddled / frozen ghosts are disabled and do not collide.
+          if (!a.enabled || !c.enabled) continue;
           // Tier 3 Hurdle / Leap deliberately let the player overlap luggage / squatters / kids.
           if (passes(a, c)) continue;
           const d = Math.hypot(a.x - c.x, a.z - c.z);
@@ -937,7 +981,7 @@ if (!isMainThread) {
   const jobs = workerData as Job[];
   const out: JobResult[] = jobs.map((j) => ({
     ...j,
-    run: runLevel(j.level, loadout(j.char === 'mage' && j.loadout === 'earned' ? 'earned-mage' : j.loadout)(j.level), j.seed, j.char ?? 'hero'),
+    run: runLevel(j.level, skillsForJob(j.char ?? 'hero', j.loadout, j.level), j.seed, j.char ?? 'hero', j.loadout),
   }));
   parentPort!.postMessage(out);
 } else {
@@ -967,13 +1011,43 @@ function target(level: number, loadout: string): [number, number] | null {
   return [0.35, 0.6];
 }
 
+function entitlementGrantTests(): string[] {
+  const fail: string[] = [];
+  const check = (label: string, ids: string[], exp: { mage: boolean; tech: boolean; noAds: boolean }) => {
+    const g = grantsForProductIds(ids);
+    if (g.mage !== exp.mage || g.tech !== exp.tech || g.noAds !== exp.noAds) {
+      fail.push(`${label}: got ${JSON.stringify(g)} want ${JSON.stringify(exp)}`);
+    }
+  };
+  check('mage product', ['exitrush.char.mage'], { mage: true, tech: false, noAds: true });
+  check('tech product', ['exitrush.char.tech'], { mage: false, tech: true, noAds: true });
+  check('pack', ['exitrush.pack.chars'], { mage: true, tech: true, noAds: true });
+  check('noads only', ['exitrush.noads'], { mage: false, tech: false, noAds: true });
+  check('empty', [], { mage: false, tech: false, noAds: false });
+  return fail;
+}
+
 async function main(): Promise<void> {
+  const grantFail = entitlementGrantTests();
+  if (grantFail.length) {
+    console.error(grantFail.join('\n'));
+    console.error(`${grantFail.length} entitlement grant test(s) failed`);
+    process.exit(1);
+  }
+  console.log('entitlement grant tests ok');
+  const kitFail = techKitSelfTest();
+  if (kitFail.length) {
+    console.error(kitFail.join('\n'));
+    console.error(`${kitFail.length} tech kit self-test(s) failed`);
+    process.exit(1);
+  }
+  console.log('tech kit self-test ok');
   const RUNS = Number(process.env.RUNS ?? process.env.SEEDS ?? 6);
   const SEED = Number(process.env.SEED ?? 0);
   const levelFilter = process.env.LEVEL ? process.env.LEVEL.split(',').map(Number) : null;
   const loadEnv = process.env.LOADOUTS && process.env.LOADOUTS !== 'default' ? process.env.LOADOUTS.split(',') : null;
   for (const lo of loadEnv ?? []) {
-    if (!LOADOUTS[lo] && !parseBuild(lo)) throw new Error(`unknown loadout "${lo}" (have: ${Object.keys(LOADOUTS).join(', ')})`);
+    if (!knownLoadout(lo)) throw new Error(`unknown loadout "${lo}" (have: ${Object.keys(LOADOUTS).join(', ')}, tech:earned, tech:grid4, tech:max, tech:kit:…)`);
   }
   const WORKERS = Math.max(1, Number(process.env.WORKERS ?? Math.min(8, cpus().length)));
 

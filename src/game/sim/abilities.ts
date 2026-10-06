@@ -142,16 +142,139 @@ function drainBoss(a: Agent, counters: PassengerKind[] | undefined, mods: Player
   a.boss.stub = Math.max(0, a.boss.stub - 0.08 * mul * (mods.spellPower || 1));
 }
 
-/** Build ability defs for currently bar-equipped spells. */
+/** Build ability defs for currently bar-equipped spells or Gear L gadgets. */
 export function abilitiesForBar(ids: string[], mods: PlayerMods): AbilityDef[] {
   const out: AbilityDef[] = [];
   for (const id of ids) {
+    const tech = techAbility(id, mods);
+    if (tech) {
+      out.push(tech);
+      continue;
+    }
     const node = spellById(id);
     if (!node || node.kind !== 'active') continue;
     const def = spellAbility(node, mods);
     if (def) out.push(def);
   }
   return out;
+}
+
+function tierOf(mods: PlayerMods, id: string): 1 | 2 | 3 {
+  const t = mods.techTier?.[id];
+  return t === 2 || t === 3 ? t : 1;
+}
+
+function techAbility(id: string, mods: PlayerMods): AbilityDef | null {
+  if (mods.characterId !== 'tech') return null;
+  const tier = tierOf(mods, id);
+  const pick = <T,>(a: T, b: T, c: T): T => (tier === 3 ? c : tier === 2 ? b : a);
+  if (id === 'D3') {
+    return {
+      id,
+      resource: 'none',
+      cost: 0,
+      cd: 10,
+      counters: ['brat'],
+      cast(ctx) {
+        const px = ctx.player.body.x;
+        const pz = ctx.player.body.z;
+        const face = facing(ctx.player);
+        // Off the lane: a lure behind the player makes brats walk back through them.
+        const lx = px - face.dx * 0.4 - face.dz * 2.2;
+        const lz = pz - face.dz * 0.4 + face.dx * 2.2;
+        const dur = pick(2.5, 3.5, 4.5);
+        ctx.emit({ t: 'gadget', id, x: lx, z: lz });
+        for (const a of ctx.crowd.agents) {
+          if (a.kind !== 'brat') continue;
+          if (dist2(a.body.x, a.body.z, px, pz) > 9) continue;
+          a.lureUntil = ctx.time + dur;
+          a.lureX = lx;
+          a.lureZ = lz;
+          drainBoss(a, ['brat'], mods);
+        }
+        return true;
+      },
+    };
+  }
+  if (id === 'D4') {
+    return {
+      id,
+      resource: 'none',
+      cost: 0,
+      cd: 12,
+      counters: ['family'],
+      cast(ctx) {
+        const px = ctx.player.body.x;
+        const pz = ctx.player.body.z;
+        const dur = pick(3, 4, 5);
+        ctx.emit({ t: 'gadget', id, x: px, z: pz });
+        for (const a of ctx.crowd.agents) {
+          const d2 = dist2(a.body.x, a.body.z, px, pz);
+          if (a.kind === 'family' && d2 <= 2.5 * 2.5) {
+            a.huddleUntil = ctx.time + dur;
+            drainBoss(a, ['family'], mods);
+          } else if (tier === 3 && a.kind === 'brat' && d2 <= 2.5 * 2.5) {
+            a.huddleUntil = ctx.time + 2;
+          }
+        }
+        return true;
+      },
+    };
+  }
+  if (id === 'D5') {
+    return {
+      id,
+      resource: 'none',
+      cost: 0,
+      cd: 6,
+      counters: ['stench'],
+      cast(ctx) {
+        const { dx, dz } = aimDir(ctx);
+        const px = ctx.player.body.x;
+        const pz = ctx.player.body.z;
+        const range = pick(2, 2.3, 2.6);
+        const impulse = pick(3, 3.6, 4.2);
+        const aura = pick(3, 4, 5);
+        ctx.emit({ t: 'gadget', id, x: px, z: pz });
+        for (const a of ctx.crowd.agents) {
+          const vx = a.body.x - px;
+          const vz = a.body.z - pz;
+          const dist = Math.hypot(vx, vz);
+          if (dist < 0.05 || dist > range) continue;
+          const along = (vx * dx + vz * dz) / dist;
+          if (along < 0.3) continue;
+          applyImpulse(a.body, dx * impulse, dz * impulse);
+          if (a.kind === 'stench') applyStatus(a, 'auraOff', ctx.time + aura, ctx.emit);
+          drainBoss(a, ['stench'], mods);
+        }
+        return true;
+      },
+    };
+  }
+  if (id === 'K1' || id === 'K2' || id === 'K3') {
+    return {
+      id,
+      resource: 'none',
+      cost: 0,
+      cd: 0.4,
+      cast(ctx) {
+        const i = ctx.player.consumables.indexOf(id);
+        if (i < 0) return false;
+        ctx.player.consumables.splice(i, 1);
+        if (id === 'K1') {
+          ctx.player.winded = false;
+          ctx.player.stamina = Math.min(ctx.player.staminaMax, ctx.player.stamina + 40);
+        } else if (id === 'K2') {
+          ctx.player.espressoUntil = ctx.time + 5;
+        } else {
+          ctx.player.mintUntil = ctx.time + 6;
+        }
+        ctx.emit({ t: 'gadget', id, x: ctx.player.body.x, z: ctx.player.body.z });
+        return true;
+      },
+    };
+  }
+  return null;
 }
 
 function spellAbility(node: SpellNodeDef, mods: PlayerMods): AbilityDef | null {

@@ -13,6 +13,9 @@ import {
 import { CHARACTERS } from '../game/charactersDef';
 import { charPortraitUrl } from '../game/charPortraits';
 import { progressOf } from '../game/storage';
+import { coinBalance } from '../game/techKit';
+import { entitlements } from '../game/entitlements';
+import { IS_STORE_BUILD } from '../game/platform';
 
 /** v0.7: long Latin station names (e.g. "Down-to-Earth Town") step down a size instead of ellipsizing. */
 function fitCls(name: string): string {
@@ -41,6 +44,11 @@ function levelsWhoChip(game: Game): string {
 
 export function renderMenu(game: Game): HTMLElement {
   const dict = t();
+  const gear = game.save.character === 'tech';
+  const progLabel = gear ? dict.gear : game.save.character === 'mage' ? dict.spells : dict.skills;
+  const progEm = gear
+    ? String(coinBalance(game.save))
+    : String(game.save.character === 'mage' ? (game.save.mage.loadouts[game.save.mage.active]?.points ?? 0) : game.save.skills.points);
   const levels = playableLevels();
   const nxt = nextLevel(game);
   const clearedCount = levels.filter((l) => game.save.cleared.includes(l.id)).length;
@@ -51,7 +59,7 @@ export function renderMenu(game: Game): HTMLElement {
         <div class="bar-right">
           ${iconBtn('chars', 'characters', dict.chars)}
           ${iconBtn('legend', 'legend', dict.legendTitle)}
-          ${iconBtn('skills', 'skills', dict.skills)}
+          ${iconBtn('skills', 'skills', progLabel)}
         </div>
       </div>
       <div class="title-main">
@@ -71,13 +79,14 @@ export function renderMenu(game: Game): HTMLElement {
         </button>
         <div class="menu-tiles">
           <button type="button" class="tile" data-act="levels">${icon('levels')}<span>${dict.levelsTitle}</span><em>${clearedCount}/${levels.length}</em></button>
-          <button type="button" class="tile" data-act="skills">${icon('skills')}<span>${dict.skills}</span><em>${icon('star', 'xs')}${game.save.skills.points}</em></button>
+          <button type="button" class="tile" data-act="skills">${icon(gear ? 'shop' : 'skills')}<span>${progLabel}</span><em>${gear ? '' : icon('star', 'xs')}${progEm}</em></button>
           <button type="button" class="tile" data-act="legend">${icon('legend')}<span>${dict.legendTitle}</span><em>9</em></button>
         </div>
         <div class="settings-row">
           <button type="button" class="setting" data-act="quality" aria-label="${dict.quality}: ${qualityLabel(game)}">${icon('quality', 'sm')}<span>${qualityLabel(game)}</span></button>
           <button type="button" class="setting ${game.save.typeIcons ? 'on' : ''}" data-act="icons" aria-pressed="${game.save.typeIcons}" aria-label="${dict.typeIcons}">${icon('tag', 'sm')}<span>${dict.typeIcons} · ${game.save.typeIcons ? dict.on : dict.off}</span></button>
           <button type="button" class="setting ${game.save.muted ? '' : 'on'}" data-act="mute" aria-pressed="${!game.save.muted}" aria-label="${game.save.muted ? dict.unmute : dict.mute}">${icon(game.save.muted ? 'mute' : 'volume', 'sm')}<span>${dict.sound} · ${game.save.muted ? dict.off : dict.on}</span></button>
+          ${entitlements().showStoreUi && IS_STORE_BUILD ? `<button type="button" class="setting" data-act="restore">${icon('star', 'sm')}<span>${dict.charRestore}</span></button>` : ''}
         </div>
         ${game.needsReloadForAA() ? `<p class="sfx-note">${dict.qualityNote}</p>` : ''}
         <p class="sfx-note">${dict.sfxNote}<br />${dict.artCredit}</p>

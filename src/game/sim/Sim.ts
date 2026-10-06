@@ -256,10 +256,16 @@ export class Sim {
   tryAbility(abilityId: string): boolean {
     if (this.result) return false;
     const pm = this.playerMods as PlayerMods;
-    if (pm.characterId !== 'mage') return false;
+    if (pm.characterId !== 'mage' && pm.characterId !== 'tech') return false;
     const defs = abilitiesForBar([abilityId], pm);
     const def = defs[0];
     if (!def) return false;
+    if (def.resource === 'none') {
+      if ((this.player.spellCd[def.id] ?? 0) > 0) return false;
+      if (!def.cast(this.abilityCtx())) return false;
+      this.player.spellCd[def.id] = def.cd;
+      return true;
+    }
     if (!this.player.beginSpell(def.id, def.cost, def.cd)) return false;
     return def.cast(this.abilityCtx());
   }
@@ -346,12 +352,17 @@ export class Sim {
         this.result !== null ||
         now - this.lastAngryHit < TUNING.player.hitIFrames,
       // STR 60 Stand Firm: angry shoves barely move you.
-      angryResist: pl.mods.standFirm
-        ? 1 - TUNING.skills.standFirmMul
-        : (pl.mods as PlayerMods).chillOut
-          ? 1 - TUNING.spells.angryShoveMul
-          : Math.min(0.85, pl.mods.resist * 1.2),
+      angryResist: (() => {
+        const tech = (pl.mods as PlayerMods).techAngryRemain;
+        if (typeof tech === 'number' && tech < 1) return 1 - tech;
+        return pl.mods.standFirm
+          ? 1 - TUNING.skills.standFirmMul
+          : (pl.mods as PlayerMods).chillOut
+            ? 1 - TUNING.spells.angryShoveMul
+            : Math.min(0.85, pl.mods.resist * 1.2);
+      })(),
       threadCouples: pl.mods.threadCouples,
+      passBossLuggage: (pl.mods as PlayerMods).techPassBossCase !== false,
       pushForce: pl.mods.pushForce,
       standFirm: pl.mods.standFirm,
       playerCharging: pl.isCharging(now),

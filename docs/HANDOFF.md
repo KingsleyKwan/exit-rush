@@ -34,7 +34,7 @@
 | Area | Status | Key paths |
 |------|--------|-----------|
 | Mage 「凱婷」 | Playable (web unlocks all) | `src/game/charactersDef.ts`, `SpellTree.ts`, `sim/abilities.ts` |
-| Gear L 「裝備L」 | **Coming soon** card only | `src/ui/characterSelect.ts` (`COMING_SOON.tech`) |
+| Gear L 「裝備L」 | **Playable** (web unlocks; iOS needs the tech entitlement) | `src/game/techKit.ts`, `src/ui/techShop.ts` |
 | Per-character progress (D12) | **Done in 0.8.1** | `src/game/storage.ts` (`progress`, `recordClear`, `progressOf`) |
 | Element colours | Fire **red** / Ice **blue** / Volt **yellow** | `Effects.ts`, `style.css` `.el-fire/.el-ice/.el-volt` |
 | Entitlements | Stub (web = all unlocked) | `src/game/entitlements.ts`, `src/game/platform.ts` (`VITE_PLATFORM`) |
@@ -142,8 +142,10 @@ npm run test:sim
 |------------------------|-------|-------------|
 | `exitrush.char.mage` | US$2.99 | `mage` |
 | `exitrush.char.tech` | US$2.99 | `tech` |
-| `exitrush.chars.bundle` | US$4.99 | `mage` + `tech` |
+| `exitrush.pack.chars` | US$4.99 | `mage` + `tech` |
 | `exitrush.noads` | US$2.99 | `noAds` |
+
+Product id for the pair is `exitrush.pack.chars` (decided in `docs/CHARACTERS.md` §8.1). Apple has no IAP bundle type, so this is its own non-consumable. Do not rename it to `exitrush.chars.bundle`.
 
 **Rules:**
 - Wire purchase / restore into `src/game/entitlements.ts` (replace stubs). Cache in `save.entitlementCache`; StoreKit/RC is source of truth on launch + Restore.
@@ -206,4 +208,12 @@ URL='http://127.0.0.1:4173/?debug=1' node scripts/capture-v081.mjs
 
 ---
 
-*Generated for v0.8.1 handoff. Update this file when Gear L / iOS / IAP land.*
+*Generated for v0.8.1 handoff. Updated locally on `feat/ios-capacitor` (not pushed).*
+
+### Landed in this working tree (not on main, not uploaded)
+
+- **Gear L** is selectable. `RUNS=40` sampled earned win rates vs hero: L1 −5, L10 −5, L20 +7, L40 0, L60 −2, L70 +10, L80 −2 pp. L100 `tech:max` 50% vs hero `ult-spd` 53% (best ult this sample). Mage stayed inside ±10 pp and was not retuned.
+- **Capacitor 8** project is in `ios/`. Portrait only, iPhone only, `ITSAppUsesNonExemptEncryption` NO, `PrivacyInfo.xcprivacy` UserDefaults `CA92.1`. `xcodebuild` for the iPhone 17 Pro simulator succeeded, and that build was installed: the title menu and L1 HUD clear the Dynamic Island and the home indicator. Team signing and a home-button device are still Kingsley's.
+- **IAP** grants are wired (`grantsForProductIds`, RevenueCat adapter). The public key is `VITE_REVENUECAT_IOS_KEY` in `.env.local` (empty example only). No secret is committed. StoreKit file `ios/App/ExitRush.storekit` has `familyShareable: false` on every product. **Do not enable Family Sharing** without Kingsley's explicit OK. Sandbox purchase / restore / revoke was not run (needs the key and a Sandbox Apple ID).
+- UI prices come from StoreKit `priceString`. The character pack hides once either character is owned. Restore is on character select and the title-screen settings row.
+- 390×844 @2x shots (EN + 粵) were reviewed: menu, character select (buy / pack / restore), workshop equip + shop, L1 HUD, tech win card. The Cantonese win card shows `+7 金幣` and 裝備, not a skill point. Web Pages base path was rebuilt with `BASE_PATH=/exit-rush/`.

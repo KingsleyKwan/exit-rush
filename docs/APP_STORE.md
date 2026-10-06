@@ -387,18 +387,18 @@ Description (繁中 draft):
 - [ ] A10 Decide: v1 no ads (recommended) vs ads/IAP
 
 ### Phase 1: Capacitor wrapper 🤖 (branch `feat/ios-capacitor`)
-- [ ] 🤖 Install Capacitor 8 core/cli/ios + app/haptics/status-bar/preferences/splash-screen + keep-awake (§B1)
-- [ ] 🤖 `capacitor.config.ts` (§B2) · `package.json` scripts `build:native`, `cap:sync`, `ios:open`, `ios:run`, `assets:ios` (§B3)
-- [ ] 🤖 `npx cap add ios`, then commit `ios/` (fix `.gitignore`, keep `ios/App/App/public` ignored)
-- [ ] 🤖 Info.plist: portrait only, iPhone only, `UIRequiresFullScreen`, `ITSAppUsesNonExemptEncryption=NO`; `PrivacyInfo.xcprivacy` (§B5)
-- [ ] 🤖 `src/native/` bridge (**to add**): platform detect, status bar, haptics routing, keep-awake, app pause/resume, Preferences save hydrate + migration (§B6–B13). Load everything with dynamic imports behind `isNativePlatform()`
-- [ ] 🤖 Bump `pages.yml` to Node 22. Verify `BASE_PATH=/exit-rush/ npm run build` still produces subpath URLs
-- [ ] 🤖 `npm run build` + `npm run build:native` + `npm run test:sim` all pass
-- [ ] 👤 Open in Xcode, set the Team, run on Simulator (iPhone 17 Pro, SE) and on your iPhone
-- [ ] 🤖/👤 Screenshot review: menu, HUD, skill tree, result, EN + 粵, notch and home-button devices
+- [x] 🤖 Install Capacitor 8 core/cli/ios + app/haptics/status-bar/preferences/splash-screen + keep-awake (§B1)
+- [x] 🤖 `capacitor.config.ts` (§B2) · `package.json` scripts `build:native`, `cap:sync`, `ios:open`, `ios:run`, `assets:ios` (§B3)
+- [x] 🤖 `npx cap add ios`, then commit `ios/` (fix `.gitignore`, keep `ios/App/App/public` ignored)
+- [x] 🤖 Info.plist: portrait only, iPhone only, `UIRequiresFullScreen`, `ITSAppUsesNonExemptEncryption=NO`; `PrivacyInfo.xcprivacy` (§B5)
+- [x] 🤖 `src/native/` bridge: platform detect, status bar, haptics routing, keep-awake, app pause/resume, Preferences save hydrate + migration (§B6–B13). Load everything with dynamic imports behind `isNativePlatform()`
+- [x] 🤖 Bump `pages.yml` to Node 22. Verify `BASE_PATH=/exit-rush/ npm run build` still produces subpath URLs
+- [x] 🤖 `npm run build` + `npm run build:native` + `npm run test:sim` all pass
+- [ ] 👤 Open in Xcode, set the Team, and run on your iPhone (SE / home-button size still unchecked). `xcodebuild` for iPhone 17 Pro succeeded without a Team (`CODE_SIGNING_ALLOWED=NO`). That build was installed on the simulator: the title menu and L1 HUD clear the Dynamic Island and the home indicator.
+- [x] 🤖 Screenshot review: menu, HUD, workshop, result, EN + 粵 at 390×844 @2x, plus the iPhone 17 Pro simulator title menu and L1 HUD. Home-button device shots are still 👤.
 
 ### Phase 2: native polish + performance
-- [ ] 🤖 Icon/splash sources in `assets/`, then `npm run assets:ios` (§C)
+- [x] 🤖 Icon/splash sources in `assets/`, then `npm run assets:ios` (§C). Icon is `store/app-icon-1024.png` (no alpha). Splash is that art centred on `#141820`.
 - [ ] 🤖 Native quality tuning (mid tier: DPR 1.5, cheaper shadows) behind a flag (§D)
 - [ ] 👤 Safari Web Inspector timelines, 10-minute soak, Low Power Mode, Airplane Mode (§D, §B12)
 - [ ] 🤖 In-app About screen: version, privacy link, support, parody disclaimer, OFL credits (EN + 粵)
@@ -414,7 +414,7 @@ Description (繁中 draft):
 - [ ] 👤 AdMob account, iOS app + ad units, payments profile · Paid Apps Agreement, tax, banking in ASC
 - [ ] 👤 Create the Remove Ads non-consumable in ASC and a Sandbox tester
 - [ ] 🤖 AdMob plugin + UMP + (optional) ATT + SKAdNetwork list + test IDs; interstitial/rewarded rules (§E)
-- [ ] 🤖 IAP (RevenueCat or native-purchases), Restore Purchases, StoreKit config for tests
+- [x] 🤖 IAP code: RevenueCat adapter, Restore Purchases (character select + title settings), StoreKit config `ios/App/ExitRush.storekit` (`familyShareable: false` — do not turn Family Sharing on without Kingsley's OK). Sandbox buy/restore/revoke is still 👤 (needs `VITE_REVENUECAT_IOS_KEY` and a Sandbox Apple ID). Product ids: `exitrush.char.mage`, `exitrush.char.tech`, `exitrush.pack.chars`, `exitrush.noads`.
 - [ ] 🤖 Update the privacy policy + 👤 update the App Privacy labels
 
 ### Phase 5: submit 👤

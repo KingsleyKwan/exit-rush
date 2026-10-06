@@ -10,6 +10,27 @@ import { haptic } from './haptics';
 import { getLevel, playableLevels, isFinaleUnlocked, type LevelDef } from './levels';
 import { MAX_POINTS_PER_LEVEL, POINTS_PER_FIRST_CLEAR, modifiersFromSkills, resetActiveLoadout, switchLoadout } from './SkillTree';
 import { CHARACTERS, characterOf, modsFor, activeTreeState, type CharacterId, type PlayerMods } from './charactersDef';
+import {
+  applyRecommend,
+  buyItem,
+  expandGrid,
+  noteTechResult,
+  packActive,
+  placeInto,
+  coinBalance,
+  reconcileTech,
+  removeAt,
+  resolveKit,
+  retierAt,
+  rotateAt,
+  sellItem,
+  isItemId,
+  trialTech,
+  type ItemId,
+  type Placement,
+  type Tier,
+} from './techKit';
+import { IS_STORE_BUILD } from './platform';
 import { defaultSpellBar } from './SpellTree';
 import { initEntitlements, entitlements } from './entitlements';
 import { warmCharPortraits } from './charPortraits';
@@ -43,8 +64,10 @@ export interface GameHooks {
 export interface ClearResult {
   /** How many times this level has now been cleared. */
   count: number;
-  /** Whether this clear awarded a skill point. */
+  /** Whether this clear awarded a skill point. Tech earns coins instead. */
   awarded: boolean;
+  /** Coins this tech clear added. Absent for hero and mage. */
+  coins?: number;
 }
 
 const NO_INPUT: PlayerInput = { x: 0, z: 0, mag: 0, shoveHeld: false };
@@ -118,9 +141,10 @@ export class Game {
     this.canvas = canvas;
     this.hooks = hooks;
     this.save = loadSave();
+    if (reconcileTech(this.save)) writeSave(this.save);
     initEntitlements(this.save.entitlementCache);
     // Fail-closed: if selected character isn't owned, fall back to hero.
-    if (this.save.character === 'tech' || !entitlements().canPlay(this.save.character)) this.save.character = 'hero';
+    if (!entitlements().canPlay(this.save.character)) this.save.character = 'hero';
     this.runSkills = { ...activeTreeState(this.save) };
     this.runMods = this.computeMods(this.runSkills);
     setLang(this.save.lang);
@@ -182,9 +206,17 @@ export class Game {
   }
 
 
+  /** Trial car: preset kit, no rewards. iOS only. */
+  trial: { character: CharacterId } | null = null;
+
   private computeMods(skills: SkillState): PlayerMods {
-    const char = characterOf(this.save.character);
-    const bar = this.save.character === 'mage'
+    const id = this.trial?.character ?? this.save.character;
+    const char = characterOf(id);
+    if (id === 'tech') {
+      const tech = this.trial ? trialTech() : this.save.tech;
+      return modsFor(char, skills, [], resolveKit(tech));
+    }
+    const bar = id === 'mage'
       ? (this.save.mage.spellBars[this.save.mage.active]?.length
           ? this.save.mage.spellBars[this.save.mage.active]
           : defaultSpellBar(skills))
@@ -197,8 +229,6 @@ export class Game {
   }
 
   selectCharacter(id: CharacterId): boolean {
-    // Gear L still Coming soon — not selectable yet.
-    if (id === 'tech') return false;
     if (!entitlements().canPlay(id)) return false;
     this.save.character = id;
     // Sync active tree into runSkills for UI.
@@ -268,6 +298,16 @@ export class Game {
     this.shoveBtn = false;
     this.audio.suspend();
   };
+
+  /** Capacitor pause. Same path as hiding the tab: the door timer must not run. */
+  noteOsBackground(): void {
+    this.onBackground();
+  }
+
+  /** Capacitor resume. Audio may come back; the run stays paused until Resume. */
+  noteOsForeground(): void {
+    this.onForeground();
+  }
 
   /** Back in view: resume audio, but the run stays paused until the player taps Resume. */
   private onForeground = (): void => {
@@ -482,7 +522,7 @@ export class Game {
     this.runMods = this.computeMods(this.runSkills);
     const sim = new Sim(level, this.runMods, Math.random);
     this.bindSim(sim);
-    this.player.setSkin(characterOf(this.save.character).skin);
+    this.player.setSkin(characterOf(this.trial?.character ?? this.save.character).skin);
     this.player.mesh.visible = true;
     this.resultDelay = -1;
     this.hitStop = 0;
@@ -633,6 +673,7 @@ export class Game {
 
   /** Explicitly abandon the run (if any) and return to the main menu. */
   goMenu(): void {
+    this.trial = null;
     this.screen = 'menu';
     this.skillsReturn = 'menu';
     this.autoPaused = false;
@@ -705,8 +746,94 @@ export class Game {
     this.hooks.onState();
   }
 
-  /** v0.7 / v0.8.1: one-time SP recalculation notices. */
+  /** iOS trial car. Preset kit, no coins or clears. */
+  startTrial(id: CharacterId): void {
+    if (!IS_STORE_BUILD || entitlements().canPlay(id) || id === 'hero') return;
+    this.trial = { character: id };
+    this.startLevel(id === 'tech' || id === 'mage' ? 6 : 6);
+  }
+
+  techBuy(id: string): boolean {
+    if (this.save.character !== 'tech' || !isItemId(id)) return false;
+    const ok = buyItem(this.save, id);
+    if (ok) this.persist();
+    this.hooks.onState();
+    return ok;
+  }
+
+  techSell(id: string): boolean {
+    if (this.save.character !== 'tech' || !isItemId(id)) return false;
+    const ok = sellItem(this.save, id);
+    if (ok) this.persist();
+    this.hooks.onState();
+    return ok;
+  }
+
+  techExpand(): boolean {
+    if (this.save.character !== 'tech') return false;
+    const ok = expandGrid(this.save);
+    if (ok) this.persist();
+    this.hooks.onState();
+    return ok;
+  }
+
+  techPlace(p: Placement): boolean {
+    if (this.save.character !== 'tech') return false;
+    const chk = placeInto(this.save.tech, p);
+    if (chk.ok) this.persist();
+    this.hooks.onState();
+    return chk.ok;
+  }
+
+  techRemove(index: number): void {
+    if (this.save.character !== 'tech') return;
+    removeAt(this.save.tech, index);
+    this.persist();
+    this.hooks.onState();
+  }
+
+  techRotate(index: number): void {
+    if (this.save.character !== 'tech') return;
+    if (rotateAt(this.save.tech, index)) this.persist();
+    this.hooks.onState();
+  }
+
+  techSetTier(index: number, tier: Tier): void {
+    if (this.save.character !== 'tech') return;
+    if (retierAt(this.save.tech, index, tier)) this.persist();
+    this.hooks.onState();
+  }
+
+  techAutoPack(): void {
+    if (this.save.character !== 'tech') return;
+    packActive(this.save.tech);
+    this.persist();
+    this.hooks.onState();
+  }
+
+  techRecommend(levelId: number): void {
+    if (this.save.character !== 'tech') return;
+    applyRecommend(this.save, levelId);
+    this.persist();
+    this.hooks.onState();
+  }
+
+  techUseSet(index: number): void {
+    if (this.save.character !== 'tech') return;
+    if (index < 0 || index > 2) return;
+    this.save.tech.activeSet = index;
+    this.persist();
+    this.hooks.onState();
+  }
+
+  /** v0.7 / v0.8.1: one-time SP / coin recalculation notices. */
   consumeRespecNotice(): boolean {
+    if (this.save.tech?.coinNotice) {
+      this.save.tech.coinNotice = false;
+      this.persist();
+      this.hooks.onToast?.(t().coinNotice);
+      return true;
+    }
     if (this.save.progressSplitNotice) {
       this.save.progressSplitNotice = false;
       this.persist();
@@ -788,9 +915,25 @@ export class Game {
     haptic([20, 40, 20, 40, 80], 0);
     this.train.addTrauma(0.2);
     const id = this.level.id;
+    if (this.trial) {
+      this.trial = null;
+      this.lastClear = { count: 0, awarded: false };
+      this.audio.stopAmbience();
+      this.screen = 'win';
+      this.hooks.onState();
+      return;
+    }
+    const timeLeft = this.sim?.timeLeft ?? 0;
+    const timer = this.level.timer;
+    const techRun = this.save.character === 'tech';
+    const coinsBefore = techRun ? coinBalance(this.save) : 0;
     const { count, first } = recordClear(this.save, id);
-    // v0.8.1: SP only for the active character's first clears.
-    const awarded = first && count <= MAX_POINTS_PER_LEVEL;
+    if (techRun) {
+      noteTechResult(this.save, id, true, timeLeft, timer, first, this.sim?.player.consumables);
+    }
+    const coins = techRun ? Math.max(0, coinBalance(this.save) - coinsBefore) : 0;
+    // v0.8.1: SP only for the active character's first clears. Tech earns coins.
+    const awarded = !techRun && first && count <= MAX_POINTS_PER_LEVEL;
     if (awarded) {
       if (this.save.character === 'mage') {
         for (const lo of this.save.mage.loadouts) lo.points += POINTS_PER_FIRST_CLEAR;
@@ -807,7 +950,7 @@ export class Game {
       if (!list.includes(ch)) this.save.clearedWith[key] = [...list, ch];
     }
     if (id === 1) this.completeFtue();
-    this.lastClear = { count, awarded };
+    this.lastClear = { count, awarded, coins: techRun ? coins : undefined };
     this.audio.stopAmbience();
     this.persist();
     this.screen = 'win';
@@ -815,6 +958,22 @@ export class Game {
   }
 
   private onLose(): void {
+    if (this.trial && this.level) {
+      this.trial = null;
+      this.train.setDoorsOpen(false);
+      this.train.setWarning(0);
+      this.audio.doorClose();
+      this.audio.lose();
+      this.audio.stopAmbience();
+      haptic([80, 50, 120], 0);
+      this.screen = 'lose';
+      this.hooks.onState();
+      return;
+    }
+    if (this.save.character === 'tech' && this.level && this.sim) {
+      noteTechResult(this.save, this.level.id, false, this.sim.timeLeft, this.level.timer, false);
+      this.persist();
+    }
     this.train.setDoorsOpen(false);
     this.train.setWarning(0);
     this.audio.doorClose();

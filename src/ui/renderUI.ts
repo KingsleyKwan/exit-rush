@@ -4,6 +4,7 @@ import { INTROS } from '../game/intros';
 import { BOSSES, countersFor } from '../game/bosses';
 import { icon } from './icons';
 import { renderSkills } from './constellationSkills';
+import { renderWorkshop } from './techShop';
 import {
   el,
   portrait,
@@ -15,6 +16,7 @@ import {
 import { renderMenu, renderLevels, renderLegend } from './menuScreens';
 import { renderCharacters } from './characterSelect';
 import { renderPlayHud, updatePlayHud, renderPause, renderEnd } from './playScreens';
+import { entitlements } from '../game/entitlements';
 
 let lastKey = '';
 
@@ -58,6 +60,15 @@ function wireCommon(scope: ParentNode, game: Game): void {
   });
   on('icons', () => game.setTypeIcons(!game.save.typeIcons));
   on('mute', () => game.toggleMute());
+  on('restore', () => {
+    void entitlements().restore().then((restored) => {
+      const dict = t();
+      if (!restored) game.toast(dict.charIapUnavailable);
+      else if (restored.mage || restored.tech || restored.noAds) game.toast(dict.charRestoreDone);
+      else game.toast(dict.charRestoreEmpty);
+      rerender(game);
+    });
+  });
 }
 
 export function renderUI(root: HTMLElement, game: Game): void {
@@ -94,13 +105,16 @@ export function renderUI(root: HTMLElement, game: Game): void {
     ov.appendChild(renderIntroCard(game));
     wrap.appendChild(ov);
   } else if (game.screen === 'skills') {
+    const sheet = game.save.character === 'tech'
+      ? renderWorkshop(game, rerender)
+      : renderSkills(game, rerender);
     if (overRun) {
       wrap.appendChild(renderPlayHud(game));
       const ov = el(`<div class="overlay" data-ui="1"></div>`);
-      ov.appendChild(renderSkills(game, rerender));
+      ov.appendChild(sheet);
       wrap.appendChild(ov);
     } else {
-      wrap.appendChild(renderSkills(game, rerender));
+      wrap.appendChild(sheet);
     }
   } else if (game.screen === 'playing' || game.screen === 'paused') {
     wrap.appendChild(renderPlayHud(game));

@@ -7,6 +7,7 @@ import { SKILL_NODES, ULT_DEFS, modifiersFromSkills, type Branch, type SkillModi
 import { SPELL_NODES, SPELL_ULT_DEFS, modifiersFromSpells, type SpellBranch } from './SpellTree';
 import type { SaveData, SkillState } from './storage';
 import { TUNING } from './sim/tuning';
+import { resolveKit, type ActiveKit } from './techKit';
 
 export type CharacterId = 'hero' | 'mage' | 'tech';
 export type ProgressionKind = 'tree' | 'shop';
@@ -159,6 +160,21 @@ export interface PlayerMods extends SkillModifiers {
   ultFire: boolean;
   ultIce: boolean;
   ultVolt: boolean;
+  /** Gear L. Absent on hero/mage — hero skill fields stay bit-identical. */
+  techLeapCd?: number;
+  techUltCd?: number;
+  /** Loudmouth drain fraction removed (0–1) when not full Unbothered. */
+  techLoudCut?: number;
+  /** Angry shove impulse that still lands (1 = full). */
+  techAngryRemain?: number;
+  techHurdlePace?: number;
+  techPassBossCase?: boolean;
+  techGpRadius?: number;
+  techGpLuggage?: number;
+  techActives?: string[];
+  techCore?: 'str' | 'spd' | 'sta' | null;
+  techConsumables?: string[];
+  techTier?: Record<string, 1 | 2 | 3>;
 }
 
 function emptyMageFlags(): Pick<
@@ -200,7 +216,7 @@ export function activeTreeState(save: SaveData): SkillState {
  * Pure mods for a character + tree state.
  * Hero: bit-identical SkillModifiers to modifiersFromSkills(), then base mass/push/speed from hero.
  */
-export function modsFor(char: CharacterDef, skills: SkillState, spellBar?: string[]): PlayerMods {
+export function modsFor(char: CharacterDef, skills: SkillState, spellBar?: string[], kit?: ActiveKit | null): PlayerMods {
   if (char.id === 'hero') {
     const sm = modifiersFromSkills(skills);
     return {
@@ -248,20 +264,27 @@ export function modsFor(char: CharacterDef, skills: SkillState, spellBar?: strin
       ultVolt: skills.ultSpd,
     };
   }
-  // Tech stub (P3): hero-like mods with tech base stats.
-  const sm = modifiersFromSkills(defaultEmptySkills());
+  const resolved = kit ?? resolveKit({
+    items: {},
+    gridTier: 0,
+    sets: [{ placements: [] }, { placements: [] }, { placements: [] }],
+    activeSet: 0,
+    stock: {},
+  });
+  const bar = resolved.actives.filter((id) => id !== 'S2');
   return {
-    ...sm,
+    ...resolved.mods,
     characterId: 'tech',
-    mass0: char.base.mass,
+    mass0: resolved.extras.mass0 ?? char.base.mass,
     pushMul: char.base.pushMul,
     speedMul: char.base.speedMul,
     manaMax: 0,
     manaRegen: 0,
     spellPower: 1,
     cdr: 1,
-    spellBar: [],
     ...emptyMageFlags(),
+    ...resolved.extras,
+    spellBar: bar,
   };
 }
 

@@ -21,6 +21,7 @@
 * {
   box-sizing: border-box;
   -webkit-tap-highlight-color: transparent;
+  -webkit-touch-callout: none;
   user-select: none;
 }
 
@@ -372,6 +373,7 @@ button {
 }
 .setting.on { color: #fff; border-color: rgba(255, 201, 64, 0.6) !important; }
 .setting.on .ico { color: var(--gold); }
+.settings-row .setting[data-act="restore"] { flex: 1 1 100%; }
 
 .sfx-note,
 .howto {
@@ -1801,7 +1803,9 @@ button {
 .char-pitch { margin: 0 0 6px; font-size: .88rem; opacity: .9; flex: 1; }
 .char-actions { display: flex; flex-direction: column; gap: 6px; }
 .char-actions .primary { padding: 8px 12px; font-size: .9rem; }
-.char-footer { display: flex; justify-content: center; padding: 2px 0 6px; }
+.char-footer { display: flex; flex-direction: column; gap: 8px; padding: 2px 0 8px; }
+.char-footer .primary,
+.char-footer .ghost { width: 100%; }
 .char-chip {
   display: inline-flex; align-items: center; gap: 4px;
   background: rgba(255,255,255,.08); border: 1px solid rgba(255,255,255,.14);
@@ -1875,3 +1879,70 @@ button {
 .char-style-ico.tint-fire { color: #e53935; --ico-ink: #e53935; }
 .char-style-ico.tint-ice { color: #1e88e5; --ico-ink: #1e88e5; }
 .char-style-ico.tint-volt { color: #fbc02d; --ico-ink: #fbc02d; }
+
+.workshop-body { display: flex; flex-direction: column; gap: 10px; padding-bottom: 18px; }
+.workshop-top { display: flex; justify-content: space-between; align-items: baseline; font-variant-numeric: tabular-nums; }
+.workshop-tabs { display: flex; gap: 6px; }
+.workshop-tabs button, .bag-actions button, .shop-actions button, .bag-tools button, .set-btn, .tray-item {
+  min-height: 44px;
+}
+.workshop-tabs button {
+  flex: 1;
+  border: 0;
+  border-radius: 999px;
+  background: rgba(255,255,255,.08);
+  color: inherit;
+  font: inherit;
+}
+.workshop-tabs button.on, .tray-item.on, .set-btn.on, .bag-tools .on { background: #ffb03a; color: #1b1408; }
+.bag-grid {
+  display: grid;
+  grid-template-columns: repeat(var(--cols), minmax(52px, 64px));
+  gap: 6px;
+  justify-content: center;
+}
+.bag-cell {
+  aspect-ratio: 1;
+  border-radius: 10px;
+  border: 1px dashed rgba(255,255,255,.28);
+  background: rgba(255,255,255,.04);
+  color: inherit;
+}
+.bag-cell.filled { border-style: solid; background: rgba(255,176,58,.22); }
+.bag-cell.on { outline: 2px solid #ffb03a; }
+.tray { display: flex; gap: 8px; overflow-x: auto; padding-bottom: 14px; }
+.tray-item span { white-space: nowrap; }
+.tray-item, .set-btn {
+  display: flex; flex-direction: column; align-items: flex-start; gap: 2px;
+  border: 0; border-radius: 12px; background: rgba(255,255,255,.08); color: inherit;
+  padding: 8px 10px; font: inherit; flex: 0 0 auto;
+}
+.tray-item small, .set-btn small { opacity: .75; }
+.bag-actions, .bag-tools, .shop-actions, .set-row { display: flex; flex-wrap: wrap; gap: 8px; }
+.shop-actions { flex-direction: column; align-items: stretch; }
+.shop-actions .primary { margin-top: 4px; }
+.shop-actions .ghost {
+  align-self: flex-start;
+  width: auto;
+  padding: 8px 16px;
+  border-radius: 12px;
+  background: rgba(255,255,255,.14);
+}
+.shop-list { display: flex; flex-direction: column; gap: 8px; }
+.shop-card {
+  background: rgba(255,255,255,.06);
+  border-radius: 14px;
+  padding: 10px 12px;
+}
+.shop-card header { display: flex; align-items: center; gap: 8px; }
+.shop-card p { margin: 4px 0; font-size: 13px; opacity: .9; }
+.coin-chip, .trial-banner {
+  display: inline-flex; align-items: center; gap: 6px;
+  background: rgba(255,176,58,.16);
+  border-radius: 999px;
+  padding: 4px 8px;
+  font-size: 12px;
+}
+.trial-banner { background: rgba(90,210,255,.16); }
+.cons-row { display: flex; gap: 4px; justify-content: flex-end; }
+.place-hint { margin: 0; font-size: 13px; opacity: .8; }

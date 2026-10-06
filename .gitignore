@@ -29,8 +29,11 @@ pnpm-debug.log*
 *.key
 credentials*
 
-# Capacitor / mobile (future)
-ios/
+# Capacitor. Commit ios/ except the synced web bundle (cap sync regenerates it).
+ios/App/App/public/
+ios/App/App/capacitor.config.json
+ios/App/Pods/
+ios/derivedData/
 android/
 .capacitor/
 

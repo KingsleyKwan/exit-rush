@@ -3,6 +3,12 @@ import type { CharacterId } from './charactersDef';
 
 export type EntitlementId = 'mage' | 'tech' | 'noAds';
 
+export interface EntitlementCache {
+  mage: boolean;
+  tech: boolean;
+  noAds: boolean;
+}
+
 export interface StoreProduct {
   id: string;
   localizedPriceString: string;
@@ -15,13 +21,36 @@ export interface Entitlements {
   owns(e: EntitlementId): boolean;
   /** Character is playable (web unlocks all; iOS needs entitlement or free hero). */
   canPlay(id: CharacterId): boolean;
+  /** Interstitials are off after any character purchase or the no-ads product. */
+  interstitialsOff(): boolean;
   products(): Promise<StoreProduct[]>;
-  /** Placeholder — real IAP lands in Kingsley's local Grok Build. */
   buy(productId: string): Promise<BuyResult>;
-  /** Placeholder restore hook for StoreKit / RevenueCat. */
-  restore(): Promise<void>;
+  /** Restored purchases, or null when the store isn't configured. */
+  restore(): Promise<EntitlementCache | null>;
+  /** Pull StoreKit / RevenueCat and update the cache. No-op on web. */
+  refresh(): Promise<void>;
   /** True when Buy / Restore / Try UI should show. */
   showStoreUi: boolean;
+}
+
+/** Product ids. The pack is its own non-consumable (Apple has no IAP bundle type). */
+export const PRODUCT_IDS = [
+  'exitrush.char.mage',
+  'exitrush.char.tech',
+  'exitrush.pack.chars',
+  'exitrush.noads',
+] as const;
+
+/**
+ * What a set of owned product ids grants.
+ * Any character purchase also removes interstitials. The pack grants both characters.
+ */
+export function grantsForProductIds(productIds: readonly string[]): EntitlementCache {
+  const ids = new Set(productIds);
+  const mage = ids.has('exitrush.char.mage') || ids.has('exitrush.pack.chars');
+  const tech = ids.has('exitrush.char.tech') || ids.has('exitrush.pack.chars');
+  const noAds = ids.has('exitrush.noads') || mage || tech;
+  return { mage, tech, noAds };
 }
 
 /** Web / Pages demo: everything unlocked, no IAP UI, no ads. */
@@ -33,24 +62,44 @@ const webDemoEntitlements: Entitlements = {
   canPlay() {
     return true;
   },
+  interstitialsOff() {
+    return true;
+  },
   async products() {
     return [];
   },
   async buy() {
     return 'unavailable';
   },
-  async restore() {},
+  async restore() {
+    return null;
+  },
+  async refresh() {},
 };
 
+type Persist = (cache: EntitlementCache) => void;
+let persistCache: Persist | null = null;
+
+/** Game registers this so a purchase updates the save. */
+export function setEntitlementPersister(fn: Persist | null): void {
+  persistCache = fn;
+}
+
 /**
- * iOS / native placeholder. Owns nothing until Grok Build wires RevenueCat / StoreKit.
- * Cache on the save can grant offline play after a real purchase; this stub never does.
+ * iOS / native. Starts from the on-device cache (offline). StoreKit is source of truth
+ * once RevenueCat is configured. No prices are hard-coded.
  */
-function makeStoreEntitlements(cache?: { mage?: boolean; tech?: boolean; noAds?: boolean }): Entitlements {
-  const owned = {
+function makeStoreEntitlements(cache?: Partial<EntitlementCache>): Entitlements {
+  const owned: EntitlementCache = {
     mage: !!cache?.mage,
     tech: !!cache?.tech,
-    noAds: !!cache?.noAds,
+    noAds: !!cache?.noAds || !!cache?.mage || !!cache?.tech,
+  };
+  const apply = (next: EntitlementCache) => {
+    owned.mage = next.mage;
+    owned.tech = next.tech;
+    owned.noAds = next.noAds || next.mage || next.tech;
+    persistCache?.(owned);
   };
   return {
     showStoreUi: true,
@@ -63,22 +112,45 @@ function makeStoreEntitlements(cache?: { mage?: boolean; tech?: boolean; noAds?:
       if (id === 'tech') return owned.tech;
       return false;
     },
-    async products() {
-      // Placeholder strings — never hard-code real prices in UI; Grok Build replaces this.
-      return [
-        { id: 'exitrush.char.mage', localizedPriceString: 'HK$23', title: 'Bad Girl' },
-        { id: 'exitrush.char.tech', localizedPriceString: 'HK$23', title: 'Gear L' },
-        { id: 'exitrush.pack.chars', localizedPriceString: 'HK$38', title: 'Both characters' },
-        { id: 'exitrush.noads', localizedPriceString: 'HK$23', title: 'Remove Ads' },
-      ];
+    interstitialsOff() {
+      return owned.noAds || owned.mage || owned.tech;
     },
-    async buy(_productId) {
-      // Hook point for Grok Build — no real purchase here.
-      console.info('[exit-rush] IAP buy stub — wire in Grok Build:', _productId);
-      return 'unavailable';
+    async products() {
+      try {
+        const { loadListings } = await import('../native/purchases');
+        return loadListings();
+      } catch {
+        return PRODUCT_IDS.map((id) => ({ id, localizedPriceString: '', title: '' }));
+      }
+    },
+    async buy(productId) {
+      try {
+        const { buyProduct } = await import('../native/purchases');
+        const bought = await buyProduct(productId);
+        if (bought.cache) apply(bought.cache);
+        return bought.result;
+      } catch {
+        return 'error';
+      }
     },
     async restore() {
-      console.info('[exit-rush] IAP restore stub — wire in Grok Build');
+      try {
+        const { restorePurchases } = await import('../native/purchases');
+        const cache = await restorePurchases();
+        if (cache) apply(cache);
+        return cache;
+      } catch {
+        return null;
+      }
+    },
+    async refresh() {
+      try {
+        const { loadCustomerCache } = await import('../native/purchases');
+        const cache = await loadCustomerCache();
+        if (cache) apply(cache);
+      } catch {
+        /* keep the offline cache */
+      }
     },
   };
 }
@@ -86,7 +158,7 @@ function makeStoreEntitlements(cache?: { mage?: boolean; tech?: boolean; noAds?:
 let _ents: Entitlements | null = null;
 
 /** Call once after save load so iOS can honour entitlementCache offline. */
-export function initEntitlements(cache?: { mage?: boolean; tech?: boolean; noAds?: boolean }): Entitlements {
+export function initEntitlements(cache?: Partial<EntitlementCache>): Entitlements {
   _ents = IS_STORE_BUILD ? makeStoreEntitlements(cache) : webDemoEntitlements;
   return _ents;
 }

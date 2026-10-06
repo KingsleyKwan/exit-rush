@@ -4,6 +4,7 @@ import { INTROS, type IntroKind } from '../game/intros';
 import { playableLevels } from '../game/levels';
 import { POINTS_PER_FIRST_CLEAR, MAX_POINTS_PER_LEVEL, modifiersFromSkills } from '../game/SkillTree';
 import { spellById } from '../game/SpellTree';
+import { itemDef, previewCoins } from '../game/techKit';
 import { linesFor, lineColor } from '../game/lines';
 import { icon, langIcon } from './icons';
 import { el, portrait, iconBtn, langBtn, qualityLabel, stationName, loadoutStrip, wireLoadoutStrip } from './uiShared';
@@ -44,9 +45,34 @@ function mageActions(game: Game, dict: ReturnType<typeof t>): string {
   return [spellBtn('fire'), spellBtn('ice'), spellBtn('volt'), ...ults.slice(0, 1)].join('');
 }
 
+function techActions(game: Game, dict: ReturnType<typeof t>): string {
+  const mods = game.runMods;
+  const en = getLang() === 'en';
+  const gadget = (mods.techActives ?? []).filter((id) => id !== 'S2').map((id) => {
+    const def = itemDef(id);
+    const name = def ? (en ? def.nameEn : def.nameZh) : id;
+    return `<button type="button" class="skill-use act-gadget" data-gadget="${id}" title="${name}" aria-label="${name}">${icon('shop')}</button>`;
+  });
+  if (mods.hasLeap) {
+    gadget.push(`<button type="button" class="skill-use act-leap" data-act-skill="leap" title="${dict.skLeap}" aria-label="${dict.skLeap}">${icon('kind_squat')}</button>`);
+  }
+  if (mods.techCore) {
+    const k = mods.techCore;
+    const title = k === 'str' ? dict.ultStr : k === 'spd' ? dict.ultSpd : dict.ultSta;
+    gadget.push(`<button type="button" class="skill-use ult-${k}" data-ult="${k}" title="${title}" aria-label="${title}">${icon(k)}</button>`);
+  }
+  const drinks = (mods.techConsumables ?? []).map((id) => {
+    const def = itemDef(id);
+    const name = def ? (en ? def.nameEn : def.nameZh) : id;
+    return `<button type="button" class="skill-use act-cons" data-cons="${id}" title="${name}" aria-label="${name}">${icon('bag', 'xs')}</button>`;
+  }).join('');
+  return `${drinks ? `<div class="cons-row">${drinks}</div>` : ''}${gadget.join('')}`;
+}
+
 export function renderPlayHud(game: Game): HTMLElement {
   const dict = t();
   const lv = game.level!;
+  const who = game.trial?.character ?? game.save.character;
   // Ults / actives available in this run = skills the run started with.
   const s = game.runSkills;
   const mods = modifiersFromSkills(s);
@@ -86,10 +112,18 @@ export function renderPlayHud(game: Game): HTMLElement {
               <span class="meter-icon" title="${dict.stamina}">${icon('stamina')}</span>
               <div class="meter-bar stamina"><i id="m-stam"></i></div>
             </div>
-            ${game.save.character === 'mage' ? `<div class="meter mana-meter">
+            ${who === 'mage' ? `<div class="meter mana-meter">
               <span class="meter-icon" title="${dict.mana}">${icon('mana')}</span>
               <div class="meter-bar mana"><i id="m-mana"></i></div>
             </div>` : ''}
+            ${who === 'tech' && game.level && !game.trial ? (() => {
+              const prev = previewCoins(game.save, game.level.id);
+              const bits = [
+                prev.first ? `+${prev.first}` : '',
+                prev.fast ? dict.fastExit : '',
+              ].filter(Boolean).join(' · ');
+              return `<div class="coin-chip" id="m-coins">${icon('star', 'xs')}<b>${bits || dict.coins}</b><small>${fmt(dict.replayCoins, { n: prev.replaysLeft })}</small></div>`;
+            })() : ''}
             <div class="meter timer" id="m-timer">
               <span class="meter-icon" title="${dict.time}">${icon('timer')}</span>
               <span class="timer-val" id="m-time"></span>
@@ -97,6 +131,7 @@ export function renderPlayHud(game: Game): HTMLElement {
           </div>
         </div>
         ${doorBanner}
+        ${game.trial ? `<div class="trial-banner" role="status">${dict.trialBanner}</div>` : ''}
         ${game.activeTip ? `<div class="tip-chip tip-under-meters" id="tip-chip">${icon(`kind_${game.activeTip}`, 'xs')}<span>${dict.tipChip}: ${getLang() === 'en' ? (INTROS[game.activeTip as IntroKind]?.tipEn ?? '') : (INTROS[game.activeTip as IntroKind]?.tipZh ?? '')}</span></div>` : ''}
       </div>
       <div class="drag-hint ${game.showFtueGhost ? 'ftue-ghost' : ''}" aria-hidden="true">
@@ -104,7 +139,7 @@ export function renderPlayHud(game: Game): HTMLElement {
       </div>
       <div class="hud-actions">
         <div class="ult-col">
-          ${game.save.character === 'mage' ? mageActions(game, dict) : `
+          ${who === 'mage' ? mageActions(game, dict) : who === 'tech' ? techActions(game, dict) : `
           ${ult('str', dict.ultStr, s.ultStr)}
           ${ult('spd', dict.ultSpd, s.ultSpd)}
           ${ult('sta', dict.ultSta, s.ultSta)}
@@ -132,11 +167,20 @@ export function renderPlayHud(game: Game): HTMLElement {
       if (id === 'wind') game.trySecondWind();
     });
   });
+  const cast = (id: string | undefined) => {
+    if (id) game.tryAbility(id);
+  };
   hud.querySelectorAll('[data-spell]').forEach((b) => {
     b.addEventListener('pointerdown', (e) => {
       e.preventDefault();
-      const id = (b as HTMLElement).dataset.spell;
-      if (id) game.tryAbility(id);
+      cast((b as HTMLElement).dataset.spell);
+    });
+  });
+  hud.querySelectorAll('[data-gadget], [data-cons]').forEach((b) => {
+    b.addEventListener('pointerdown', (e) => {
+      e.preventDefault();
+      const el = b as HTMLElement;
+      cast(el.dataset.gadget || el.dataset.cons);
     });
   });
   hud.querySelector('#btn-pause')?.addEventListener('click', () => {
@@ -186,6 +230,22 @@ export function updatePlayHud(root: HTMLElement, game: Game): void {
     root.querySelector('.mana-meter')?.classList.toggle('denied', (game.sim?.player.manaDeniedT ?? 0) > 0);
   }
   // Spell CD rings — button stays fully visible; pie only.
+  root.querySelectorAll<HTMLElement>('[data-gadget]').forEach((b) => {
+    const id = b.dataset.gadget!;
+    const cd = game.sim?.player.spellCd[id] ?? 0;
+    b.classList.toggle('cooling', cd > 0);
+    b.style.setProperty('--cd', String(Math.min(1, cd / 12)));
+  });
+  const left = game.sim?.player.consumables ?? [];
+  const seen: Record<string, number> = {};
+  root.querySelectorAll<HTMLElement>('[data-cons]').forEach((b) => {
+    const id = b.dataset.cons!;
+    const n = seen[id] ?? 0;
+    seen[id] = n + 1;
+    const alive = n < left.filter((x) => x === id).length;
+    b.classList.toggle('dim', !alive);
+    b.toggleAttribute('disabled', !alive);
+  });
   root.querySelectorAll<HTMLElement>('[data-spell]').forEach((b) => {
     const id = b.dataset.spell!;
     const cd = game.sim?.player.spellCd[id] ?? 0;
@@ -268,7 +328,7 @@ export function renderEnd(game: Game, win: boolean): HTMLElement {
         <h2>${win ? dict.win : dict.lose}</h2>
         ${lv ? `<p class="end-station"><span class="lv-badge sm" style="--line:${lineColor(lv.stationEn)}">${lv.id}</span>${stationName(lv)}</p>` : ''}
         ${win ? endBonus(game) : `<p class="howto">${dict.loseHint}</p>`}
-        ${loadoutStrip(game, { cls: 'on-end' })}
+        ${game.save.character === 'tech' ? '' : loadoutStrip(game, { cls: 'on-end' })}
         ${
           hasNext
             ? `<button type="button" class="primary" id="btn-next">${icon('next', 'sm')}<span>${dict.next}</span></button>`
@@ -276,7 +336,7 @@ export function renderEnd(game: Game, win: boolean): HTMLElement {
         }
         <div class="round-row">
           ${hasNext ? roundBtn('id="btn-retry"', 'restart', dict.retry) : ''}
-          ${roundBtn('data-act="skills"', 'skills', dict.skills)}
+          ${roundBtn('data-act="skills"', game.save.character === 'tech' ? 'shop' : 'skills', game.save.character === 'tech' ? dict.gear : dict.skills)}
           ${roundBtn('data-act="home"', 'home', dict.menu)}
         </div>
       </div>
@@ -302,6 +362,9 @@ function endBonus(game: Game): string {
   const dict = t();
   const c = game.lastClear;
   const star = icon('star', 'sm');
+  if (game.save.character === 'tech') {
+    return `<p class="bonus">${star}${fmt(dict.coinGain, { n: c?.coins ?? 0 })}</p>`;
+  }
   if (!c || (c.awarded && c.count === 1)) return `<p class="bonus">${star}${fmt(dict.clearBonusN, { n: POINTS_PER_FIRST_CLEAR })}</p>`;
   if (c.awarded) return `<p class="bonus">${star}${fmt(dict.replayBonus, { n: c.count, max: MAX_POINTS_PER_LEVEL })}</p>`;
   return `<p class="howto">${dict.clearNoBonus}</p>`;

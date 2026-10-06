@@ -79,6 +79,10 @@ export class PlayerSim {
   targetDoorZ = DOOR_Z;
   private pathT = 0;
   private tmp: Body[] = [];
+  /** Gear L consumables packed this run (removed as they are used). */
+  consumables: string[] = [];
+  espressoUntil = 0;
+  mintUntil = 0;
 
   constructor(mods: SkillModifiers) {
     const P = TUNING.player;
@@ -98,6 +102,7 @@ export class PlayerSim {
     const pm = mods as SkillModifiers & Partial<PlayerMods>;
     this.manaMax = pm.manaMax ?? 0;
     this.mana = this.manaMax;
+    this.consumables = [...(pm.techConsumables ?? [])];
   }
 
   isCharging(now: number): boolean {
@@ -212,7 +217,7 @@ export class PlayerSim {
     // ---- Speed / drive.
     const auraR = Math.min(1, this.mods.auraResist + (iron ? U.sta.auraResist : 0));
     // STA 40 Hold Breath: stench aura has no effect.
-    const slow = this.mods.holdBreath ? 0 : crowd.auraSlowAt(b.x, b.z) * (1 - auraR);
+    const slow = this.mods.holdBreath || now < this.mintUntil ? 0 : crowd.auraSlowAt(b.x, b.z) * (1 - auraR);
     this.drag = this.crowdDrag(world, crowd, dashing || leaping);
     // Squatting neighbours add lateral weave friction (harder to slip past) — not while leaping over them.
     const iceGlide = !!(this.mods as SkillModifiers & Partial<PlayerMods>).iceGlide;
@@ -226,8 +231,9 @@ export class PlayerSim {
     if (dashing) maxV *= U.spd.speedMul * (this.blinkSpeedMul > 1 ? this.blinkSpeedMul / U.spd.speedMul : 1);
     // Burning Urgency: last 5 s of door timer — set by Sim via flag on player.
     if (this.burningUrgencyActive) maxV *= 1.1;
+    if (now < this.espressoUntil) maxV *= 1.2;
     // Hurdle: clearing a suitcase costs a little pace (no block, but not free).
-    if (now < this.hopUntil) maxV *= TUNING.skills.hurdleHopSpeed;
+    if (now < this.hopUntil) maxV *= pm.techHurdlePace ?? TUNING.skills.hurdleHopSpeed;
     if (this.winded) maxV *= St.windedSpeedMul;
 
     let fx: number;
@@ -316,7 +322,9 @@ export class PlayerSim {
     const noise = crowd.noiseAt(b.x, b.z);
     if (noise > 0) {
       const Ld = TUNING.types.loud;
-      const mul = this.mods.unbothered ? TUNING.skills.unbotheredLoudMul : 1;
+      let mul = this.mods.unbothered ? TUNING.skills.unbotheredLoudMul : 1;
+      if (!this.mods.unbothered && pm.techLoudCut) mul = 1 - pm.techLoudCut;
+      if (now < this.mintUntil) mul *= 0.5;
       this.noiseDrain = noise * Ld.drainPeak * mul;
       // Undo part of this step's regen (regen was added above), then drain.
       const regenBack = this.mods.staminaRegen * regenMul * (1 - Ld.regenMul) * mul;
@@ -472,14 +480,17 @@ export class PlayerSim {
     // STR T3b Ground Pound: full-charge adds a small radial shockwave.
     if (this.mods.hasGroundPound && power > 0.95) {
       const K = TUNING.skills;
-      for (const o of world.query(b.x, b.z, K.groundPoundRadius, this.tmp)) {
+      const pmGp = this.mods as SkillModifiers & Partial<PlayerMods>;
+      const gpR = pmGp.techGpRadius ?? K.groundPoundRadius;
+      const gpLug = pmGp.techGpLuggage ?? K.groundPoundLuggageMul;
+      for (const o of world.query(b.x, b.z, gpR, this.tmp)) {
         if (o === b) continue;
         const rx = o.x - b.x;
         const rz = o.z - b.z;
         const d = Math.hypot(rx, rz) || 1e-6;
-        const fall = Math.max(0, 1 - d / K.groundPoundRadius);
+        const fall = Math.max(0, 1 - d / gpR);
         // Heavy luggage (owner + suitcase) gets a proportionally bigger kick so it actually moves.
-        const J = K.groundPoundImpulse * fall * (o.passTag & PASS_LUGGAGE ? K.groundPoundLuggageMul : 1);
+        const J = K.groundPoundImpulse * fall * (o.passTag & PASS_LUGGAGE ? gpLug : 1);
         applyImpulse(o, (rx / d) * J, (rz / d) * J);
       }
     }
@@ -491,7 +502,8 @@ export class PlayerSim {
     const U = TUNING.ult;
     if (this.ultCd[kind] > 0) return false;
     const b = this.body;
-    this.ultCd[kind] = U.cooldown;
+    const pmUlt = this.mods as SkillModifiers & Partial<PlayerMods>;
+    this.ultCd[kind] = pmUlt.techUltCd ?? U.cooldown;
     if (kind === 'str') {
       this.chargeUntil = now + U.str.duration;
       const near = world.query(b.x, b.z, U.str.radius, this.tmp);
@@ -552,7 +564,8 @@ export class PlayerSim {
   tryLeap(now: number): boolean {
     if (!this.mods.hasLeap || this.activeCd.leap > 0) return false;
     const K = TUNING.skills;
-    this.activeCd.leap = K.leapCd;
+    const pmLeap = this.mods as SkillModifiers & Partial<PlayerMods>;
+    this.activeCd.leap = pmLeap.techLeapCd ?? K.leapCd;
     this.leapStart = now;
     this.leapUntil = now + K.leapDuration;
     this.body.passMask |= PASS_SQUAT | PASS_KID;
