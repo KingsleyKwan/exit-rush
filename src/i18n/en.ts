@@ -51,6 +51,28 @@ export interface Dict {
   skillHowto: string;
   ultShort: string;
   skillsApplyNext: string;
+  examTag: string;
+  /** v0.7 bosses */
+  bossTag: string;
+  bossKicker: string;
+  bossSkip: string;
+  bossCounter: string;
+  bossYield: string;
+  bossAllZh: string;
+  bossAllEn: string;
+  bossAllTagline: string;
+  bossBarHint: string;
+  loadoutN: string;
+  loadoutLbl: string;
+  resetSkills: string;
+  resetTitle: string;
+  resetBody: string;
+  resetYes: string;
+  cancel: string;
+  editSkills: string;
+  respecNotice: string;
+  loadoutNext: string;
+  spLeft: string;
   quality: string;
   qualityAuto: string;
   qualityLow: string;
@@ -161,14 +183,35 @@ export const en: Dict = {
   density: 'Crowd',
   howTo: 'Drag anywhere to steer · hold ✊ to shove · get out before the doors close.',
   language: 'Language',
-  clearBonus: '+3 skill points',
+  clearBonus: '+1 skill point',
   replayBonus: '+{n} skill points (replay {n}/{max})',
   clearNoBonus: 'No more skill points from this level — first clear only',
   back: 'Back',
-  levelsTeaser: 'Levels 1–30 playable · clear 30 to unlock Lv100',
-  skillHowto: 'Constellation: spend into a branch · major skills every ~10 · +{ult} for the Ultimate after {fill}',
+  levelsTeaser: 'All 100 levels · clear 99 to unlock the Lv100 finale',
+  skillHowto: '+1 point per first clear · major skills every 10 · +{ult} for the Ultimate after {fill}',
   ultShort: 'Ult',
   skillsApplyNext: 'Changes apply from your next run.',
+  examTag: 'Exam',
+  bossTag: 'Boss',
+  bossKicker: 'Boss',
+  bossSkip: 'Tap to skip',
+  bossCounter: 'Counter',
+  bossYield: 'He yields — go!',
+  bossAllZh: '八王齊集',
+  bossAllEn: 'All Eight Kings',
+  bossAllTagline: 'Every king in one car. Wear them down, slip past, get out.',
+  bossBarHint: 'Push into the king to drain his stubbornness bar — at zero he steps aside',
+  loadoutN: 'Build {n}',
+  loadoutLbl: 'Build',
+  resetSkills: 'Reset',
+  resetTitle: 'Reset this build?',
+  resetBody: 'Refund all {n} spent points (incl. Ultimates) to {slot}. Free and instant.',
+  resetYes: 'Reset',
+  cancel: 'Cancel',
+  editSkills: 'Edit skills',
+  respecNotice: 'Skill points recalculated — please re-allocate',
+  loadoutNext: 'Applies from your next run',
+  spLeft: '{n} pts left',
   quality: 'Graphics',
   qualityAuto: 'Auto',
   qualityLow: 'Low',
@@ -219,12 +262,12 @@ export const en: Dict = {
   finale: 'Finale',
   cleared: 'Cleared',
   artCredit: 'Concept art: Grok Image. 香城鐵路 is fiction — inspired by HK metro, not affiliated.',
-  finaleLocked: 'Clear level 30 to unlock the fireworks finale.',
+  finaleLocked: 'Clear level 99 to unlock the fireworks finale.',
   introTap: 'Tap to start',
   introTitle: 'New passenger',
   tipChip: 'Tip',
   reviewIntro: 'How they block you',
-  clearBonusN: '+{n} skill points',
+  clearBonusN: '+{n} skill point',
   levelsTeaserV05: 'Short exits · learn one special every few levels',
   doorClosedToast: "This door won't open!",
   doorBanner: 'Only {n} doors open',
