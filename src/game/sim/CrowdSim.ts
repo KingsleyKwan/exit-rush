@@ -327,6 +327,63 @@ export class CrowdSim {
     return out;
   }
 
+/**
+   * Loudmouths stand on the short way to the nearest door, outside the doorway
+   * and outside the spawn. The other aisle is the quiet way around.
+   */
+  private loudHomes(openBays: readonly number[], fromZ: number): { x: number; z: number }[] {
+    const near = nearestDoorBay(fromZ, openBays);
+    const longWay = openBays.some((z) => Math.abs(z - near) > 0.5);
+    if (longWay) {
+      // Screen the near door. The far-side lane stays clear so you can walk down to the other one.
+      return [
+        { x: -0.4, z: near - 0.55 },
+        { x: -0.6, z: near - 0.95 },
+        { x: -0.25, z: near - 0.8 },
+        { x: -0.5, z: near - 1.05 },
+      ];
+    }
+    // One door: the far-side straight line is noisy. The door-wall aisle is the way around.
+    return [
+      { x: 0.95, z: near + 1.2 },
+      { x: 0.85, z: near + 0.25 },
+      { x: 0.78, z: near - 0.7 },
+      { x: 0.7, z: near - 1.55 },
+    ];
+  }
+
+  /** A spot on a loudmouth home. Slides along the aisle, never into the doorway or onto the player. */
+  private loudPlace(
+    homeX: number,
+    homeZ: number,
+    avoidX: number,
+    avoidZ: number,
+    openBays: readonly number[],
+  ): [number, number] | null {
+    const noise = TUNING.types.loud.radius;
+    const bodyR = PASSENGER_DEFS.loud.radius;
+    const wall = doorWallX();
+    const hw = TUNING.car.halfWidth;
+    // Step away from the player along the aisle. Never toward them — that puts the ring on the spawn.
+    const away = Math.sign(homeZ - avoidZ) || -1;
+    const near = nearestDoorBay(avoidZ, openBays);
+    const screen = openBays.some((bay) => Math.abs(bay - near) > 0.5);
+    for (let i = 0; i < 3; i++) {
+      const x = clamp(homeX, -hw + 0.45, hw - 0.5);
+      let z = clamp(homeZ + away * 0.12 * i, CAR_Z_MIN + 0.55, CAR_Z_MAX - 0.55);
+      // Keep a two-door screen up by the near door, so the walk down to the other door stays quiet.
+      if (screen && z < near - 1.15) z = near - 1.15;
+      if (Math.hypot(x - avoidX, z - avoidZ) < noise + 0.4) continue;
+      let blocksExit = false;
+      for (const bay of openBays) {
+        if (Math.hypot(x - (wall + 0.35), z - bay) < noise + 0.05) blocksExit = true;
+      }
+      if (blocksExit) continue;
+      if (this.canFit(x, z, bodyR)) return [x, z];
+    }
+    return null;
+  }
+
   private randomCarSpot(openBays: readonly number[]): [number, number] {
     const c = TUNING.car;
     // Bias riders toward the door (left) wall — the crush the player must cross.
@@ -339,28 +396,58 @@ export class CrowdSim {
 
   spawnInitial(level: LevelDef, openBays: readonly number[], avoidX: number, avoidZ: number): void {
     const n = crowdCount(level.density);
+    const homes = this.loudHomes(openBays, avoidZ);
+    let loudI = 0;
     let people = 0;
     let guard = 0;
-    while (people < n && guard++ < n * 6) {
+    const takeLoud = (): [number, number] | null => {
+      for (let nTry = 0; nTry < homes.length; nTry++) {
+        const home = homes[(loudI + nTry) % homes.length];
+        const spot = this.loudPlace(home.x, home.z, avoidX, avoidZ, openBays);
+        if (!spot) continue;
+        loudI = (loudI + nTry + 1) % homes.length;
+        return spot;
+      }
+      return null;
+    };
+    const queued: PassengerKind[] = [];
+    let planned = 0;
+    while (planned < n && guard++ < n * 4) {
       const kind = pickKind(level.mix, this.rng);
-      let [x, z] = this.randomCarSpot(openBays);
-      if (Math.hypot(x - avoidX, z - avoidZ) < 0.75) continue;
-      const made = this.spawnGroup(kind, x, z, 'rider', 0.45);
-      people += made.length;
+      queued.push(kind);
+      planned += kind === 'family' ? 3 : kind === 'couple' ? 2 : 1;
     }
-    // 大聲公 intro car must actually contain a couple of loudmouths to learn from: the car is
-    // packed by now, so swap plain commuters (away from the player) for loudmouths in place.
+    const placeRider = (kind: PassengerKind, x: number, z: number, spread: number) => {
+      const made = this.spawnGroup(kind, x, z, 'rider', spread);
+      people += made.length;
+    };
+    // Loudmouths first, while the short-way spots are still empty.
+    for (const kind of queued) {
+      if (kind !== 'loud' || people >= n) continue;
+      const spot = takeLoud();
+      if (!spot) continue;
+      placeRider(kind, spot[0], spot[1], 0.08);
+    }
+    for (const kind of queued) {
+      if (kind === 'loud' || people >= n) continue;
+      for (let t = 0; t < 6; t++) {
+        const [x, z] = this.randomCarSpot(openBays);
+        if (Math.hypot(x - avoidX, z - avoidZ) < 0.75) continue;
+        placeRider(kind, x, z, 0.45);
+        break;
+      }
+    }
+    // Intro car teaches the detour: at least two loudmouths standing on the short way.
     if (level.introKind === 'loud') {
-      let have = this.agents.filter((a) => a.kind === 'loud').length;
-      const swap = this.agents.filter((a) => a.kind === 'normal' && Math.hypot(a.body.x - avoidX, a.body.z - avoidZ) > 1.6);
-      while (have < 2 && swap.length) {
-        const old = swap.splice(Math.floor(this.rng() * swap.length), 1)[0];
-        const { x, z } = old.body;
-        this.world.remove(old.body);
-        this.byBody.delete(old.body.id);
-        this.agents.splice(this.agents.indexOf(old), 1);
-        this.makeAgent('loud', x, z, 'rider', false);
-        have++;
+      for (const home of homes) {
+        const have = this.agents.filter((a) => a.kind === 'loud').length;
+        if (have >= 2) break;
+        const taken = this.agents.some((a) => a.kind === 'loud' && Math.hypot(a.body.x - home.x, a.body.z - home.z) < 0.55);
+        if (taken) continue;
+        this.clearAround(home.x, home.z, 0.4);
+        const spot = this.loudPlace(home.x, home.z, avoidX, avoidZ, openBays);
+        if (!spot) continue;
+        this.makeAgent('loud', spot[0], spot[1], 'rider', false);
       }
     }
     if (level.boss?.length) this.spawnBosses(level.boss, openBays, level.boss.length > 1);

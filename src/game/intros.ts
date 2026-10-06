@@ -84,10 +84,10 @@ export const INTROS: Record<IntroKind, IntroCopy> = {
     kind: 'loud',
     whatEn: 'Shouting into the phone.',
     whatZh: '對住電話大嗌「喂！！」。',
-    blockEn: 'Inside the orange noise ring your stamina drains fast.',
-    blockZh: '行入橙色噪音圈，體力會好快冇。',
-    tipEn: 'Keep your distance',
-    tipZh: '行遠啲',
+    blockEn: 'The orange ring drains you, and it sits on the short way out.',
+    blockZh: '橙色圈抽體力，而且霸住近路。',
+    tipEn: 'Short way is noisy. Go around.',
+    tipZh: '近路好嘈，兜遠啲。',
   },
 };
 

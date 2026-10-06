@@ -1199,6 +1199,47 @@ async function main(): Promise<void> {
     }
   }
 
+  // Loudmouths own the short way. Spawn and the open doorway stay quiet, and so does the long way around.
+  {
+    const R = TUNING.types.loud.radius;
+    let sawTwoDoor = false;
+    const check = (id: number, quiet: [number, number][], minLoud: number) => {
+      for (const seed of [1, 2, 3, 4, 7, 11]) {
+        const lv = LEVELS.find((l) => l.id === id)!;
+        const sim = new Sim(lv, modifiersFromSkills(defaultSkills()), mulberry32(seed));
+        const louds = sim.crowd.agents.filter((a) => a.kind === 'loud' && !a.boss);
+        if (louds.length) sawTwoDoor = sawTwoDoor || id !== 26;
+        const bay = nearestDoorBay(sim.player.body.z, sim.openBays);
+        const mouthX = doorWallX() + 0.35;
+        const bad: string[] = [];
+        if (louds.length < minLoud) bad.push(`louds=${louds.length}`);
+        if (sim.crowd.noiseAt(sim.player.body.x, sim.player.body.z) > 0) bad.push('spawn in noise');
+        if (sim.crowd.noiseAt(mouthX, bay) > 0) bad.push('door in noise');
+        for (const [x, z] of quiet) {
+          if (sim.crowd.noiseAt(x, z) > 0) bad.push(`quiet ${x},${z} noise=${sim.crowd.noiseAt(x, z).toFixed(2)}`);
+        }
+        for (const a of louds) {
+          if (Math.hypot(a.body.x - mouthX, a.body.z - bay) < R) bad.push(`on door (${a.body.x.toFixed(2)},${a.body.z.toFixed(2)})`);
+          if (id === 26 && a.body.x < 0.35) bad.push(`on quiet aisle (${a.body.x.toFixed(2)},${a.body.z.toFixed(2)})`);
+          if (id !== 26 && (a.body.x > 0.45 || a.body.z < 0.6)) bad.push(`off near door (${a.body.x.toFixed(2)},${a.body.z.toFixed(2)})`);
+        }
+        if (id === 26 && sim.crowd.noiseAt(0.95, 1.4) <= 0) bad.push('short way is quiet');
+        if (bad.length) {
+          const where = louds.map((a) => `(${a.body.x.toFixed(2)},${a.body.z.toFixed(2)})`).join(' ');
+          console.error(`L${id} seed ${seed} loud layout: ${bad.join('; ')} | ${where}`);
+          process.exit(1);
+        }
+      }
+    };
+    check(26, [[-1.05, 2.3], [-1.05, 1.15], [-1.1, 0.45]], 2);
+    check(64, [[1.05, 1.8], [1.0, 0.7], [-1.15, 0.25]], 0);
+    if (!sawTwoDoor) {
+      console.error('L64 never spawned a loudmouth to check the two-door detour');
+      process.exit(1);
+    }
+    console.log('loud layout ok');
+  }
+
   // Seat AABB: benches must not overlap any door vestibule [bayZ ± doorHalf].
   {
     const sim = new Sim(LEVELS.find((l) => l.id === 1)!, modifiersFromSkills(defaultSkills()), mulberry32(1));
