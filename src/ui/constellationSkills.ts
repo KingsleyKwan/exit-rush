@@ -55,14 +55,15 @@ export function renderSkills(game: Game, rerender: (game: Game) => void): HTMLEl
       .map((n, i) => {
         const on = nodeUnlocked(s, n);
         const tip = getLang() === 'en' ? n.tipEn : n.tipZh;
-        const tbd = n.tbd ? ` · ${dict.tier3Tbd}` : '';
+        const counters = n.counters ?? [];
+        const ctrNames = counters.map((k) => dict.passenger[k]).join(' · ');
         const kind = n.kind === 'active' ? dict.skillNodeActive : dict.skillNodePassive;
-        const title = `${n.nameEn} / ${n.nameZh} — ${tip}${tbd} (${kind})`;
+        const title = `${n.nameEn} / ${n.nameZh} — ${tip} (${kind})`;
         // Every ~10pt unlock is a major (Valhalla-style); keep early passives slightly compact via CSS.
         const major = true;
         const compact = n.kind === 'passive' && n.at < 30;
-        return `<button type="button" class="cst-node major ${compact ? 'compact' : ''} ${on ? 'on' : ''} ${n.tbd ? 'tbd' : ''} t${n.tier}" style="--i:${i}" title="${title}" aria-label="${title}" data-node="${n.id}" data-tip="${tip.replace(/"/g, '&quot;')}" data-kind="${kind}" data-en="${n.nameEn}" data-zh="${n.nameZh}">
-          <span class="cst-dot">${on ? icon(branchIco(branch), compact ? 'xs' : 'sm') : icon('lock', compact ? 'xs' : 'sm')}</span>
+        return `<button type="button" class="cst-node major ${compact ? 'compact' : ''} ${on ? 'on' : ''} ${counters.length ? 'counter' : ''} t${n.tier}" style="--i:${i}" title="${title}" aria-label="${title}" data-node="${n.id}" data-tip="${tip.replace(/"/g, '&quot;')}" data-kind="${kind}" data-en="${n.nameEn}" data-zh="${n.nameZh}" data-counters="${counters.join(',')}" data-ctr-names="${ctrNames}">
+          <span class="cst-dot">${on ? icon(branchIco(branch), compact ? 'xs' : 'sm') : icon('lock', compact ? 'xs' : 'sm')}${counters.length ? `<span class="cst-ctr" aria-hidden="true">${icon(`kind_${counters[0]}`, 'xs')}</span>` : ''}</span>
           <span class="cst-label">
             <span class="cst-en">${n.nameEn}</span>
             <span class="cst-zh">${n.nameZh}</span>
@@ -108,7 +109,7 @@ export function renderSkills(game: Game, rerender: (game: Game) => void): HTMLEl
           <div class="cst-detail" id="cst-detail" aria-live="polite">
             <div class="cst-detail-names"><b class="cst-detail-en"></b><span class="cst-detail-zh"></span></div>
             <p class="cst-detail-tip"></p>
-            <span class="cst-detail-kind"></span>
+            <div class="cst-detail-foot"><span class="cst-detail-kind"></span><span class="cst-detail-ctr"></span></div>
           </div>
           <div class="cst-arms">
             ${arm('str')}
@@ -140,6 +141,12 @@ export function renderSkills(game: Game, rerender: (game: Game) => void): HTMLEl
     detail.querySelector('.cst-detail-zh')!.textContent = btn.dataset.zh ?? '';
     detail.querySelector('.cst-detail-tip')!.textContent = btn.dataset.tip ?? '';
     detail.querySelector('.cst-detail-kind')!.textContent = btn.dataset.kind ?? '';
+    const ctr = detail.querySelector('.cst-detail-ctr') as HTMLElement;
+    const kinds = (btn.dataset.counters ?? '').split(',').filter(Boolean);
+    ctr.innerHTML = kinds.length
+      ? `<span class="ctr-lbl">${dict.skCounters}</span>${kinds.map((k) => `<span class="ctr-kind">${icon(`kind_${k}`, 'xs')}<span>${dict.passenger[k as keyof typeof dict.passenger]}</span></span>`).join('')}`
+      : '';
+    ctr.style.display = kinds.length ? '' : 'none';
   };
   panel.querySelectorAll('.cst-node[data-node]').forEach((btn) => {
     btn.addEventListener('click', () => {

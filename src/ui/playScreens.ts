@@ -65,8 +65,8 @@ export function renderPlayHud(game: Game): HTMLElement {
           ${ult('str', dict.ultStr, s.ultStr)}
           ${ult('spd', dict.ultSpd, s.ultSpd)}
           ${ult('sta', dict.ultSta, s.ultSta)}
-          ${mods.hasBriefDash ? act('dash', dict.skillNodeActive + ': Brief Dash', true, 'spd') : ''}
-          ${mods.hasSecondWind ? act('wind', dict.skillNodeActive + ': Second Wind', true, 'sta') : ''}
+          ${mods.hasLeap ? act('leap', `${dict.skillNodeActive}: ${dict.skLeap}`, true, 'kind_squat') : ''}
+          ${mods.hasSecondWind ? act('wind', `${dict.skillNodeActive}: ${dict.skSecondWind}`, true, 'sta') : ''}
         </div>
         <button type="button" class="shove-btn" id="btn-shove" title="${dict.shove}" aria-label="${dict.shove}">${icon('shove')}</button>
       </div>
@@ -84,7 +84,7 @@ export function renderPlayHud(game: Game): HTMLElement {
     b.addEventListener('pointerdown', (e) => {
       e.preventDefault();
       const id = (b as HTMLElement).dataset.actSkill;
-      if (id === 'dash') game.tryBriefDash();
+      if (id === 'leap') game.tryLeap();
       if (id === 'wind') game.trySecondWind();
     });
   });
@@ -138,6 +138,12 @@ export function updatePlayHud(root: HTMLElement, game: Game): void {
     shove.classList.toggle('cooling', game.shoveCooldown() > 0);
     shove.classList.toggle('charging', game.shoveCharge() > 0);
   }
+  root.querySelectorAll<HTMLElement>('[data-act-skill]').forEach((b) => {
+    const id = b.dataset.actSkill as 'leap' | 'wind';
+    const cd = game.activeCooldown(id);
+    b.style.setProperty('--cd', cd.toFixed(3));
+    b.classList.toggle('cooling', cd > 0);
+  });
   root.querySelectorAll<HTMLElement>('[data-ult]').forEach((b) => {
     const k = b.dataset.ult as 'str' | 'spd' | 'sta';
     b.style.setProperty('--cd', game.ultCooldown(k).toFixed(3));
