@@ -166,6 +166,8 @@ export interface Dict {
   ice: string;
   volt: string;
   chars: string;
+  charSwitch: string;
+  charPickTitle: string;
   comingSoon: string;
   youOffice: string;
   gear: string;
@@ -361,6 +363,8 @@ export const en: Dict = {
   ice: 'Ice',
   volt: 'Lightning',
   chars: 'Characters',
+  charSwitch: 'Change character',
+  charPickTitle: 'Pick a character',
   comingSoon: 'Coming soon',
   youOffice: 'Office Worker',
   gear: 'Gear',

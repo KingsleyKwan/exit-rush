@@ -89,12 +89,10 @@ async function boot(): Promise<void> {
   void startNativeShell(game);
   void entitlements().refresh();
 
-  // v0.5 FTUE: first launch jumps into L1 (ghost-hand teach).
+  // First launch stays on the start screen so a new player can see the other characters
+  // before Play. The L1 ghost-hand still teaches the drag once they start.
   queueMicrotask(() => {
-    game.tryAutoFtue();
-    // v0.7: economy change (1 SP per clear) may have refunded the save → tell the player once.
     window.setTimeout(() => game.consumeRespecNotice(), 600);
-    if (game.screen !== 'menu') renderUI(uiRoot, game);
   });
 
   // Unlock audio on the first gesture, and re-resume it on later gestures if the

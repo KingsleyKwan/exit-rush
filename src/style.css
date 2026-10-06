@@ -222,7 +222,9 @@ button {
   display: flex;
   flex-direction: column;
   gap: 12px;
-  max-height: 100%;
+  /* Leave the floating top bar clear. Short phones scroll the column instead of sliding the logo under those buttons. */
+  min-height: 0;
+  max-height: calc(100% - 72px - env(safe-area-inset-top, 0px));
   overflow: auto;
 }
 .logo {
@@ -281,6 +283,77 @@ button {
   font-weight: 700;
 }
 .howto-icons .ico { width: 22px; height: 22px; }
+
+.char-pick { display: flex; flex-direction: column; gap: 6px; }
+.char-pick-title {
+  margin: 0;
+  font-size: 13px;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  color: #ffc940;
+}
+.char-pick-row { display: flex; gap: 8px; }
+.char-opt {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 3px;
+  padding: 6px 4px 7px;
+  border-radius: 14px;
+  color: #fff;
+  background: rgba(27, 42, 78, 0.92);
+  border: 1.5px solid rgba(255, 255, 255, 0.28) !important;
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.3);
+}
+.char-opt .face {
+  position: relative;
+  width: 100%;
+  height: 52px;
+  border-radius: 10px;
+  overflow: hidden;
+  box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.3);
+}
+.char-opt img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: center 18%;
+  display: block;
+}
+.char-opt b {
+  font-size: 13px;
+  font-weight: 900;
+  line-height: 1.15;
+  text-align: center;
+  max-width: 100%;
+}
+.char-opt small {
+  font-size: 11px;
+  font-weight: 900;
+  line-height: 1.2;
+  color: #1a1204;
+  background: #ffc940;
+  border-radius: 999px;
+  padding: 2px 8px;
+}
+.char-opt.on {
+  border-color: #ffc940 !important;
+  box-shadow: 0 0 0 1px #ffc940, 0 6px 16px rgba(0, 0, 0, 0.3);
+}
+.char-opt.on .face { box-shadow: 0 0 0 2px #ffc940; }
+.char-opt.on small { color: #ffc940; background: transparent; padding: 2px 0; }
+.char-opt.locked .face { filter: grayscale(0.45); }
+.char-opt .face .ico {
+  position: absolute;
+  right: 2px;
+  bottom: 2px;
+  width: 14px;
+  height: 14px;
+  color: #fff;
+}
+.char-opt:active { transform: scale(0.97); }
 
 .play-big {
   display: flex;
@@ -1886,7 +1959,7 @@ button {
 .char-chip.who img { width: 28px; height: 32px; border-radius: 6px; object-fit: cover; }
 .char-chip.who span { display: flex; flex-direction: column; align-items: flex-start; line-height: 1.15; min-width: 0; }
 .char-chip.who b { font-size: 12px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 9em; }
-.char-chip.who .chip-prog { font-size: 11px; opacity: .85; font-variant-numeric: tabular-nums; }
+.char-chip.who .chip-prog { font-size: 11px; font-weight: 800; color: #ffc940; opacity: 1; }
 
 .char-style-ico { display: inline-flex; }
 .char-style-ico.tint-fire { color: #e53935; --ico-ink: #e53935; }

@@ -10,9 +10,8 @@ import {
   el, portrait, screenBar, pointsChip, stationName, stationAlt, nextLevel,
   PORTRAITS, PortraitKind, asset, langBtn, iconBtn, qualityLabel, loadoutStrip, wireLoadoutStrip,
 } from './uiShared';
-import { CHARACTERS } from '../game/charactersDef';
+import { CHARACTER_ORDER, CHARACTERS, type CharacterId } from '../game/charactersDef';
 import { charPortraitUrl } from '../game/charPortraits';
-import { progressOf } from '../game/storage';
 import { coinBalance } from '../game/techKit';
 import { entitlements } from '../game/entitlements';
 import { IS_STORE_BUILD } from '../game/platform';
@@ -28,18 +27,45 @@ function titleCls(name: string): string {
   return name.length >= 15 ? 'wrap wrap-s' : name.length >= 8 ? 'wrap' : '';
 }
 
-function levelsWhoChip(game: Game): string {
+function charDisplayName(id: CharacterId): string {
   const dict = t();
   const en = getLang() === 'en';
-  const id = game.save.character;
   const c = CHARACTERS[id] ?? CHARACTERS.hero;
-  const name = id === 'hero' ? dict.youOffice : (en ? c.nameEn : c.nameZh);
-  const prog = progressOf(game.save);
+  return id === 'hero' ? dict.youOffice : (en ? c.nameEn : c.nameZh);
+}
+
+function levelsWhoChip(game: Game): string {
+  const dict = t();
+  const id = game.save.character;
+  const name = charDisplayName(id);
   const port = charPortraitUrl(id);
   const img = port ? `<img src="${port}" alt="" width="28" height="32" />` : icon('chars', 'xs');
-  const total = 100;
-  const n = prog.cleared.length;
-  return `<button type="button" class="char-chip who" data-act="characters" title="${dict.charProgressOf}: ${name}">${img}<span><b>${name}</b><small class="chip-prog">${n}/${total}</small></span></button>`;
+  return `<button type="button" class="char-chip who" data-act="characters" aria-label="${dict.charSwitch}: ${name}" title="${dict.charSwitch}: ${name}">${img}<span><b>${name}</b><small class="chip-prog">${dict.charSwitch}</small></span></button>`;
+}
+
+/** Three named choices on the start screen. A first run can see the other characters and pick one. */
+function titleCharPick(game: Game): string {
+  const dict = t();
+  const id = game.save.character;
+  const ents = entitlements();
+  const buttons = CHARACTER_ORDER.map((cid: CharacterId) => {
+    const name = charDisplayName(cid);
+    const url = charPortraitUrl(cid);
+    const on = cid === id;
+    const locked = !ents.canPlay(cid);
+    const img = url ? `<img src="${url}" alt="" width="72" height="52" />` : '';
+    const status = locked ? dict.charBuy : on ? dict.charSelected : dict.charSelect;
+    const badge = locked ? icon('lock', 'xs') : on ? icon('check', 'xs') : '';
+    return `<button type="button" class="char-opt${on ? ' on' : ''}${locked ? ' locked' : ''}" data-char="${cid}" aria-pressed="${on ? 'true' : 'false'}" aria-label="${name}, ${status}">
+      <span class="face">${img}${badge}</span>
+      <b>${name}</b>
+      <small>${status}</small>
+    </button>`;
+  }).join('');
+  return `<div class="char-pick">
+    <p class="char-pick-title">${dict.charPickTitle}</p>
+    <div class="char-pick-row" role="group" aria-label="${dict.charPickTitle}">${buttons}</div>
+  </div>`;
 }
 
 export function renderMenu(game: Game): HTMLElement {
@@ -57,7 +83,6 @@ export function renderMenu(game: Game): HTMLElement {
       <div class="top-bar">
         ${langBtn()}
         <div class="bar-right">
-          ${iconBtn('chars', 'characters', dict.chars)}
           ${iconBtn('legend', 'legend', dict.legendTitle)}
           ${iconBtn('skills', 'skills', progLabel)}
         </div>
@@ -73,6 +98,7 @@ export function renderMenu(game: Game): HTMLElement {
           <span>${icon('shove')}<small>${dict.hintShove}</small></span>
           <span>${icon('door')}<small>${dict.hintExit}</small></span>
         </div>
+        ${titleCharPick(game)}
         <button type="button" class="play-big" id="btn-play" aria-label="${dict.play}: ${dict.level} ${nxt.id} ${stationName(nxt)}">
           ${icon('play', 'lg')}
           <span class="play-txt"><b>${dict.play}</b><small><i class="line-dot" style="background:${lineColor(nxt.stationEn)}"></i>${nxt.id} · ${stationName(nxt)}</small></span>
@@ -94,6 +120,22 @@ export function renderMenu(game: Game): HTMLElement {
     </div>
   `);
   panel.querySelector('#btn-play')?.addEventListener('click', () => game.startLevel(nxt.id));
+  panel.querySelectorAll<HTMLButtonElement>('[data-char]').forEach((b) => {
+    b.addEventListener('click', () => {
+      game.audio.unlock();
+      game.audio.ui();
+      const cid = b.dataset.char as CharacterId;
+      if (!cid || !entitlements().canPlay(cid)) {
+        game.openCharacters();
+        return;
+      }
+      if (game.save.character === cid) {
+        game.openCharacters();
+        return;
+      }
+      game.selectCharacter(cid);
+    });
+  });
   return panel;
 }
 

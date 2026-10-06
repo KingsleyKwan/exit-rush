@@ -627,13 +627,6 @@ export class Game {
     this.ftueGhostT = 0;
   }
 
-  /** First launch: jump straight into L1. */
-  tryAutoFtue(): void {
-    if (this.save.ftueDone || this.save.cleared.length > 0) return;
-    if (this.screen !== 'menu') return;
-    this.startLevel(1);
-  }
-
   /** Pause a running level (no-op otherwise). `auto` = backgrounded / blurred. */
   pause(auto = false): void {
     if (this.screen === 'intro') return;

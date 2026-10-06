@@ -162,6 +162,8 @@ export const zhHK: Dict = {
   ice: '冰',
   volt: '雷',
   chars: '角色',
+  charSwitch: '換角色',
+  charPickTitle: '揀一個角色',
   comingSoon: '即將推出',
   youOffice: '上班族',
   gear: '裝備',
