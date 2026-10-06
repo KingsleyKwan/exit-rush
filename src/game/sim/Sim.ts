@@ -222,6 +222,18 @@ export class Sim {
     return this.openBays.some((bay) => Math.abs(b.z - bay) < C.winHalf);
   }
 
+  /** SPD 50 飛身 Leap. */
+  tryLeap(): boolean {
+    if (this.result) return false;
+    return this.player.tryLeap(this.time);
+  }
+
+  /** STA 50 回魂 Second Wind (also shakes off nearby brats). */
+  trySecondWind(): boolean {
+    if (this.result) return false;
+    return this.player.trySecondWind(this.crowd);
+  }
+
   tryUltimate(kind: UltKind): boolean {
     if (this.result) return false;
     return this.player.activateUltimate(kind, this.time, this.world, this.crowd, this.emit);
@@ -291,11 +303,16 @@ export class Sim {
         iron ||
         this.result !== null ||
         now - this.lastAngryHit < TUNING.player.hitIFrames,
-      angryResist: Math.min(0.85, pl.mods.resist * 1.2),
+      // STR 60 Stand Firm: angry shoves barely move you.
+      angryResist: pl.mods.standFirm
+        ? 1 - TUNING.skills.standFirmMul
+        : Math.min(0.85, pl.mods.resist * 1.2),
+      threadCouples: pl.mods.threadCouples,
       emit: this.emit,
       onPlayerShoved: () => {
         this.lastAngryHit = now;
-        pl.stunT = TUNING.player.stunTime * (1 - pl.mods.resist);
+        pl.stunT =
+          TUNING.player.stunTime * (1 - pl.mods.resist) * (pl.mods.standFirm ? TUNING.skills.standFirmMul : 1);
       },
     });
     // Tell the player which bay to aim for (dash / aim assist).

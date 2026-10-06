@@ -1,4 +1,4 @@
-import { applyImpulse, createBody, type Body, type World } from './Physics';
+import { PASS_KID, PASS_LUGGAGE, PASS_SQUAT, applyImpulse, createBody, type Body, type World } from './Physics';
 import { PASSENGER_DEFS, type PassengerKind } from '../PassengerTypes';
 import { crowdCount, type LevelDef } from '../levels';
 import { CAR_Z_MAX, CAR_Z_MIN, TUNING, doorWallX, nearestDoorBay } from './tuning';
@@ -37,6 +37,10 @@ export interface Agent {
   bumpAcc: number;
   /** Visual scale of the figure. */
   scale: number;
+  /** Couples: hand-hold link released until this sim time (STR Split). */
+  splitUntil: number;
+  /** Brats: no zigzag / darting until this sim time (STA Second Wind). */
+  dazedUntil: number;
 }
 
 export interface CrowdCtx {
@@ -63,6 +67,8 @@ export interface CrowdCtx {
   angryImmune: boolean;
   /** 0–1 reduction of angry knockback (STR resist). */
   angryResist: number;
+  /** SPD Thread: the couple hand-hold link does not block the player. */
+  threadCouples?: boolean;
   emit: Emit;
   onPlayerShoved: (dx: number, dz: number, power: number) => void;
 }
@@ -95,6 +101,8 @@ export class CrowdSim {
   private world: World;
   private rng: Rng;
   private tmp: Body[] = [];
+  /** Last sim time seen in update() (for timed effects triggered by the player). */
+  private now = 0;
 
   constructor(world: World, rng: Rng) {
     this.world = world;
@@ -161,7 +169,12 @@ export class CrowdSim {
       windup: -1,
       bumpAcc: 0,
       scale,
+      splitUntil: -1,
+      dazedUntil: -1,
     };
+    // Hurdle hops the suitcase only; the owner still blocks (keeps L100 luggage walls honest).
+    if (kind === 'squat') body.passTag = PASS_SQUAT;
+    else if (kid) body.passTag = PASS_KID;
     this.agents.push(a);
     this.byBody.set(body.id, a);
     return a;
@@ -224,6 +237,7 @@ export class CrowdSim {
         maxSpeed: 5,
         group: g,
       });
+      cb.passTag = PASS_LUGGAGE;
       owner.body.group = g;
       this.world.add(cb);
       owner.caseBody = cb;
@@ -360,7 +374,47 @@ export class CrowdSim {
     return Math.min(0.75, s);
   }
 
+  /** STR Split: a shove breaks this couple's hand-hold for a while and pops them apart. */
+  splitCouple(a: Agent): boolean {
+    const p = a.partner;
+    if (!p) return false;
+    const until = this.now + TUNING.skills.splitDuration;
+    const fresh = a.splitUntil < this.now;
+    a.splitUntil = p.splitUntil = until;
+    const dx = p.body.x - a.body.x;
+    const dz = p.body.z - a.body.z;
+    const d = Math.hypot(dx, dz) || 1e-6;
+    const J = TUNING.skills.splitImpulse;
+    applyImpulse(a.body, (-dx / d) * J, (-dz / d) * J);
+    applyImpulse(p.body, (dx / d) * J, (dz / d) * J);
+    return fresh;
+  }
+
+  isSplit(a: Agent): boolean {
+    return a.splitUntil > this.now;
+  }
+
+  /** STA Second Wind: knock nearby brats away and daze them (no darting) for a while. */
+  shakeOffBrats(x: number, z: number): number {
+    const K = TUNING.skills;
+    let n = 0;
+    for (const a of this.agents) {
+      if (a.kind !== 'brat') continue;
+      const dx = a.body.x - x;
+      const dz = a.body.z - z;
+      const d = Math.hypot(dx, dz) || 1e-6;
+      if (d > K.shakeOffRadius) continue;
+      const J = K.shakeOffImpulse * (1 - (d / K.shakeOffRadius) * 0.5) * a.body.mass;
+      applyImpulse(a.body, (dx / d) * J, (dz / d) * J);
+      a.dazedUntil = this.now + K.shakeOffDaze;
+      a.bumpAcc = 1;
+      n++;
+    }
+    return n;
+  }
+
   update(dt: number, ctx: CrowdCtx): void {
+    this.now = ctx.time;
     const C = TUNING.crowd;
     const T = TUNING.types;
     const ai = 1 - ctx.calm;
@@ -458,7 +512,7 @@ export class CrowdSim {
       fx += Math.sin(a.phase * 1.3 + a.id) * C.wander * m * ai;
       fz += Math.cos(a.phase * 0.9 + a.id * 1.7) * C.wander * m * ai;
 
-      if (def.zigzag) {
+      if (def.zigzag && a.dazedUntil <= ctx.time) {
         a.zig += dt * T.brat.zigFreq;
         fx += Math.sin(a.zig) * T.brat.zigForce * m * ai;
         a.dartT -= dt * ai;
@@ -476,7 +530,7 @@ export class CrowdSim {
       b.fz += fz;
     }
 
-    this.applyLinks(dt);
+    this.applyLinks(dt, ctx);
     this.applyStenchRepel();
   }
 
@@ -531,12 +585,14 @@ export class CrowdSim {
     if (a.kind === 'angry' && a.windup < 0) a.shoveCd = Math.min(a.shoveCd, TUNING.types.angry.retaliateCd);
   }
 
-  private applyLinks(dt: number): void {
+  private applyLinks(dt: number, ctx: CrowdCtx): void {
     const T = TUNING.types;
+    const pl = ctx.player;
     // Couples: damped spring "holding hands".
     for (const a of this.agents) {
       const p = a.partner;
       if (!p || a.id > p.id) continue;
+      if (a.splitUntil > ctx.time) continue; // STR Split: link broken
       const ab = a.body;
       const pb = p.body;
       const dx = pb.x - ab.x;
@@ -544,6 +600,21 @@ export class CrowdSim {
       const d = Math.hypot(dx, dz) || 1e-6;
       const nx = dx / d;
       const nz = dz / d;
+      if (ctx.threadCouples) {
+        // SPD Thread: if the player is at the gap between the pair, let go and step aside.
+        const rx = pl.x - ab.x;
+        const rz = pl.z - ab.z;
+        const along = rx * nx + rz * nz;
+        const lat = Math.abs(rx * nz - rz * nx);
+        if (along > -0.15 && along < d + 0.15 && lat < TUNING.skills.threadReach) {
+          const k = TUNING.skills.threadYield;
+          ab.fx -= nx * k * ab.mass;
+          ab.fz -= nz * k * ab.mass;
+          pb.fx += nx * k * pb.mass;
+          pb.fz += nz * k * pb.mass;
+          continue;
+        }
+      }
       const relV = (pb.vx - ab.vx) * nx + (pb.vz - ab.vz) * nz;
       let f = T.couple.k * (d - T.couple.rest) + T.couple.damping * relV;
       f = clamp(f, -T.couple.maxForce, T.couple.maxForce);

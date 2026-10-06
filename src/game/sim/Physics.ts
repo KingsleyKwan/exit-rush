@@ -29,6 +29,10 @@ export interface Body {
   restitution: number;
   /** Bodies sharing a non-zero group never collide (e.g. owner + suitcase). */
   group: number;
+  /** Category bits this body belongs to (see PASS_* in tuning-free consts below). */
+  passTag: number;
+  /** Category bits this body currently passes through (no contact). */
+  passMask: number;
   /** Total overlap depth this step — a cheap "how squeezed am I" measure. */
   pressure: number;
   /** Largest normal impulse received this step. */
@@ -99,6 +103,8 @@ export function createBody(o: BodyInit): Body {
     maxSpeed: o.maxSpeed ?? 8,
     restitution: o.restitution ?? 0.05,
     group: o.group ?? 0,
+    passTag: 0,
+    passMask: 0,
     pressure: 0,
     impact: 0,
     cnx: 0,
@@ -106,6 +112,16 @@ export function createBody(o: BodyInit): Body {
     contacts: 0,
     enabled: true,
   };
+}
+
+/** Pass-through categories (v0.6.2 Tier-3 counter skills). */
+export const PASS_LUGGAGE = 1; // suitcase (Hurdle hops it; Ground Pound shoves it harder)
+export const PASS_SQUAT = 2;
+export const PASS_KID = 4;
+
+/** True when a and b should skip contact because one passes through the other's category. */
+export function passes(a: Body, b: Body): boolean {
+  return (a.passMask & b.passTag) !== 0 || (b.passMask & a.passTag) !== 0;
 }
 
 export function setMass(b: Body, mass: number): void {
@@ -286,6 +302,7 @@ export class World {
             const b = arr[n];
             if (b.idx <= a.idx) continue;
             if (a.group !== 0 && a.group === b.group) continue;
+            if ((a.passMask | b.passMask) !== 0 && passes(a, b)) continue;
             this.resolvePair(a, b, withVel);
           }
         }

@@ -240,21 +240,37 @@ export const TUNING = {
     gapSense: 0.35,
     frontPush: 0.35,
     chargeShoveMul: 1.45,
-    wideConeCos: 0.22,
-    knockbackMul: 1.25,
     clearSpeed: 1.18,
     blockedDragCut: 0.4,
-    weaveSlip: 1.55,
-    drainResist: 0.35,
     regenNodeBonus: 6,
     staminaBuffer: 28,
+    // ---- v0.6.2 Tier 3: counters to special passengers
+    /** STR 40 Split: couple link released for N s after a shove hit; pop-apart impulse. */
+    splitDuration: 4,
+    splitImpulse: 1.1,
+    /** STR 50 Ground Pound (full-charge shove): radial shockwave; luggage owner+case get ×luggageMul. */
     groundPoundRadius: 1.6,
     groundPoundImpulse: 2.4,
-    briefDashBurst: 3.6,
-    briefDashDuration: 0.35,
-    briefDashCd: 4.5,
+    groundPoundLuggageMul: 2.6,
+    /** STR 60 Stand Firm: angry shove impulse × this; stun × this. */
+    standFirmMul: 0.15,
+    /** SPD 40 Hurdle: visual hop length (s) when passing through luggage. */
+    hurdleHop: 0.32,
+    /** Max-speed multiplier while mid-hop. */
+    hurdleHopSpeed: 0.7,
+    /** SPD 50 Leap (active): burst, airtime, cooldown. Passes over squatters + kids. */
+    leapBurst: 3.8,
+    leapDuration: 0.55,
+    leapCd: 6,
+    /** SPD 60 Thread: lateral reach to the couple link line, and step-aside force. */
+    threadReach: 0.42,
+    threadYield: 3.5,
+    /** STA 50 Second Wind (active): stamina, cooldown, brat shake-off. */
     secondWindAmount: 45,
     secondWindCd: 12,
+    shakeOffRadius: 1.6,
+    shakeOffImpulse: 2.6,
+    shakeOffDaze: 3,
   },
 
   ult: {

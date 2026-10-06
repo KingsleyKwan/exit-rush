@@ -1,4 +1,4 @@
-import { applyImpulse, createBody, setMass, type Body, type World } from './Physics';
+import { PASS_KID, PASS_LUGGAGE, PASS_SQUAT, applyImpulse, createBody, setMass, type Body, type World } from './Physics';
 import type { SkillModifiers } from '../SkillTree';
 import type { CrowdSim } from './CrowdSim';
 import { PASSENGER_DEFS } from '../PassengerTypes';
@@ -36,8 +36,16 @@ export class PlayerSim {
   dashUntil = 0;
   ironUntil = 0;
   ultCd: Record<UltKind, number> = { str: 0, spd: 0, sta: 0 };
-  /** Cooldowns for Tier3 actives. */
-  activeCd: { dash: number; wind: number } = { dash: 0, wind: 0 };
+  /** Cooldowns for Tier3 actives (SPD 飛身 Leap, STA 回魂 Second Wind). */
+  activeCd: { leap: number; wind: number } = { leap: 0, wind: 0 };
+  /** SPD 50 Leap airtime ends at this sim time. */
+  leapUntil = 0;
+  leapStart = 0;
+  /** SPD 40 Hurdle: visual hop over luggage ends at this sim time. */
+  hopUntil = 0;
+  hopStart = 0;
+  /** Counter-skill telemetry (tests / debugging). */
+  stats = { hops: 0, leaps: 0, splits: 0, shakeOffs: 0, pushDrain: 0 };
   /** Smoothed, assisted move direction (unit, world XZ). */
   aimX = 0;
   aimZ = -1;
@@ -81,6 +89,21 @@ export class PlayerSim {
   isIronStance(now: number): boolean {
     return now < this.ironUntil;
   }
+  isLeaping(now: number): boolean {
+    return now < this.leapUntil;
+  }
+  /** Visual height (m) of the hop / leap arc for the view. */
+  airHeight(now: number): number {
+    if (now < this.leapUntil) {
+      const u = (now - this.leapStart) / Math.max(1e-3, this.leapUntil - this.leapStart);
+      return Math.sin(Math.PI * Math.min(1, Math.max(0, u))) * 0.62;
+    }
+    if (now < this.hopUntil) {
+      const u = (now - this.hopStart) / Math.max(1e-3, this.hopUntil - this.hopStart);
+      return Math.sin(Math.PI * Math.min(1, Math.max(0, u))) * 0.32;
+    }
+    return 0;
+  }
   /** @deprecated path highlight removed with WIS; kept false for Effects callers. */
   isSensing(_now: number): boolean {
     return false;
@@ -102,8 +125,16 @@ export class PlayerSim {
     this.shoveCd = Math.max(0, this.shoveCd - dt);
     this.stunT = Math.max(0, this.stunT - dt);
     for (const k of ULTS) this.ultCd[k] = Math.max(0, this.ultCd[k] - dt);
-    this.activeCd.dash = Math.max(0, this.activeCd.dash - dt);
+    this.activeCd.leap = Math.max(0, this.activeCd.leap - dt);
     this.activeCd.wind = Math.max(0, this.activeCd.wind - dt);
+    const leaping = this.isLeaping(now);
+    // Tier 3 pass-through: Hurdle (luggage) always; Leap (squat + kids) while airborne.
+    b.passMask = (this.mods.hurdle ? PASS_LUGGAGE : 0) | (leaping ? PASS_SQUAT | PASS_KID : 0);
+    if (this.mods.hurdle && now >= this.hopUntil && this.overlapsTag(world, PASS_LUGGAGE)) {
+      this.hopStart = now;
+      this.hopUntil = now + TUNING.skills.hurdleHop;
+      this.stats.hops++;
+    }
 
     // Mass: STR resist + ult buffs.
     let mass = this.baseMass();
@@ -141,15 +172,18 @@ export class PlayerSim {
 
     // ---- Speed / drive.
     const auraR = Math.min(1, this.mods.auraResist + (iron ? U.sta.auraResist : 0));
-    const slow = crowd.auraSlowAt(b.x, b.z) * (1 - auraR);
-    this.drag = this.crowdDrag(world, dashing);
-    // Squatting neighbours add lateral weave friction (harder to slip past).
-    this.drag = Math.min(0.85, this.drag + crowd.squatLateralDrag(b.x, b.z, this.aimX, this.aimZ));
+    // STA 40 Hold Breath: stench aura has no effect.
+    const slow = this.mods.holdBreath ? 0 : crowd.auraSlowAt(b.x, b.z) * (1 - auraR);
+    this.drag = this.crowdDrag(world, crowd, dashing || leaping);
+    // Squatting neighbours add lateral weave friction (harder to slip past) — not while leaping over them.
+    if (!leaping) this.drag = Math.min(0.85, this.drag + crowd.squatLateralDrag(b.x, b.z, this.aimX, this.aimZ));
     const St = P.stamina;
     const clear = b.contacts === 0 && b.pressure < 0.002;
     let maxV = P.maxSpeed * this.mods.moveSpeed * (clear ? this.mods.clearSpeed : 1) * (1 - slow) * (1 - this.drag);
     if (charging) maxV *= 1.3;
     if (dashing) maxV *= U.spd.speedMul;
+    // Hurdle: clearing a suitcase costs a little pace (no block, but not free).
+    if (now < this.hopUntil) maxV *= TUNING.skills.hurdleHopSpeed;
     if (this.winded) maxV *= St.windedSpeedMul;
 
     let fx: number;
@@ -197,7 +231,7 @@ export class PlayerSim {
           if (tl > 1e-3) {
             tx /= tl;
             tz /= tl;
-            const k = P.slip * (1 + this.mods.gapSense * 2) * this.mods.weaveSlip * cap * -dot * mag;
+            const k = P.slip * (1 + this.mods.gapSense * 2) * cap * -dot * mag;
             fx += tx * k;
             fz += tz * k;
           }
@@ -218,10 +252,13 @@ export class PlayerSim {
     if (this.winded) {
       this.stamina += this.mods.staminaRegen * regenMul * dt * (mag < 0.2 ? 1 : St.windedRegen);
     } else if (this.pushing && !dashing) {
+      // STA 60 Unbothered: the share of contacts that are family members costs nothing.
+      const famCut = this.mods.unbothered ? this.familyContactFrac(world, crowd) : 0;
       const drain =
         ((St.drainBase + b.pressure * St.drainPerPressure) * mag) /
         (1 + this.mods.resist) *
-        (1 - this.mods.drainResist);
+        (1 - famCut);
+      this.stats.pushDrain += drain * dt;
       this.stamina += (this.mods.staminaRegen * regenMul * St.pushRegen - drain) * dt;
     } else {
       this.stamina += this.mods.staminaRegen * regenMul * dt * (mag < 0.2 ? 1 : 0.55);
@@ -262,13 +299,15 @@ export class PlayerSim {
    * closeness) shaves a little off top speed, up to `max`. WIS slips through
    * better; the SPD dash mostly ignores it.
    */
-  private crowdDrag(world: World, dashing: boolean): number {
+  private crowdDrag(world: World, crowd: CrowdSim, dashing: boolean): number {
     const D = TUNING.player.crowdDrag;
     if (D.perBody <= 0) return 0;
     const b = this.body;
     let n = 0;
     for (const o of world.query(b.x, b.z, D.radius, this.tmp)) {
       if (o === b) continue;
+      if (b.passMask & o.passTag) continue; // hurdled / leapt bodies don't slow you
+      if (this.mods.unbothered && crowd.byBody.get(o.id)?.kind === 'family') continue;
       const d = Math.hypot(o.x - b.x, o.z - b.z);
       if (d < D.radius) n += 1 - d / D.radius;
     }
@@ -276,6 +315,30 @@ export class PlayerSim {
     drag *= 1 - this.mods.blockedDragCut;
     if (dashing) drag *= D.dashMul;
     return drag;
+  }
+
+  /** Is the player currently overlapping any body with this pass tag? */
+  private overlapsTag(world: World, tag: number): boolean {
+    const b = this.body;
+    for (const o of world.query(b.x, b.z, b.r + 0.05, this.tmp)) {
+      if (o === b || !(o.passTag & tag)) continue;
+      if (Math.hypot(o.x - b.x, o.z - b.z) < o.r + b.r + 0.04) return true;
+    }
+    return false;
+  }
+
+  /** Fraction (0–1) of bodies touching the player that are family members. */
+  private familyContactFrac(world: World, crowd: CrowdSim): number {
+    const b = this.body;
+    let all = 0;
+    let fam = 0;
+    for (const o of world.query(b.x, b.z, b.r + 0.35, this.tmp)) {
+      if (o === b || (b.passMask & o.passTag)) continue;
+      if (Math.hypot(o.x - b.x, o.z - b.z) > o.r + b.r + 0.03) continue;
+      all++;
+      if (crowd.byBody.get(o.id)?.kind === 'family') fam++;
+    }
+    return all ? fam / all : 0;
   }
 
   private tryShove(power: number, world: World, crowd: CrowdSim, emit: Emit): boolean {
@@ -291,7 +354,7 @@ export class PlayerSim {
     applyImpulse(b, dx * S.lunge * power * b.mass, dz * S.lunge * power * b.mass);
     const chargeMul =
       this.mods.hasChargedShove && power > 0.85 ? this.mods.chargeShoveMul : 1;
-    const cone = this.mods.shoveConeCos;
+    const cone = TUNING.player.shove.coneCos;
     const near = world.query(b.x, b.z, S.range, this.tmp);
     let hits = 0;
     for (const o of near) {
@@ -309,7 +372,6 @@ export class PlayerSim {
         S.impulse *
         power *
         this.mods.pushForce *
-        this.mods.knockbackMul *
         chargeMul *
         typeMul *
         (0.35 + 0.65 * fall);
@@ -325,6 +387,8 @@ export class PlayerSim {
       if (ag) {
         ag.bumpAcc = Math.max(ag.bumpAcc, 0.6 + power * 0.4);
         crowd.annoy(ag);
+        // STR 40 Split: break the couple's hand-hold.
+        if (this.mods.splitCouples && ag.partner && crowd.splitCouple(ag)) this.stats.splits++;
         emit({ t: 'shoveHit', x: o.x, z: o.z, power, agentId: ag.id });
       }
     }
@@ -337,7 +401,9 @@ export class PlayerSim {
         const rz = o.z - b.z;
         const d = Math.hypot(rx, rz) || 1e-6;
         const fall = Math.max(0, 1 - d / K.groundPoundRadius);
-        applyImpulse(o, (rx / d) * K.groundPoundImpulse * fall, (rz / d) * K.groundPoundImpulse * fall);
+        // Heavy luggage (owner + suitcase) gets a proportionally bigger kick so it actually moves.
+        const J = K.groundPoundImpulse * fall * (o.passTag & PASS_LUGGAGE ? K.groundPoundLuggageMul : 1);
+        applyImpulse(o, (rx / d) * J, (rz / d) * J);
       }
     }
     emit({ t: 'shove', x: b.x, z: b.z, dx, dz, power, hits });
@@ -393,12 +459,14 @@ export class PlayerSim {
     return true;
   }
 
-  /** SPD T3 Brief Dash active. */
-  tryBriefDash(now: number): boolean {
-    if (!this.mods.hasBriefDash || this.activeCd.dash > 0) return false;
+  /** SPD 50 飛身 Leap (active): short burst; airborne over squatters + family kids. */
+  tryLeap(now: number): boolean {
+    if (!this.mods.hasLeap || this.activeCd.leap > 0) return false;
     const K = TUNING.skills;
-    this.activeCd.dash = K.briefDashCd;
-    this.dashUntil = now + K.briefDashDuration;
+    this.activeCd.leap = K.leapCd;
+    this.leapStart = now;
+    this.leapUntil = now + K.leapDuration;
+    this.body.passMask |= PASS_SQUAT | PASS_KID;
     let dx = this.faceX;
     let dz = this.faceZ;
     if (this.moving < 0.1) {
@@ -410,18 +478,20 @@ export class PlayerSim {
     }
     this.aimX = this.faceX = dx;
     this.aimZ = this.faceZ = dz;
-    this.body.vx = dx * K.briefDashBurst;
-    this.body.vz = dz * K.briefDashBurst;
+    this.body.vx = dx * K.leapBurst;
+    this.body.vz = dz * K.leapBurst;
+    this.stats.leaps++;
     return true;
   }
 
-  /** STA T3 Second Wind active. */
-  trySecondWind(): boolean {
+  /** STA 50 回魂 Second Wind (active): stamina burst + knock nearby brats away (dazed). */
+  trySecondWind(crowd?: CrowdSim): boolean {
     if (!this.mods.hasSecondWind || this.activeCd.wind > 0) return false;
     const K = TUNING.skills;
     this.activeCd.wind = K.secondWindCd;
     this.winded = false;
     this.stamina = Math.min(this.staminaMax, this.stamina + K.secondWindAmount);
+    if (crowd) this.stats.shakeOffs += crowd.shakeOffBrats(this.body.x, this.body.z);
     return true;
   }
 
@@ -448,7 +518,7 @@ export class PlayerSim {
       const cz = dx * s + dz * c;
       let cost = 0;
       for (const o of near) {
-        if (o === this.body) continue;
+        if (o === this.body || (this.body.passMask & o.passTag)) continue;
         const rx = o.x - x;
         const rz = o.z - z;
         const along = rx * cx + rz * cz;
