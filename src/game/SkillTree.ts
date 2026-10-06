@@ -253,11 +253,11 @@ export const SKILL_NODES: SkillNodeDef[] = [
     tier: 3,
     at: 60,
     kind: 'passive',
-    counters: ['family'],
+    counters: ['family', 'loud'],
     nameEn: 'Unbothered',
     nameZh: '好脾氣',
-    tipEn: 'Family: pushing through them costs no stamina or drag',
-    tipZh: '一家大細：擠過佢哋唔耗體力、唔拖慢',
+    tipEn: 'Family: no stamina/drag · Loudmouth noise −70%',
+    tipZh: '一家大細：唔耗體力唔拖慢・大聲公噪音 −70%',
   },
 ];
 
@@ -337,7 +337,7 @@ export interface SkillModifiers {
   holdBreath: boolean;
   /** STA 50 回魂 (active): stamina burst + shake off brats. */
   hasSecondWind: boolean;
-  /** STA 60 好脾氣: family contacts cost no stamina / drag. */
+  /** STA 60 好脾氣: family contacts cost no stamina / drag; loudmouth noise drain × unbotheredLoudMul. */
   unbothered: boolean;
 }
 

@@ -29,7 +29,8 @@ const mixOf = (extra: Partial<Record<PassengerKind, number>>): LevelDef['mix'] =
 /**
  * v0.5.0 — ~10–15 s levels, staged special intros (see docs/LEVELS.md /
  * /workspace/review/LEVEL_PLAN_v05.md). L1–5 normals only; L6 luggage, L8 squat, then L9/12/15/18/21
- * introduce one type each; L100 fireworks finale.
+ * introduce one type each; v0.6.3: L26 introduces 大聲公 Loudmouth (reinforced 27, mixed 29/30/100);
+ * L100 fireworks finale.
  */
 export const LEVELS: LevelDef[] = [
   {
@@ -355,13 +356,14 @@ export const LEVELS: LevelDef[] = [
     id: 26,
     stationEn: 'Koi Stream',
     stationZh: '鯉魚涌',
-    flavourEn: 'Mix exam C',
-    flavourZh: '綜合測驗丙',
-    density: 9,
-    timer: 16,
-    mix: mixOf({ angry: 4, couple: 4 }),
-    pressure: 0.76,
+    flavourEn: 'Phone-call carriage',
+    flavourZh: '講電話車廂',
+    density: 8,
+    timer: 19,
+    mix: mixOf({ loud: 1 }),
+    pressure: 0.58,
     playable: true,
+    introKind: 'loud',
   },
   {
     id: 27,
@@ -371,9 +373,10 @@ export const LEVELS: LevelDef[] = [
     flavourZh: '逼上車牆',
     density: 8,
     timer: 17,
-    mix: mixOf({ luggage: 2, squat: 2, stench: 2, family: 2, brat: 2, couple: 2, angry: 2 }),
+    mix: mixOf({ luggage: 2, squat: 2, stench: 2, family: 2, brat: 2, couple: 2, angry: 2, loud: 1 }),
     pressure: 0.66,
     playable: true,
+    tipKind: 'loud',
   },
   {
     id: 28,
@@ -396,7 +399,7 @@ export const LEVELS: LevelDef[] = [
     flavourZh: '壓力高峰',
     density: 10,
     timer: 17,
-    mix: mixOf({ angry: 4, family: 3, stench: 3 }),
+    mix: mixOf({ angry: 4, family: 3, stench: 3, loud: 0.8 }),
     pressure: 0.91,
     playable: true,
   },
@@ -408,7 +411,7 @@ export const LEVELS: LevelDef[] = [
     flavourZh: '關底',
     density: 10,
     timer: 18,
-    mix: mixOf({ luggage: 2, squat: 2, stench: 2, family: 2, brat: 2, couple: 2, angry: 2 }),
+    mix: mixOf({ luggage: 2, squat: 2, stench: 2, family: 2, brat: 2, couple: 2, angry: 2, loud: 0.8 }),
     pressure: 0.96,
     playable: true,
   },
@@ -429,6 +432,7 @@ export const LEVELS: LevelDef[] = [
       couple: 2,
       stench: 2,
       brat: 1,
+      loud: 1,
     },
     pressure: 1.60,
     playable: true,

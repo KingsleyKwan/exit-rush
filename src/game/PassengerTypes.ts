@@ -6,7 +6,8 @@ export type PassengerKind =
   | 'couple'
   | 'angry'
   | 'luggage'
-  | 'squat';
+  | 'squat'
+  | 'loud';
 
 export interface PassengerDef {
   kind: PassengerKind;
@@ -39,6 +40,8 @@ export interface PassengerDef {
   scale?: number;
   /** Receives reduced shove impulse (squatting / rooted). */
   hardToShove?: boolean;
+  /** 大聲公: loud phone call — stamina-draining noise zone (TUNING.types.loud). */
+  noise?: boolean;
 }
 
 export const PASSENGER_DEFS: Record<PassengerKind, PassengerDef> = {
@@ -141,5 +144,17 @@ export const PASSENGER_DEFS: Record<PassengerKind, PassengerDef> = {
     widthMul: 1.15,
     scale: 0.82,
     hardToShove: true,
+  },
+  loud: {
+    kind: 'loud',
+    color: 0xf39c12,
+    mass: 1.15,
+    radius: 0.24,
+    damping: 4.2,
+    restitution: 0.05,
+    anchorMul: 1.15,
+    driveMul: 0.95,
+    speedMul: 0.8,
+    noise: true,
   },
 };

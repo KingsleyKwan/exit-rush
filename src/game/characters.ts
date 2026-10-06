@@ -35,7 +35,7 @@ interface Spec {
   hat?: number;
   camera?: boolean;
   brows?: 'angry' | 'firm' | 'sad';
-  mouth?: 'smile' | 'frown' | 'tongue' | 'flat';
+  mouth?: 'smile' | 'frown' | 'tongue' | 'flat' | 'shout';
   stubble?: boolean;
   collar?: number;
   /** Open jacket colour (torso + sleeves) over `inner`. */
@@ -50,6 +50,8 @@ interface Spec {
   outline?: boolean;
   /** Crouched / squatting pose — lowers torso & shortens legs. */
   crouch?: boolean;
+  /** 大聲公: right hand holds a phone to the ear (bent arm). */
+  phoneEar?: boolean;
 }
 
 const Y = new THREE.Vector3(0, 1, 0);
@@ -220,6 +222,26 @@ function buildCharacter(s: Spec): { geo: THREE.BufferGeometry; shell: THREE.Buff
     let rot: V3 = crouch ? [1.05, 0, sx * 0.35] : [0, 0, sx * 0.12];
     const phoneHand = s.phone && sx === 1;
     if (phoneHand) rot = [-1.15, 0, 0.28];
+    if (s.phoneEar && sx === 1) {
+      // Bent arm: upper arm out to the side, forearm up so the hand + phone sit at the ear.
+      const upRot: V3 = [0, 0, 1.25];
+      const UL = 0.16;
+      const sleeveCol = s.sleeves === 'long' ? longCol : s.shirt;
+      b.limb(UL, 0.112, 0.122, sleeveCol, pivot, upRot, 0, O);
+      const elbow = pointOnPivot(pivot, upRot, UL);
+      const ear: V3 = [R * 1.02 + 0.05, HY - 0.02, 0.02];
+      const ddx = ear[0] - elbow[0];
+      const ddy = ear[1] - elbow[1];
+      const FL = Math.hypot(ddx, ddy) - 0.04;
+      const foreRot: V3 = [0, 0, Math.atan2(ddx, -ddy)];
+      b.limb(FL, 0.09, 0.1, s.sleeves === 'long' ? longCol : s.skin, elbow, foreRot, 0, O);
+      const hp = pointOnPivot(elbow, foreRot, FL + 0.02);
+      b.add(new THREE.BoxGeometry(0.085, 0.085, 0.085), s.skin, hp, foreRot, undefined, O);
+      // Phone pressed to the ear (thin in X, tall in Y).
+      b.add(new THREE.BoxGeometry(0.04, 0.18, 0.09), 0x202024, [R * 0.98 + 0.03, HY - 0.01, 0.03], [0, 0, 0.12]);
+      b.add(new THREE.BoxGeometry(0.01, 0.15, 0.072), 0x7fe3ff, [R * 0.98 + 0.053, HY - 0.008, 0.03], [0, 0, 0.12]);
+      continue;
+    }
     if (s.armUp && sx === 1) rot = [0.15, 0, 2.55];
     const L = 0.34;
     if (s.sleeves === 'long') {
@@ -279,6 +301,11 @@ function buildCharacter(s: Spec): { geo: THREE.BufferGeometry; shell: THREE.Buff
       break;
     case 'frown':
       for (const sx of [-1, 1]) b.add(new THREE.BoxGeometry(0.044, 0.018, 0.02), 0x5a1a1a, [sx * 0.019, my, mz], [0, 0, -sx * 0.4]);
+      break;
+    case 'shout':
+      // Wide-open shouting mouth (dark) with a red tongue.
+      b.add(new THREE.BoxGeometry(0.085, 0.07, 0.022), 0x3a1010, [0, my - 0.008, mz]);
+      b.add(new THREE.BoxGeometry(0.06, 0.024, 0.024), 0xd84a5a, [0, my - 0.03, mz + 0.004]);
       break;
     case 'tongue':
       b.add(new THREE.BoxGeometry(0.08, 0.05, 0.02), 0x5a1a1a, [0, my, mz]);
@@ -373,7 +400,8 @@ export type Look =
   | 'coupleM'
   | 'angry'
   | 'luggage'
-  | 'squat';
+  | 'squat'
+  | 'loud';
 
 const SKIN = 0xf2c6a0;
 const DARK_HAIR = 0x2a2830;
@@ -397,6 +425,7 @@ const SPECS: Record<Look | 'hero', Spec> = {
   angry: { skin: 0xe7a07c, hair: DARK_HAIR, style: 'short', shirt: 0xd32f2f, sleeves: 'short', pants: 0x2b2b2e, shoes: 0x1a1a1a, collar: 0xb71c1c, bw: 1.14, brows: 'angry', mouth: 'frown', belt: true },
   luggage: { skin: 0xf0c49c, hair: 0x3a302a, style: 'short', hat: 0xcfae7a, shirt: 0x26a69a, sleeves: 'short', pants: 0xc2a878, shorts: true, shoes: 0x7a5230, camera: true },
   squat: { skin: SKIN, hair: DARK_HAIR, style: 'short', shirt: 0x5c6bc0, sleeves: 'short', pants: 0x37474f, shoes: 0x263238, crouch: true, bw: 1.1, brows: 'firm', mouth: 'flat', phone: true },
+  loud: { skin: 0xeab48c, hair: 0x2a2026, style: 'short', shirt: 0xf39c12, sleeves: 'short', pants: 0x3e3a4a, shoes: 0xf5f5f5, collar: 0xd35400, bw: 1.06, brows: 'firm', mouth: 'shout', phoneEar: true },
 };
 
 export const LOOKS = Object.keys(SPECS).filter((k) => k !== 'hero') as Look[];

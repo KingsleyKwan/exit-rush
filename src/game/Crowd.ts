@@ -10,7 +10,7 @@ const linkGeo = new THREE.CylinderGeometry(0.035, 0.035, 1, 6);
 linkGeo.rotateZ(Math.PI / 2); // length along X
 
 /** Kinds that get a floating type icon (couples share one heart per pair). */
-const ICON_KINDS = ['stench', 'family', 'brat', 'angry', 'luggage', 'couple', 'squat'] as const;
+const ICON_KINDS = ['stench', 'family', 'brat', 'angry', 'luggage', 'couple', 'squat', 'loud'] as const;
 type IconKind = (typeof ICON_KINDS)[number];
 
 const STINK_PER = 3;

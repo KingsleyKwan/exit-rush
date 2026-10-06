@@ -330,6 +330,16 @@ export class GameAudio {
     this.noise(0.18, 0.12 + power * 0.1, 500, 0.9, 0, 160);
     this.tone(150, 0.12, 'triangle', 0.06 + power * 0.04, 0, 70);
   }
+  /** 大聲公: muffled phone-chatter syllables (band-passed noise + low buzz), louder deeper in the zone. */
+  chatter(intensity: number): void {
+    const n = 2 + Math.floor(Math.random() * 2);
+    const g = 0.025 + intensity * 0.035;
+    for (let i = 0; i < n; i++) {
+      const w = i * (0.07 + Math.random() * 0.03);
+      this.noise(0.06, g, 700 + Math.random() * 700, 4, w);
+      this.tone(170 + Math.random() * 90, 0.055, 'square', g * 0.35, w, 140 + Math.random() * 60);
+    }
+  }
   angryWindup(): void {
     this.tone(95, 0.22, 'sawtooth', 0.035, 0, 140);
   }

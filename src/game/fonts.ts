@@ -1,7 +1,7 @@
 /**
  * Load subset OFL fonts used for station-sign canvas textures.
  * Fonts live under public/fonts/ (see OFL-Noto.txt).
- * Paths respect Vite `base` (e.g. /hk-mtr-exit-rush/ on GitHub Pages).
+ * Paths respect Vite `base` (e.g. /exit-rush/ on GitHub Pages).
  */
 import { publicUrl } from './publicUrl';
 

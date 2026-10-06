@@ -2,16 +2,21 @@ import * as THREE from 'three';
 import { TUNING } from './sim/tuning';
 import type { Agent } from './sim/CrowdSim';
 import { lookFor, type Look } from './characters';
+import { shoutBubbleTexture } from './badges';
 
 /** Shared geometry / materials for the per-agent floor decals (never disposed per passenger). */
 export const G = {
   aura: new THREE.RingGeometry(0.55, 0.95, 24),
   disc: new THREE.CircleGeometry(0.32, 16),
   shadow: new THREE.CircleGeometry(0.3, 14),
+  loudFill: new THREE.CircleGeometry(TUNING.types.loud.radius, 40),
+  loudRim: new THREE.RingGeometry(TUNING.types.loud.radius - 0.06, TUNING.types.loud.radius, 48),
+  loudWave: new THREE.RingGeometry(0.88, 1, 40),
 };
 export const M = {
   familyDisc: new THREE.MeshBasicMaterial({ color: 0xf08a3c, transparent: true, opacity: 0.22, depthWrite: false }),
   shadow: new THREE.MeshBasicMaterial({ color: 0x000000, transparent: true, opacity: 0.24, depthWrite: false }),
+  loudFill: new THREE.MeshBasicMaterial({ color: 0xff9f1a, transparent: true, opacity: 0.1, depthWrite: false }),
 };
 
 function angleLerp(a: number, b: number, t: number): number {
@@ -44,6 +49,14 @@ export class Passenger {
   private lean = new THREE.Object3D();
   private aura: THREE.Mesh | null = null;
   private auraMat: THREE.MeshBasicMaterial | null = null;
+  /** 大聲公: noise-zone rim, expanding sound-wave rings and the 「喂！！」 bubble. */
+  private loud: {
+    rim: THREE.Mesh;
+    rimMat: THREE.MeshBasicMaterial;
+    waves: { mesh: THREE.Mesh; mat: THREE.MeshBasicMaterial }[];
+    bubble: THREE.Sprite;
+    bubbleMat: THREE.SpriteMaterial;
+  } | null = null;
   private squash = 0;
   private squashV = 0;
   private flash = 0;
@@ -73,6 +86,30 @@ export class Passenger {
       this.aura.rotation.x = -Math.PI / 2;
       this.aura.position.y = 0.04;
       this.mesh.add(this.aura);
+    }
+    if (agent.kind === 'loud') {
+      const flat = (m: THREE.Object3D, y: number) => {
+        m.rotation.x = -Math.PI / 2;
+        m.position.y = y;
+        m.renderOrder = 2;
+        this.mesh.add(m);
+      };
+      flat(new THREE.Mesh(G.loudFill, M.loudFill), 0.03);
+      const rimMat = new THREE.MeshBasicMaterial({ color: 0xff8f00, transparent: true, opacity: 0.5, depthWrite: false, side: THREE.DoubleSide });
+      const rim = new THREE.Mesh(G.loudRim, rimMat);
+      flat(rim, 0.035);
+      const waves = [0, 1, 2].map(() => {
+        const mat = new THREE.MeshBasicMaterial({ color: 0xffb74d, transparent: true, opacity: 0, depthWrite: false, side: THREE.DoubleSide });
+        const mesh = new THREE.Mesh(G.loudWave, mat);
+        flat(mesh, 0.045);
+        return { mesh, mat };
+      });
+      const bubbleMat = new THREE.SpriteMaterial({ map: shoutBubbleTexture(), transparent: true, depthWrite: false, depthTest: false });
+      const bubble = new THREE.Sprite(bubbleMat);
+      bubble.center.set(0.3, 0);
+      bubble.renderOrder = 7;
+      this.mesh.add(bubble);
+      this.loud = { rim, rimMat, waves, bubble, bubbleMat };
     }
     if (agent.kind === 'family' && !agent.isKid) {
       const disc = new THREE.Mesh(G.disc, M.familyDisc);
@@ -151,6 +188,28 @@ export class Passenger {
       this.auraMat.opacity = 0.14 + 0.08 * Math.sin(time * 2.3 + a.id);
     }
 
+    if (this.loud) {
+      const R = TUNING.types.loud.radius;
+      const L = this.loud;
+      L.rimMat.opacity = 0.42 + 0.18 * Math.sin(time * 5 + a.id);
+      // Sound waves: three rings expanding from the speaker to the zone rim.
+      L.waves.forEach((w, k) => {
+        const ph = (time * 0.85 + k / 3 + a.id * 0.21) % 1;
+        w.mesh.scale.setScalar(0.25 * R + ph * 0.75 * R);
+        w.mat.opacity = 0.55 * (1 - ph) * Math.min(1, ph * 6);
+      });
+      // 「喂！！」 pops in bursts (talking), above the floating type badge.
+      const talk = (time * 0.7 + a.id * 0.37) % 1;
+      const on = talk < 0.62;
+      L.bubble.visible = on;
+      if (on) {
+        const pop = Math.min(1, talk * 12);
+        const s = (0.5 + 0.08 * Math.sin(time * 14)) * (0.6 + 0.4 * pop);
+        L.bubble.scale.set(s, s * (168 / 256), 1);
+        L.bubble.position.set(0, 1.86, 0);
+      }
+    }
+
     if (this.caseAnchor && a.caseBody) {
       const c = a.caseBody;
       const cx = c.px + (c.x - c.px) * alpha;
@@ -163,5 +222,10 @@ export class Passenger {
 
   dispose(): void {
     this.auraMat?.dispose();
+    if (this.loud) {
+      this.loud.rimMat.dispose();
+      for (const w of this.loud.waves) w.mat.dispose();
+      this.loud.bubbleMat.dispose();
+    }
   }
 }

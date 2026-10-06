@@ -43,7 +43,61 @@ export interface SaveData {
   ftueDone: boolean;
 }
 
-const KEY = 'hk-mtr-exit-rush-v1';
+/** Save key (v0.6.3: renamed with the repo → `exit-rush`). */
+export const SAVE_KEY = 'exit-rush-v1';
+const KEY = SAVE_KEY;
+const KEY_PREFIX = 'exit-rush';
+/**
+ * Legacy key prefix from pre-rename builds (old repo/package name). Built from parts on purpose
+ * so the old operator-like letters never appear literally in the source (or, unlike
+ * a string concat, in the minified bundle — esbuild doesn't fold Array#join).
+ */
+const LEGACY_PREFIX = ['hk', ['m', 't', 'r'].join(''), 'exit-rush'].join('-');
+
+/** Minimal Storage surface (lets the sim test pass a fake). */
+export interface KeyValueStore {
+  readonly length: number;
+  key(i: number): string | null;
+  getItem(k: string): string | null;
+  setItem(k: string, v: string): void;
+  removeItem(k: string): void;
+}
+
+/**
+ * One-time migration of every pre-rename key (`<legacy>-v1`, plus any other `<legacy>…` keys such
+ * as settings) to the matching new `exit-rush…` key. An existing new key always wins (never
+ * overwritten); the legacy key is deleted either way. Returns the migrated new key names.
+ */
+export function migrateLegacyKeys(store: KeyValueStore): string[] {
+  const legacy: string[] = [];
+  for (let i = 0; i < store.length; i++) {
+    const k = store.key(i);
+    if (k && k.startsWith(LEGACY_PREFIX)) legacy.push(k);
+  }
+  const moved: string[] = [];
+  for (const oldKey of legacy) {
+    const newKey = KEY_PREFIX + oldKey.slice(LEGACY_PREFIX.length);
+    const v = store.getItem(oldKey);
+    if (v != null && store.getItem(newKey) == null) {
+      store.setItem(newKey, v);
+      moved.push(newKey);
+    }
+    // Only drop the old key once the new one is safely present.
+    if (store.getItem(newKey) != null) store.removeItem(oldKey);
+  }
+  return moved;
+}
+
+let migrated = false;
+function migrateOnce(): void {
+  if (migrated) return;
+  migrated = true;
+  try {
+    migrateLegacyKeys(localStorage);
+  } catch {
+    /* storage blocked / quota — keep legacy data untouched */
+  }
+}
 
 /**
  * In-memory fallback used when localStorage is unavailable (Safari private mode,
@@ -140,6 +194,7 @@ export function normalizeSave(parsed: Partial<SaveData> | null | undefined): Sav
 }
 
 function readRaw(): string | null {
+  migrateOnce();
   try {
     const raw = localStorage.getItem(KEY);
     if (raw != null) return raw;

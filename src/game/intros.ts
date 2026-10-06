@@ -80,6 +80,15 @@ export const INTROS: Record<IntroKind, IntroCopy> = {
     tipEn: 'Weave wide',
     tipZh: '大弧度閃過',
   },
+  loud: {
+    kind: 'loud',
+    whatEn: 'Shouting into the phone.',
+    whatZh: '對住電話大嗌「喂！！」。',
+    blockEn: 'Inside the orange noise ring your stamina drains fast.',
+    blockZh: '行入橙色噪音圈，體力會好快冇。',
+    tipEn: 'Keep your distance',
+    tipZh: '行遠啲',
+  },
 };
 
-export const INTRO_ORDER: IntroKind[] = ['luggage', 'squat', 'stench', 'family', 'brat', 'couple', 'angry'];
+export const INTRO_ORDER: IntroKind[] = ['luggage', 'squat', 'stench', 'family', 'brat', 'couple', 'angry', 'loud'];

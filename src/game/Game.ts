@@ -92,6 +92,8 @@ export class Game {
   private beepT = 0;
   private ghostT = 0;
   private stinkT = 0;
+  /** 大聲公 chatter-blip timer. */
+  private chatterT = 0;
   private resultDelay = -1;
   private hooks: GameHooks;
   private canvas: HTMLCanvasElement;
@@ -331,6 +333,11 @@ export class Game {
   staminaFrac(): number {
     const p = this.sim?.player;
     return p ? p.stamina / p.staminaMax : 1;
+  }
+
+  /** 大聲公: current loudmouth noise drain on the player (stamina/s; 0 outside every zone). */
+  noiseDrain(): number {
+    return this.sim && !this.sim.ambient ? this.sim.player.noiseDrain : 0;
   }
 
   isWinded(): boolean {
@@ -922,6 +929,12 @@ export class Game {
       this.train.addTrauma(0.02);
     }
 
+    // 大聲公: muffled chatter blips while you're inside a noise zone (synth only).
+    this.chatterT -= dt;
+    if (p.noiseDrain > 0 && this.chatterT <= 0) {
+      this.chatterT = 0.28 + Math.random() * 0.3;
+      this.audio.chatter(Math.min(1, p.noiseDrain / TUNING.types.loud.drainPeak));
+    }
     // HUD refresh at ~12 Hz.
     this.hudT -= dt;
     if (this.hudT <= 0) {
