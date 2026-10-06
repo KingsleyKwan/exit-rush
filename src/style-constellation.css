@@ -387,3 +387,104 @@
   .cst-arm-head .skill-ico { width: 36px; height: 36px; }
   .cst-label { display: flex; }
 }
+
+/* ---- v0.7 skill loadouts (配點1/2/3) + free respec ---- */
+.loadout-strip {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+.loadout-strip .lo-lbl { flex: none; display: inline-flex; opacity: 0.75; color: #ffd54f; }
+.loadout-strip .lo-lbl .ico { width: 18px; height: 18px; }
+.lo-slots {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 3px;
+  padding: 3px;
+  border-radius: 14px;
+  background: rgba(8, 12, 22, 0.72);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+}
+.lo-slot {
+  min-width: 0;
+  min-height: 40px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 1px;
+  padding: 3px 2px;
+  border-radius: 11px;
+  background: transparent;
+  color: rgba(255, 255, 255, 0.78);
+  line-height: 1.05;
+}
+.lo-slot b { font-size: 12px; font-weight: 900; white-space: nowrap; }
+.lo-slot small { font-size: 10px; font-weight: 700; opacity: 0.8; white-space: nowrap; font-variant-numeric: tabular-nums; }
+.lo-slot .lo-ult { font-style: normal; color: #ffd54f; margin-left: 2px; }
+.lo-slot.on {
+  background: linear-gradient(180deg, #ffe082, #ffc107);
+  color: #2a1d00;
+  box-shadow: 0 2px 0 #a07800;
+}
+.lo-slot.on small { opacity: 0.9; }
+.lo-slot.on .lo-ult { color: #8a5a00; }
+.lo-btn {
+  flex: none;
+  min-height: 40px;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 0 10px 0 8px;
+  border-radius: 12px;
+  font-size: 12px;
+  font-weight: 900;
+  white-space: nowrap;
+  color: #fff;
+  background: rgba(8, 12, 22, 0.72);
+  border: 1.5px solid rgba(255, 255, 255, 0.22);
+}
+.lo-btn .ico { width: 16px; height: 16px; }
+.lo-reset { border-color: rgba(255, 138, 128, 0.7); color: #ffd0cb; }
+.lo-edit { border-color: rgba(255, 213, 79, 0.7); color: #ffe9a8; }
+.loadout-strip.pre-level { position: sticky; top: 0; z-index: 3; padding: 4px 0 6px; background: linear-gradient(to bottom, rgba(10, 14, 24, 0.95) 70%, rgba(10, 14, 24, 0)); }
+/* End screens are light panels: dark segmented control. */
+.end-panel .loadout-strip { margin-top: 10px; }
+.end-panel .loadout-strip .lo-lbl { color: var(--navy, #1b2a4e); }
+.end-panel .lo-slots { background: #1b2a4e; }
+
+.confirm-veil {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  background: rgba(4, 7, 14, 0.62);
+  backdrop-filter: blur(3px);
+  -webkit-backdrop-filter: blur(3px);
+}
+.confirm-card {
+  width: min(320px, 100%);
+  padding: 18px 16px 14px;
+  border-radius: 20px;
+  text-align: center;
+  background: linear-gradient(180deg, #ffffff, #eef1f5);
+  color: #18202e;
+  box-shadow: 0 0 0 3px #ff8a80, 0 18px 50px rgba(0, 0, 0, 0.55);
+}
+.confirm-ico { display: inline-flex; padding: 10px; border-radius: 50%; background: #ffebee; color: #c62828; }
+.confirm-ico .ico { width: 30px; height: 30px; }
+.confirm-card h3 { margin: 8px 0 6px; font-size: 18px; font-weight: 900; }
+.confirm-card p { margin: 0 0 12px; font-size: 13px; line-height: 1.45; opacity: 0.85; }
+.confirm-row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.confirm-row button { min-height: 46px; margin: 0; display: inline-flex; align-items: center; justify-content: center; gap: 6px; border-radius: 14px; font-weight: 900; font-size: 15px; }
+.confirm-row .ghost { background: #e3e8ef; color: #1b2a4e; box-shadow: 0 3px 0 #a9b3c0; }
+.confirm-row .primary { width: auto; }
+.confirm-row .primary[disabled] { opacity: 0.45; }
+.confirm-row .ico { width: 16px; height: 16px; }

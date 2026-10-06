@@ -16,8 +16,9 @@ function showToast(msg: string): void {
   el.setAttribute('role', 'status');
   el.textContent = msg;
   app.appendChild(el);
-  window.setTimeout(() => el.classList.add('gone'), 3200);
-  window.setTimeout(() => el.remove(), 3800);
+  const ms = msg.length > 24 ? 5200 : 3200; // longer notices (e.g. respec) stay up a bit longer
+  window.setTimeout(() => el.classList.add('gone'), ms);
+  window.setTimeout(() => el.remove(), ms + 600);
 }
 
 const game = new Game(canvas, {
@@ -42,6 +43,8 @@ renderUI(uiRoot, game);
 // v0.5 FTUE: first launch jumps into L1 (ghost-hand teach).
 queueMicrotask(() => {
   game.tryAutoFtue();
+  // v0.7: economy change (1 SP per clear) may have refunded the save → tell the player once.
+  window.setTimeout(() => game.consumeRespecNotice(), 600);
   if (game.screen !== 'menu') renderUI(uiRoot, game);
 });
 
