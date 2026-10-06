@@ -36,6 +36,28 @@ function screenBar(title: string, iconName: string, right = ''): string {
     </div>`;
 }
 
+/** One glyph per node. Ult ids are shared by hero and mage, so those depend on who is open. */
+const NODE_ICON: Record<string, string> = {
+  str_t1: 'str', str_t2a: 'shove', str_t2b: 'sk_charge', str_t3a: 'sk_split', str_t3b: 'sk_pound', str_t3c: 'sk_firm',
+  spd_t1: 'spd', spd_t2a: 'sk_lane', spd_t2b: 'sk_squeeze', spd_t3a: 'sk_hurdle', spd_t3b: 'sk_leap', spd_t3c: 'sk_thread',
+  sta_t1: 'stamina', sta_t2a: 'sk_regen', sta_t2b: 'sk_tank', sta_t3a: 'sk_breath', sta_t3b: 'sk_revive', sta_t3c: 'sk_calm',
+  fire_t1: 'fire', fire_t2a: 'sk_hot', fire_t2b: 'sk_urgent', fire_t3a: 'sk_cleanse', fire_t3b: 'sk_fburst', fire_t3c: 'sk_unhand',
+  ice_t1: 'sk_cone', ice_t2a: 'sk_cool', ice_t2b: 'sk_ishield', ice_t3a: 'sk_chill', ice_t3b: 'sk_freeze', ice_t3c: 'sk_glide',
+  volt_t1: 'volt', volt_t2a: 'sk_static', volt_t2b: 'sk_conduct', volt_t3a: 'sk_dropcall', volt_t3b: 'sk_clap', volt_t3c: 'sk_tstep',
+};
+const ULT_ICON: Record<string, { hero: string; mage: string }> = {
+  str: { hero: 'sk_bull', mage: 'sk_phoenix' },
+  spd: { hero: 'sk_dash', mage: 'sk_blink' },
+  sta: { hero: 'sk_stance', mage: 'sk_age' },
+};
+function skillIcon(id: string, mage: boolean): string {
+  if (id.startsWith('ult-')) {
+    const b = id.slice(4);
+    return (ULT_ICON[b]?.[mage ? 'mage' : 'hero']) ?? 'star';
+  }
+  return NODE_ICON[id] ?? 'star';
+}
+
 const pointsChip = (game: Game): string => {
   const pts = game.save.character === 'mage'
     ? (game.save.mage.loadouts[game.save.mage.active]?.points ?? 0)
@@ -90,7 +112,7 @@ export function renderSkills(game: Game, rerender: (game: Game) => void): HTMLEl
         const major = true;
         const compact = n.kind === 'passive' && n.at < 30;
         return `<button type="button" class="cst-node major ${compact ? 'compact' : ''} ${on ? 'on' : ''} ${counters.length ? 'counter' : ''} t${n.tier}" style="--i:${i}" title="${title}" aria-label="${title}" data-node="${n.id}" data-tip="${tip.replace(/"/g, '&quot;')}" data-kind="${kind}" data-en="${n.nameEn}" data-zh="${n.nameZh}" data-counters="${counters.join(',')}" data-ctr-names="${ctrNames}">
-          <span class="cst-dot">${on ? icon(branchIco(branch), compact ? 'xs' : 'sm') : icon('lock', compact ? 'xs' : 'sm')}${counters.length ? `<span class="cst-ctr" aria-hidden="true">${icon(`kind_${counters[0]}`, 'xs')}</span>` : ''}</span>
+          <span class="cst-dot">${icon(skillIcon(n.id, isMage))}${counters.length ? `<span class="cst-ctr" aria-hidden="true">${icon(`kind_${counters[0]}`, 'xs')}</span>` : ''}</span>
           <span class="cst-label">
             <span class="cst-en">${n.nameEn}</span>
             <span class="cst-zh">${n.nameZh}</span>
@@ -113,7 +135,7 @@ export function renderSkills(game: Game, rerender: (game: Game) => void): HTMLEl
         <div class="cst-arm-line" aria-hidden="true"></div>
         <div class="cst-nodes">${nodeHtml}
           <button type="button" class="cst-node major ult ${ult ? 'on' : ''}" title="${ultTitle}" aria-label="${ultTitle}" data-node="ult-${branch}" data-tip="${ultTip.replace(/"/g, '&quot;')}" data-kind="${dict.ultShort}" data-en="${ultDef.nameEn}" data-zh="${ultDef.nameZh}">
-            <span class="cst-dot">${icon(ult ? 'star' : 'lock', 'sm')}</span>
+            <span class="cst-dot">${icon(skillIcon(`ult-${branch}`, isMage))}</span>
             <span class="cst-label">
               <span class="cst-en">${ultDef.nameEn}</span>
               <span class="cst-zh">${ultDef.nameZh}</span>
@@ -135,7 +157,7 @@ export function renderSkills(game: Game, rerender: (game: Game) => void): HTMLEl
         <div class="constellation ${game.save.character === 'mage' ? 'mage' : 'hero'}" role="group" aria-label="${dict.skills}">
           <div class="cst-core" title="${dict.skillPoints}">${icon('skills')}<b>${s.points}</b></div>
           <div class="cst-detail" id="cst-detail" aria-live="polite">
-            <div class="cst-detail-names"><b class="cst-detail-en"></b><span class="cst-detail-zh"></span></div>
+            <div class="cst-detail-names"><span class="cst-detail-ico"></span><b class="cst-detail-en"></b><span class="cst-detail-zh"></span></div>
             <p class="cst-detail-tip"></p>
             <div class="cst-detail-foot"><span class="cst-detail-kind"></span><span class="cst-detail-ctr"></span></div>
           </div>
@@ -199,6 +221,9 @@ export function renderSkills(game: Game, rerender: (game: Game) => void): HTMLEl
     btn.classList.add('selected');
     if (!detail) return;
     detail.classList.add('on');
+    const glyph = btn.querySelector('.cst-dot > .ico');
+    const slot = detail.querySelector('.cst-detail-ico');
+    if (slot) slot.innerHTML = glyph ? glyph.outerHTML : '';
     detail.querySelector('.cst-detail-en')!.textContent = btn.dataset.en ?? '';
     detail.querySelector('.cst-detail-zh')!.textContent = btn.dataset.zh ?? '';
     detail.querySelector('.cst-detail-tip')!.textContent = btn.dataset.tip ?? '';
