@@ -7,7 +7,8 @@ import { spellById } from '../game/SpellTree';
 import { itemDef, previewCoins } from '../game/techKit';
 import { linesFor, lineColor } from '../game/lines';
 import { icon, langIcon } from './icons';
-import { el, portrait, iconBtn, langBtn, qualityLabel, stationName, loadoutStrip, wireLoadoutStrip } from './uiShared';
+import { el, iconBtn, langBtn, qualityLabel, stationName, loadoutStrip, wireLoadoutStrip } from './uiShared';
+import { charPortraitUrl } from '../game/charPortraits';
 
 
 function mageActions(game: Game, dict: ReturnType<typeof t>): string {
@@ -322,7 +323,7 @@ export function renderEnd(game: Game, win: boolean): HTMLElement {
       <div class="panel end-panel ${win ? 'win' : 'lose'}">
         ${
           win
-            ? `<div class="end-hero">${portrait('hero', 'lg')}<span class="burst" aria-hidden="true"></span></div>`
+            ? `<div class="end-hero">${endPortrait(game)}<span class="burst" aria-hidden="true"></span></div>`
             : `<div class="end-icon lose-ico">${icon('door', 'xl')}<span class="x">${icon('close')}</span></div>`
         }
         <h2>${win ? dict.win : dict.lose}</h2>
@@ -356,6 +357,13 @@ export function renderEnd(game: Game, win: boolean): HTMLElement {
     if (next) game.startLevel(next.id);
   });
   return p;
+}
+
+function endPortrait(game: Game): string {
+  const id = game.trial?.character ?? game.save.character;
+  const url = charPortraitUrl(id);
+  if (!url) return '';
+  return `<img class="end-portrait who-${id}" src="${url}" width="112" height="112" alt="" />`;
 }
 
 function endBonus(game: Game): string {

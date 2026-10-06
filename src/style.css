@@ -709,6 +709,18 @@ button {
   justify-content: center;
   margin-top: -2px;
 }
+.end-portrait {
+  position: relative;
+  width: 112px;
+  height: 112px;
+  border-radius: 50%;
+  object-fit: cover;
+  object-position: center 18%;
+  background: #152238;
+  box-shadow: 0 0 0 4px #5ad2ff, 0 10px 26px rgba(0, 0, 0, 0.5);
+}
+.end-portrait.who-mage { background: #1a1030; box-shadow: 0 0 0 4px #b388ff, 0 10px 26px rgba(0, 0, 0, 0.5); }
+.end-portrait.who-tech { background: #0d1410; box-shadow: 0 0 0 4px #ffb03a, 0 10px 26px rgba(0, 0, 0, 0.5); }
 .end-hero .burst {
   position: absolute;
   inset: -16px;
