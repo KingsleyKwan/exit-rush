@@ -408,6 +408,7 @@ export class PlayerSim {
       if (ag) {
         ag.bumpAcc = Math.max(ag.bumpAcc, 0.6 + power * 0.4);
         crowd.annoy(ag);
+        if (ag.boss) crowd.hitBoss(ag, power * this.mods.pushForce * chargeMul * typeMul);
         // STR 40 Split: break the couple's hand-hold.
         if (this.mods.splitCouples && ag.partner && crowd.splitCouple(ag)) this.stats.splits++;
         emit({ t: 'shoveHit', x: o.x, z: o.z, power, agentId: ag.id });

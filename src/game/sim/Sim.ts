@@ -1,5 +1,5 @@
-import { World, type Body, type Box } from './Physics';
-import { CrowdSim } from './CrowdSim';
+import { World, resetBodyIds, type Body, type Box } from './Physics';
+import { CrowdSim, resetAgentIds } from './CrowdSim';
 import { PlayerSim, type PlayerInput } from './PlayerSim';
 import {
   CAR_Z_MAX,
@@ -55,10 +55,12 @@ export class Sim {
   };
 
   constructor(level: LevelDef, mods: SkillModifiers, rng: Rng) {
+    resetBodyIds();
+    resetAgentIds();
     const P = TUNING.physics;
     this.level = level;
     this.timeLeft = level.timer;
-    this.openBays = openDoorBays(level.id);
+    this.openBays = openDoorBays(level.id, level.openDoors);
     this.world = new World({
       iterations: P.iterations,
       beta: P.contactBeta,
@@ -308,11 +310,16 @@ export class Sim {
         ? 1 - TUNING.skills.standFirmMul
         : Math.min(0.85, pl.mods.resist * 1.2),
       threadCouples: pl.mods.threadCouples,
+      pushForce: pl.mods.pushForce,
+      standFirm: pl.mods.standFirm,
+      playerCharging: pl.isCharging(now),
       emit: this.emit,
-      onPlayerShoved: () => {
+      onPlayerShoved: (_dx, _dz, _p, heavy) => {
         this.lastAngryHit = now;
         pl.stunT =
-          TUNING.player.stunTime * (1 - pl.mods.resist) * (pl.mods.standFirm ? TUNING.skills.standFirmMul : 1);
+          TUNING.player.stunTime *
+          (1 - pl.mods.resist) *
+          (pl.mods.standFirm ? TUNING.skills.standFirmMul : heavy ? TUNING.boss.angry.heavyStun : 1);
       },
     });
     // Tell the player which bay to aim for (dash / aim assist).

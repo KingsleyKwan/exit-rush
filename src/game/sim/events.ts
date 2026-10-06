@@ -8,6 +8,8 @@ export type SimEvent =
   | { t: 'angryWindup'; agentId: number }
   | { t: 'angryHit'; x: number; z: number; dx: number; dz: number; power: number }
   | { t: 'ult'; kind: UltKind; x: number; z: number; dx: number; dz: number }
+  | { t: 'bossBounce'; x: number; z: number; dx: number; dz: number; power: number }
+  | { t: 'bossYield'; x: number; z: number; agentId: number }
   | { t: 'milestone'; pct: number }
   | { t: 'winded' }
   | { t: 'win' }

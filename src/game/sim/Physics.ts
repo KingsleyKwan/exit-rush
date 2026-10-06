@@ -72,6 +72,10 @@ export interface WorldConfig {
 export type ImpactFn = (a: Body, b: Body | null, j: number, x: number, z: number) => void;
 
 let nextBodyId = 1;
+/** v0.7: reset per Sim so ids (used for jitter angles) don't leak between runs → bot runs are seed-deterministic. */
+export function resetBodyIds(): void {
+  nextBodyId = 1;
+}
 
 export interface BodyInit {
   x: number;

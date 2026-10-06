@@ -38,8 +38,12 @@ export function doorWallX(): number {
  * How many / which door bays are open for this level.
  * Early levels: all three. Mid: two (mid + near player). Late / L100: one (mid).
  */
-export function openDoorBays(levelId: number): number[] {
+export function openDoorBays(levelId: number, override?: 1 | 2 | 3): number[] {
   const all = [...DOOR_BAYS];
+  // v0.7: per-level override (2-door relief levels in 31–99).
+  if (override === 3) return all;
+  if (override === 2) return [all[1], all[2]];
+  if (override === 1) return [all[1]];
   if (levelId >= 100) return [all[1]];
   // v0.5: fewer open bays as the 1–30 curve tightens
   if (levelId >= 24) return [all[1]];
@@ -228,6 +232,41 @@ export const TUNING = {
      * (≈24.5/s): painful, not instantly fatal. Unbothered (sta_t3c) ×`skills.unbotheredLoudMul`.
      */
     loud: { radius: 1.3, drainPeak: 40, edge: 0.08, stackCap: 1.0, regenMul: 0.5 },
+  },
+
+  /**
+   * v0.7 bosses: an oversized, heavy "king" of a type that sits between you and the exit.
+   * Not defeated — worn down: pushing against him (contact) and shoving drain his
+   * stubbornness bar; at 0 he yields (steps aside, mechanic paused) for `yieldTime`,
+   * then slowly regains his resolve. STR push force speeds the drain.
+   */
+  boss: {
+    scale: 1.75,
+    /** L100 crowds eight kings into one car: smaller. */
+    scaleFinale: 1.4,
+    radiusMul: 1.5,
+    massMul: 3.2,
+    anchorMul: 1.9,
+    /** Anchor while yielding (he lets himself be moved). */
+    yieldAnchor: 0.25,
+    yieldTime: 3.2,
+    /** Stubbornness drained per second of the player leaning on him. */
+    contactDrain: 0.26,
+    /** Iron Bull Charge (STR ult) multiplies the contact drain. */
+    chargeDrainMul: 5,
+    /** Per full-power shove hit (× push force × charge). */
+    shoveDrain: 0.2,
+    /** Regained per second when nobody is pushing (after a yield or between pushes). */
+    regen: 0.06,
+    /** Step-aside distance while yielding. */
+    stepAside: 1.15,
+    luggage: { caseRadiusMul: 2.4, caseMassMul: 3, rest: 0.7, bounce: 2.8, bounceCd: 0.6 },
+    stench: { auraMul: 1.5 },
+    family: { kidEvery: 2.4, maxKids: 6 },
+    brat: { dashEvery: 1.25, dashImpulse: 3.6, range: 2.8, bump: 3.4, bumpCd: 0.7 },
+    couple: { rest: 1.2, maxForceMul: 3 },
+    /** Boss shoves cut through generic STR resist (only Stand Firm keeps its full effect). */
+    angry: { rangeMul: 1.6, impulseMul: 1.8, windupMul: 1.5, intervalMul: 0.45, chargeForce: 4, resistKeep: 0.35, heavyStun: 2.6 },
   },
 
   /**

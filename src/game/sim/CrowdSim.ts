@@ -1,5 +1,6 @@
-import { PASS_KID, PASS_LUGGAGE, PASS_SQUAT, applyImpulse, createBody, type Body, type World } from './Physics';
+import { PASS_KID, PASS_LUGGAGE, PASS_SQUAT, applyImpulse, createBody, setMass, type Body, type World } from './Physics';
 import { PASSENGER_DEFS, type PassengerKind } from '../PassengerTypes';
+import type { BossKind } from '../bosses';
 import { crowdCount, type LevelDef } from '../levels';
 import { CAR_Z_MAX, CAR_Z_MIN, TUNING, doorWallX, nearestDoorBay } from './tuning';
 import type { Emit } from './events';
@@ -41,6 +42,31 @@ export interface Agent {
   splitUntil: number;
   /** Brats: no zigzag / darting until this sim time (STA Second Wind). */
   dazedUntil: number;
+  /** v0.7 boss state (shared by both halves of the couple boss); null for ordinary passengers. */
+  boss: BossState | null;
+  /** Original standing spot (bosses step aside from it while yielding, then return). */
+  originX: number;
+  originZ: number;
+}
+
+/** v0.7: a boss is worn down, not defeated — see TUNING.boss. */
+export interface BossState {
+  kind: BossKind;
+  /** 1 = immovable … 0 = yields. */
+  stub: number;
+  yieldUntil: number;
+  /** Visual / mechanic size multiplier (TUNING.boss.scale, smaller at L100). */
+  size: number;
+  /** Mechanic cooldown (kids, dashes). */
+  cd: number;
+  /** Player-hit cooldown (bounce, bump). */
+  hitCd: number;
+  lastPushT: number;
+  /** Last time the player leaned on the royal couple's hand-hold. */
+  linkT: number;
+  /** Luggage / couple link rest length override. */
+  rest: number;
+  clusterId: number;
 }
 
 export interface CrowdCtx {
@@ -67,10 +93,17 @@ export interface CrowdCtx {
   angryImmune: boolean;
   /** 0–1 reduction of angry knockback (STR resist). */
   angryResist: number;
+  /** v0.7: STR ult Iron Bull Charge active — rams through a boss's stubbornness. */
+  playerCharging?: boolean;
+  /** v0.7: STR 60 Stand Firm owned (boss shoves ignore other resist). */
+  standFirm?: boolean;
+  /** v0.7: player push-force multiplier (STR) — speeds up wearing a boss down. */
+  pushForce?: number;
   /** SPD Thread: the couple hand-hold link does not block the player. */
   threadCouples?: boolean;
   emit: Emit;
-  onPlayerShoved: (dx: number, dz: number, power: number) => void;
+  /** `heavy` = a boss shove (longer stun unless Stand Firm). */
+  onPlayerShoved: (dx: number, dz: number, power: number, heavy?: boolean) => void;
 }
 
 function pickKind(mix: LevelDef['mix'], rng: Rng): PassengerKind {
@@ -90,6 +123,11 @@ function clamp(v: number, a: number, b: number): number {
 
 let agentSeq = 0;
 let groupSeq = 0;
+/** v0.7: reset per Sim (agent ids feed wander phase) so runs are seed-deterministic. */
+export function resetAgentIds(): void {
+  agentSeq = 0;
+  groupSeq = 0;
+}
 
 export class CrowdSim {
   readonly agents: Agent[] = [];
@@ -107,6 +145,11 @@ export class CrowdSim {
   constructor(world: World, rng: Rng) {
     this.world = world;
     this.rng = rng;
+  }
+
+  /** Sim time of the last update (views use it for boss yield state). */
+  get time(): number {
+    return this.now;
   }
 
   get bodyCount(): number {
@@ -171,6 +214,9 @@ export class CrowdSim {
       scale,
       splitUntil: -1,
       dazedUntil: -1,
+      boss: null,
+      originX: x,
+      originZ: z,
     };
     // Hurdle hops the suitcase only; the owner still blocks (keeps L100 luggage walls honest).
     if (kind === 'squat') body.passTag = PASS_SQUAT;
@@ -283,6 +329,7 @@ export class CrowdSim {
         have++;
       }
     }
+    if (level.boss?.length) this.spawnBosses(level.boss, openBays, level.boss.length > 1);
     // Boarders waiting on the platform beyond the left wall.
     const C = TUNING.crowd;
     this.boardBudget = Math.round(C.boardBudgetBase + level.pressure * C.boardBudgetPerPressure);
@@ -295,6 +342,260 @@ export class CrowdSim {
       q += made;
     }
     this.boardBudget = Math.max(0, this.boardBudget - q);
+  }
+
+  // ------------------------------------------------------------------ bosses
+
+  /** Remove one passenger (and its suitcase / hand-hold) — used to clear room for a boss. */
+  private removeAgent(a: Agent): void {
+    this.world.remove(a.body);
+    if (a.caseBody) this.world.remove(a.caseBody);
+    if (a.partner) a.partner.partner = null;
+    this.byBody.delete(a.body.id);
+    const i = this.agents.indexOf(a);
+    if (i >= 0) this.agents.splice(i, 1);
+  }
+
+  private clearAround(x: number, z: number, r: number): void {
+    for (const a of [...this.agents]) {
+      if (a.boss) continue;
+      const near = (b: Body) => Math.hypot(b.x - x, b.z - z) < r + b.r;
+      if (near(a.body) || (a.caseBody && near(a.caseBody))) {
+        const p = a.partner;
+        this.removeAgent(a);
+        if (p && !p.boss) this.removeAgent(p);
+      }
+    }
+  }
+
+  /**
+   * Bosses stand between the player's start (+X, +Z) and the exit bay. Single-boss levels
+   * use a per-type spot; the L100 finale packs all eight along the route at a smaller size.
+   */
+  private spawnBosses(kinds: readonly BossKind[], openBays: readonly number[], finale: boolean): void {
+    const B = TUNING.boss;
+    const wall = doorWallX();
+    const bay = nearestDoorBay(3.05, openBays);
+    const size = finale ? B.scaleFinale : B.scale;
+    // Single bosses plant themselves in the door vestibule: push him aside, slip past, or counter.
+    const single: Record<BossKind, [number, number]> = {
+      luggage: [0.75, 0.8],
+      stench: [0.66, 0],
+      squat: [0.6, 0.2],
+      family: [0.68, 0],
+      brat: [0.7, 0],
+      couple: [0.72, 0],
+      angry: [0.66, 0],
+      loud: [0.68, 0],
+    };
+    // Finale: a gauntlet of kings along the route (door mouth kept passable — the jam is the kings).
+    const fin: Record<BossKind, [number, number]> = {
+      squat: [0.95, -0.55],
+      couple: [1.3, 0.45],
+      luggage: [2.05, 1.5],
+      angry: [1.55, 2.4],
+      stench: [2.9, 1.2],
+      family: [0.8, 2.35],
+      brat: [2.4, -0.7],
+      loud: [3.25, -1.9],
+    };
+    for (const kind of kinds) {
+      const [ox, oz] = (finale ? fin : single)[kind];
+      const x = wall + ox;
+      const z = clamp(bay + oz, CAR_Z_MIN + 0.5, CAR_Z_MAX - 0.5);
+      this.spawnBoss(kind, x, z, size);
+    }
+  }
+
+  private makeBossBody(kind: BossKind, x: number, z: number, size: number, state: BossState): Agent {
+    const B = TUNING.boss;
+    const k = size / B.scale;
+    const def = PASSENGER_DEFS[kind];
+    // Floor the base size so the tiny brat still makes a king-sized obstacle.
+    const r = Math.max(0.24, def.radius) * (1 + (B.radiusMul - 1) * k);
+    this.clearAround(x, z, r + 0.08);
+    const a = this.makeAgent(kind, x, z, 'rider', false);
+    a.body.r = r;
+    setMass(a.body, Math.max(1.3, def.mass) * (1 + (B.massMul - 1) * k));
+    a.scale = (def.scale ?? 1) * size;
+    a.boss = state;
+    a.dazedUntil = -1;
+    a.shoveCd = 1.2;
+    return a;
+  }
+
+  /** Spawn one boss (public for scripted tests). */
+  spawnBoss(kind: BossKind, x: number, z: number, size: number = TUNING.boss.scale): void {
+    const B = TUNING.boss;
+    const st: BossState = { kind, stub: 1, yieldUntil: -1, size, cd: 1.2, hitCd: 0, lastPushT: -9, linkT: -9, rest: 0, clusterId: 0 };
+    if (kind === 'couple') {
+      // Hand in hand across the approach to the door (Z span), both crowned.
+      st.rest = B.couple.rest * (size / B.scale);
+      const a = this.makeBossBody('couple', x, z - st.rest / 2, size, st);
+      const b = this.makeBossBody('couple', x, z + st.rest / 2, size, st);
+      a.partner = b;
+      b.partner = a;
+      return;
+    }
+    const a = this.makeBossBody(kind, x, z, size, st);
+    if (kind === 'luggage') {
+      const L = TUNING.types.luggage;
+      const BL = B.luggage;
+      const k = size / B.scale;
+      st.rest = BL.rest * k;
+      const cr = L.caseRadius * (1 + (BL.caseRadiusMul - 1) * k);
+      // Giant case parked on the player's side of him.
+      // Giant case parked in the doorway itself (owner stands just inside, beside the door).
+      const cx = x - 0.28;
+      const cz = z - st.rest;
+      this.clearAround(cx, cz, cr + 0.05);
+      const g = ++groupSeq + 10000;
+      const cb = createBody({ x: cx, z: cz, r: cr, mass: L.caseMass * (1 + (BL.caseMassMul - 1) * k), damping: L.caseDamping, restitution: 0.3, maxSpeed: 5, group: g });
+      cb.passTag = PASS_LUGGAGE;
+      a.body.group = g;
+      this.world.add(cb);
+      a.caseBody = cb;
+    } else if (kind === 'family') {
+      st.clusterId = a.clusterId = ++this.clusterSeq;
+      for (let k = 0; k < 2; k++) this.spawnBossKid(a);
+    }
+  }
+
+  /** 大家長: one more kid joins the trail (toward the player — the trail is in your way). */
+  private spawnBossKid(lead: Agent, towardX = 1, towardZ = 1): boolean {
+    const st = lead.boss!;
+    if (this.world.bodies.length >= TUNING.physics.maxBodies) return false;
+    let n = 0;
+    for (const o of this.agents) if (o.isKid && o.clusterId === st.clusterId) n++;
+    if (n >= TUNING.boss.family.maxKids) return false;
+    const l = Math.hypot(towardX, towardZ) || 1;
+    const off = lead.body.r + 0.3 + n * 0.12;
+    const px = lead.body.x + (towardX / l) * off + (this.rng() - 0.5) * 0.5;
+    const pz = lead.body.z + (towardZ / l) * off + (this.rng() - 0.5) * 0.5;
+    const r = PASSENGER_DEFS.family.radius * 0.78;
+    const spot = this.findSpot(clamp(px, -TUNING.car.halfWidth + 0.3, TUNING.car.halfWidth - 0.3), clamp(pz, CAR_Z_MIN + 0.3, CAR_Z_MAX - 0.3), r, 0.5);
+    if (!spot) return false;
+    const kid = this.makeAgent('family', spot[0], spot[1], 'rider', true);
+    kid.clusterId = st.clusterId;
+    kid.bumpAcc = 1;
+    return true;
+  }
+
+  /** Boss agents (both couple halves included). */
+  bosses(): Agent[] {
+    return this.agents.filter((a) => a.boss);
+  }
+
+  /** Called when the player's shove lands on a boss: chips the stubbornness bar. */
+  hitBoss(a: Agent, power: number): void {
+    const s = a.boss;
+    if (!s || s.yieldUntil > this.now) return;
+    s.stub = Math.max(0, s.stub - TUNING.boss.shoveDrain * power);
+    s.lastPushT = this.now;
+  }
+
+  private updateBosses(dt: number, ctx: CrowdCtx): void {
+    const B = TUNING.boss;
+    const pl = ctx.player;
+    const groups = new Map<BossState, Agent[]>();
+    for (const a of this.agents) {
+      if (!a.boss) continue;
+      const g = groups.get(a.boss);
+      if (g) g.push(a);
+      else groups.set(a.boss, [a]);
+    }
+    for (const [s, list] of groups) {
+      const yielding = s.yieldUntil > ctx.time;
+      s.hitCd -= dt;
+      // Leaning on him (body or his suitcase) while moving into him wears him down.
+      let touching = ctx.time - s.linkT < 0.05;
+      if (ctx.playerMoving > 0.2) {
+        for (const a of list) {
+          for (const b of a.caseBody ? [a.body, a.caseBody] : [a.body]) {
+            const dx = b.x - pl.x;
+            const dz = b.z - pl.z;
+            const d = Math.hypot(dx, dz) || 1e-6;
+            if (d < b.r + pl.r + 0.07 && (dx * ctx.playerDirX + dz * ctx.playerDirZ) / d > 0.15) touching = true;
+          }
+        }
+      }
+      if (!yielding) {
+        if (touching) {
+          s.stub -= B.contactDrain * (ctx.pushForce ?? 1) * ctx.playerMoving * (ctx.playerCharging ? B.chargeDrainMul : 1) * dt;
+          s.lastPushT = ctx.time;
+        } else if (ctx.time - s.lastPushT > 0.8) {
+          s.stub = Math.min(1, s.stub + B.regen * dt);
+        }
+        if (s.stub <= 0) {
+          // Yield: step aside, sideways off the player's line toward the door.
+          s.stub = 0;
+          s.yieldUntil = ctx.time + B.yieldTime;
+          const dirX = ctx.playerDirX || -0.7;
+          const dirZ = ctx.playerDirZ || -0.7;
+          for (const a of list) {
+            const lat = (a.body.x - pl.x) * -dirZ + (a.body.z - pl.z) * dirX;
+            const sg = lat >= 0 ? 1 : -1;
+            a.homeX = clamp(a.originX - dirZ * sg * B.stepAside, -TUNING.car.halfWidth + 0.45, TUNING.car.halfWidth - 0.45);
+            a.homeZ = clamp(a.originZ + dirX * sg * B.stepAside, CAR_Z_MIN + 0.45, CAR_Z_MAX - 0.45);
+            a.splitUntil = s.yieldUntil;
+            a.windup = -1;
+            a.bumpAcc = 1;
+          }
+          ctx.emit({ t: 'bossYield', x: list[0].body.x, z: list[0].body.z, agentId: list[0].id });
+        }
+      } else if (s.yieldUntil - ctx.time <= dt) {
+        for (const a of list) {
+          a.homeX = a.originX;
+          a.homeZ = a.originZ;
+        }
+      }
+      if (yielding) continue;
+      const a = list[0];
+      const b = a.body;
+      const dx = pl.x - b.x;
+      const dz = pl.z - b.z;
+      const d = Math.hypot(dx, dz) || 1e-6;
+      if (s.kind === 'luggage' && a.caseBody && s.hitCd <= 0 && !(pl.passMask & PASS_LUGGAGE)) {
+        // Giant suitcase: bouncy — walking into it springs you back.
+        const c = a.caseBody;
+        const cx = pl.x - c.x;
+        const cz = pl.z - c.z;
+        const cd = Math.hypot(cx, cz) || 1e-6;
+        if (cd < c.r + pl.r + 0.05) {
+          const j = B.luggage.bounce * (1 - ctx.angryResist * 0.5);
+          // Springs you back into the car (away from the door), not around the case.
+          let bx = cx / cd + 1.2;
+          let bz = cz / cd;
+          const bl = Math.hypot(bx, bz) || 1;
+          bx /= bl;
+          bz /= bl;
+          applyImpulse(pl, bx * j, bz * j);
+          s.hitCd = B.luggage.bounceCd;
+          a.bumpAcc = 0.8;
+          ctx.emit({ t: 'bossBounce', x: pl.x, z: pl.z, dx: bx, dz: bz, power: j });
+        }
+      } else if (s.kind === 'family') {
+        s.cd -= dt * (1 - ctx.calm);
+        if (s.cd <= 0) {
+          s.cd = B.family.kidEvery;
+          this.spawnBossKid(a, dx, dz);
+        }
+      } else if (s.kind === 'brat' && a.dazedUntil <= ctx.time) {
+        s.cd -= dt * (1 - ctx.calm);
+        if (s.cd <= 0 && d < B.brat.range) {
+          s.cd = B.brat.dashEvery * (0.8 + this.rng() * 0.4);
+          applyImpulse(b, (dx / d) * B.brat.dashImpulse * b.mass, (dz / d) * B.brat.dashImpulse * b.mass);
+          a.bumpAcc = 1;
+        }
+        const sp = Math.hypot(b.vx, b.vz);
+        if (d < b.r + pl.r + 0.08 && sp > 1.2 && s.hitCd <= 0 && !ctx.angryImmune) {
+          const j = B.brat.bump * (1 - (ctx.standFirm ? ctx.angryResist : ctx.angryResist * B.angry.resistKeep));
+          applyImpulse(pl, (dx / d) * j, (dz / d) * j);
+          s.hitCd = B.brat.bumpCd;
+          ctx.emit({ t: 'bossBounce', x: pl.x, z: pl.z, dx: dx / d, dz: dz / d, power: j });
+        }
+      }
+    }
   }
 
   private spawnBoarderUnit(level: LevelDef, openBays: readonly number[]): number {
@@ -369,12 +670,13 @@ export class CrowdSim {
       const rx = b.x - px;
       const rz = b.z - pz;
       const d = Math.hypot(rx, rz);
-      if (d > 1.1 || d < 1e-4) continue;
+      const reach = 1.1 * (a.boss ? 1.3 : 1);
+      if (d > reach || d < 1e-4) continue;
       // Lateral alignment: beside you more than in front.
       const along = (rx * aimX + rz * aimZ) / d;
       const lat = Math.abs(rx * aimZ - rz * aimX) / d;
       if (lat > 0.35 && along < 0.55) {
-        extra += T.lateralDrag * (1 - d / 1.1);
+        extra += T.lateralDrag * (1 - d / reach);
       }
     }
     return Math.min(0.45, extra);
@@ -389,8 +691,9 @@ export class CrowdSim {
     let n = 0;
     for (const a of this.agents) {
       if (!PASSENGER_DEFS[a.kind].noise) continue;
+      const R = L.radius * (a.boss ? a.boss.size : 1);
       const d = Math.hypot(a.body.x - x, a.body.z - z);
-      if (d < L.radius) n += L.edge + (1 - L.edge) * (1 - d / L.radius);
+      if (d < R) n += L.edge + (1 - L.edge) * (1 - d / R);
     }
     return Math.min(L.stackCap, n);
   }
@@ -401,8 +704,10 @@ export class CrowdSim {
     for (const a of this.agents) {
       const def = PASSENGER_DEFS[a.kind];
       if (!def.auraSlow) continue;
+      const k = a.boss ? a.boss.size : 1;
+      const Ra = R * k;
       const d = Math.hypot(a.body.x - x, a.body.z - z);
-      if (d < R) s += def.auraSlow * (1 - d / R);
+      if (d < Ra) s += def.auraSlow * (a.boss ? TUNING.boss.stench.auraMul : 1) * (1 - d / Ra);
     }
     return Math.min(0.75, s);
   }
@@ -496,17 +801,21 @@ export class CrowdSim {
         // Rider (or boarder still waiting): spring to standing spot.
         const dx = a.homeX - b.x;
         const dz = a.homeZ - b.z;
-        const k = C.anchorK * def.anchorMul * m;
+        const bossYield = !!a.boss && a.boss.yieldUntil > ctx.time;
+        const anchorMul = a.boss ? Math.max(1.3, def.anchorMul) * (bossYield ? TUNING.boss.yieldAnchor : TUNING.boss.anchorMul) : def.anchorMul;
+        const k = C.anchorK * anchorMul * m;
         fx = dx * k;
         fz = dz * k;
-        const cap = C.anchorMax * def.anchorMul * m;
+        const cap = C.anchorMax * Math.max(def.anchorMul, anchorMul) * m;
         const fm = Math.hypot(fx, fz);
         if (fm > cap) {
           fx *= cap / fm;
           fz *= cap / fm;
         }
         const disp = Math.hypot(dx, dz);
-        if (disp > C.driftDist) {
+        if (a.boss) {
+          // Bosses never give up their spot (they only step aside while yielding).
+        } else if (disp > C.driftDist) {
           a.displacedT += dt;
           if (a.displacedT > C.driftAfter) {
             // Give up the old spot: the crowd compresses / re-settles.
@@ -518,14 +827,14 @@ export class CrowdSim {
           a.displacedT = Math.max(0, a.displacedT - dt);
         }
         // Boarding pressure squeezes riders near the left doors toward the far (+X) wall.
-        if (a.mode === 'rider' && ctx.pressureField > 0) {
+        if (a.mode === 'rider' && !a.boss && ctx.pressureField > 0) {
           const dd = b.x - ctx.doorWallX;
           if (dd > 0 && dd < C.pressureRange) {
             fx += C.pressureForce * ctx.pressureField * (1 - dd / C.pressureRange) * m;
           }
         }
         // Sidestep for the player ("唔該借借") — stronger with WIS.
-        if (a.mode === 'rider' && ctx.playerMoving > 0.2 && ctx.yieldK > 0) {
+        if (a.mode === 'rider' && !a.boss && ctx.playerMoving > 0.2 && ctx.yieldK > 0) {
           const rx = b.x - pl.x;
           const rz = b.z - pl.z;
           const along = rx * ctx.playerDirX + rz * ctx.playerDirZ;
@@ -563,6 +872,7 @@ export class CrowdSim {
       b.fz += fz;
     }
 
+    this.updateBosses(dt, ctx);
     this.applyLinks(dt, ctx);
     this.applyStenchRepel();
   }
@@ -574,22 +884,31 @@ export class CrowdSim {
     const dx = pl.x - a.body.x;
     const dz = pl.z - a.body.z;
     const d = Math.hypot(dx, dz) || 1e-6;
-    const reach = T.range + pl.r + a.body.r;
+    const BA = TUNING.boss.angry;
+    const boss = a.boss;
+    if (boss && boss.yieldUntil > ctx.time) return;
+    const reach = T.range * (boss ? BA.rangeMul : 1) + pl.r + a.body.r;
     if (a.windup >= 0) {
       a.windup -= dt * (1 - ctx.calm);
+      if (boss) {
+        // 嬲嬲豬王 charges while winding up.
+        a.body.fx += (dx / d) * BA.chargeForce * a.body.mass * (1 - ctx.calm);
+        a.body.fz += (dz / d) * BA.chargeForce * a.body.mass * (1 - ctx.calm);
+      }
       if (a.windup < 0) {
         a.windup = -1;
-        a.shoveCd = (def.shoveInterval ?? 3) * (0.7 + this.rng() * 0.6);
+        a.shoveCd = (def.shoveInterval ?? 3) * (0.7 + this.rng() * 0.6) * (boss ? BA.intervalMul : 1);
         if (d < reach * 1.25 && !ctx.angryImmune) {
           const nx = dx / d;
           const nz = dz / d;
-          const power = T.impulse * (def.shoveForce ?? 2.8) / 2.8;
-          const j = power * (1 - ctx.angryResist);
+          const power = (T.impulse * (def.shoveForce ?? 2.8)) / 2.8 * (boss ? BA.impulseMul : 1);
+          const resist = boss && !ctx.standFirm ? ctx.angryResist * BA.resistKeep : ctx.angryResist;
+          const j = power * (1 - resist);
           applyImpulse(pl, nx * j, nz * j);
           // Recoil + push neighbours: the angry man barges.
           applyImpulse(a.body, -nx * j * 0.25, -nz * j * 0.25);
           a.bumpAcc = 1;
-          ctx.onPlayerShoved(nx, nz, j);
+          ctx.onPlayerShoved(nx, nz, j, !!boss);
           ctx.emit({ t: 'angryHit', x: pl.x, z: pl.z, dx: nx, dz: nz, power: j });
         }
         // Shoulder-barge anyone else nearby.
@@ -608,7 +927,7 @@ export class CrowdSim {
     }
     a.shoveCd -= dt * (1 - ctx.calm);
     if (a.shoveCd <= 0 && d < reach && ctx.calm < 0.5) {
-      a.windup = T.windup;
+      a.windup = T.windup * (boss ? BA.windupMul : 1);
       ctx.emit({ t: 'angryWindup', agentId: a.id });
     }
   }
@@ -648,9 +967,12 @@ export class CrowdSim {
           continue;
         }
       }
+      if (a.boss) this.handHoldBarrier(a, p, ctx);
       const relV = (pb.vx - ab.vx) * nx + (pb.vz - ab.vz) * nz;
-      let f = T.couple.k * (d - T.couple.rest) + T.couple.damping * relV;
-      f = clamp(f, -T.couple.maxForce, T.couple.maxForce);
+      const rest = a.boss ? a.boss.rest : T.couple.rest;
+      const maxF = T.couple.maxForce * (a.boss ? TUNING.boss.couple.maxForceMul : 1);
+      let f = T.couple.k * (a.boss ? 2 : 1) * (d - rest) + T.couple.damping * relV;
+      f = clamp(f, -maxF, maxF);
       ab.fx += nx * f;
       ab.fz += nz * f;
       pb.fx -= nx * f;
@@ -668,7 +990,9 @@ export class CrowdSim {
       const nx = dx / d;
       const nz = dz / d;
       const relV = (cb.vx - ab.vx) * nx + (cb.vz - ab.vz) * nz;
-      const f = clamp(L.k * (d - L.rest) + L.linkDamping * relV, -60, 60);
+      const f = a.boss
+        ? clamp(L.k * 2 * (d - a.boss.rest) + L.linkDamping * relV, -160, 160)
+        : clamp(L.k * (d - L.rest) + L.linkDamping * relV, -60, 60);
       ab.fx += nx * f;
       ab.fz += nz * f;
       cb.fx -= nx * f;
@@ -703,11 +1027,49 @@ export class CrowdSim {
     void dt;
   }
 
+  /** 黏身情侶王: their joined hands are a rope across the aisle — you can't walk through it. */
+  private handHoldBarrier(a: Agent, p: Agent, ctx: CrowdCtx): void {
+    const pl = ctx.player;
+    const ab = a.body;
+    const pb = p.body;
+    const sx = pb.x - ab.x;
+    const sz = pb.z - ab.z;
+    const L2 = sx * sx + sz * sz;
+    if (L2 < 1e-6) return;
+    const t = ((pl.x - ab.x) * sx + (pl.z - ab.z) * sz) / L2;
+    if (t <= 0.05 || t >= 0.95) return;
+    const qx = ab.x + sx * t;
+    const qz = ab.z + sz * t;
+    let nx = pl.x - qx;
+    let nz = pl.z - qz;
+    const d = Math.hypot(nx, nz);
+    const reach = pl.r + 0.06;
+    if (d >= reach) return;
+    if (d < 1e-5) {
+      nx = sz;
+      nz = -sx;
+    }
+    const nl = Math.hypot(nx, nz) || 1;
+    nx /= nl;
+    nz /= nl;
+    // Push the player back out to their side and cancel velocity into the rope.
+    const pen = reach - d;
+    pl.x += nx * pen * 0.6;
+    pl.z += nz * pen * 0.6;
+    const vn = pl.vx * nx + pl.vz * nz;
+    if (vn < 0) {
+      pl.vx -= vn * nx * 1.2;
+      pl.vz -= vn * nz * 1.2;
+    }
+    a.boss!.linkT = ctx.time;
+  }
+
   private applyStenchRepel(): void {
     const S = TUNING.types.stench;
     for (const s of this.agents) {
       if (s.kind !== 'stench') continue;
-      const near = this.world.query(s.body.x, s.body.z, S.repelRadius, this.tmp);
+      const rr = S.repelRadius * (s.boss ? s.boss.size : 1);
+      const near = this.world.query(s.body.x, s.body.z, rr, this.tmp);
       for (const o of near) {
         if (o === s.body) continue;
         const ag = this.byBody.get(o.id);
@@ -715,7 +1077,7 @@ export class CrowdSim {
         const dx = o.x - s.body.x;
         const dz = o.z - s.body.z;
         const d = Math.hypot(dx, dz) || 1e-6;
-        const f = S.repelForce * (1 - d / (S.repelRadius + o.r)) * o.mass;
+        const f = S.repelForce * (1 - d / (rr + o.r)) * o.mass;
         if (f <= 0) continue;
         o.fx += (dx / d) * f;
         o.fz += (dz / d) * f;
