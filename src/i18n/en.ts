@@ -26,7 +26,9 @@ export interface Dict {
   ultSpd: string;
   ultWis: string; // legacy
   ultSta: string;
-  tier3Tbd: string;
+  skCounters: string;
+  skLeap: string;
+  skSecondWind: string;
   skillNodePassive: string;
   skillNodeActive: string;
   door: string;
@@ -141,7 +143,9 @@ export const en: Dict = {
   ultSpd: 'Slip-Off Dash',
   ultWis: 'Iron Stance',
   ultSta: 'Iron Stance',
-  tier3Tbd: 'Tier 3 TBD',
+  skCounters: 'Counters',
+  skLeap: 'Leap',
+  skSecondWind: 'Second Wind',
   skillNodePassive: 'Passive',
   skillNodeActive: 'Active',
   door: 'Door',
