@@ -9,6 +9,11 @@ import { GameAudio } from './Audio';
 import { haptic } from './haptics';
 import { getLevel, playableLevels, isFinaleUnlocked, type LevelDef } from './levels';
 import { MAX_POINTS_PER_LEVEL, POINTS_PER_FIRST_CLEAR, modifiersFromSkills, resetActiveLoadout, switchLoadout } from './SkillTree';
+import { CHARACTERS, characterOf, modsFor, activeTreeState, type CharacterId, type PlayerMods } from './charactersDef';
+import { defaultSpellBar } from './SpellTree';
+import { initEntitlements, entitlements } from './entitlements';
+import { warmCharPortraits } from './charPortraits';
+import { earnedFrom } from './storage';
 import type { IntroKind } from './intros';
 import type { PassengerKind } from './PassengerTypes';
 import { loadSave, writeSave, type QualityLevel, type QualitySetting, type SaveData, type SkillState } from './storage';
@@ -19,14 +24,14 @@ import { TUNING } from './sim/tuning';
 import type { SimEvent, UltKind } from './sim/events';
 import type { PlayerInput } from './sim/PlayerSim';
 
-export type GameScreen = 'menu' | 'levels' | 'legend' | 'boss' | 'intro' | 'playing' | 'paused' | 'skills' | 'win' | 'lose';
+export type GameScreen = 'menu' | 'levels' | 'legend' | 'characters' | 'boss' | 'intro' | 'playing' | 'paused' | 'skills' | 'win' | 'lose';
 
 /** v0.7 boss entrance cutscene lengths (s): first time / repeat visits. */
 export const BOSS_CUT_FULL = 2.6;
 export const BOSS_CUT_SHORT = 1.1;
 
 /** Screens drawn over the full-bleed key art (the 3D view is hidden, so skip rendering it). */
-const BACKDROP_SCREENS: GameScreen[] = ['menu', 'levels', 'legend'];
+const BACKDROP_SCREENS: GameScreen[] = ['menu', 'levels', 'legend', 'characters'];
 
 export interface GameHooks {
   onState: () => void;
@@ -64,6 +69,8 @@ export class Game {
   autoPaused = false;
   /** Skills the current run was started with (spending mid-run applies on the next run). */
   runSkills: SkillState;
+  /** v0.8 resolved mods for the current run. */
+  runMods: PlayerMods;
   lastClear: ClearResult | null = null;
   /** v0.7: running boss entrance cutscene (screen === 'boss'). */
   bossCut: { t: number; start: number; dur: number; full: boolean; slammed: boolean; hold?: boolean } | null = null;
@@ -111,7 +118,11 @@ export class Game {
     this.canvas = canvas;
     this.hooks = hooks;
     this.save = loadSave();
-    this.runSkills = { ...this.save.skills };
+    initEntitlements(this.save.entitlementCache);
+    // Fail-closed: if selected character isn't owned, fall back to hero.
+    if (this.save.character === 'tech' || !entitlements().canPlay(this.save.character)) this.save.character = 'hero';
+    this.runSkills = { ...activeTreeState(this.save) };
+    this.runMods = this.computeMods(this.runSkills);
     setLang(this.save.lang);
     this.audio.applySettings({
       master: this.save.masterVol,
@@ -170,10 +181,52 @@ export class Game {
     this.raf = requestAnimationFrame(this.loop);
   }
 
+
+  private computeMods(skills: SkillState): PlayerMods {
+    const char = characterOf(this.save.character);
+    const bar = this.save.character === 'mage'
+      ? (this.save.mage.spellBars[this.save.mage.active]?.length
+          ? this.save.mage.spellBars[this.save.mage.active]
+          : defaultSpellBar(skills))
+      : [];
+    return modsFor(char, skills, bar);
+  }
+
+  get selectedCharacter(): CharacterId {
+    return this.save.character;
+  }
+
+  selectCharacter(id: CharacterId): boolean {
+    // Gear L ships in v0.8.1 — not selectable yet.
+    if (id === 'tech') return false;
+    if (!entitlements().canPlay(id)) return false;
+    this.save.character = id;
+    // Sync active tree into runSkills for UI.
+    if (id === 'hero') {
+      this.save.skills = { ...this.save.loadouts[this.save.activeLoadout] };
+    } else if (id === 'mage') {
+      const slot = this.save.mage.loadouts[this.save.mage.active] ?? this.save.mage.loadouts[0];
+      // Ensure points match shared earned total.
+      const earned = earnedFrom(this.save.cleared);
+      const spent = slot.str + slot.spd + slot.sta + 10 * ((slot.ultStr?1:0)+(slot.ultSpd?1:0)+(slot.ultSta?1:0));
+      slot.points = Math.max(0, earned - spent);
+      this.save.mage.loadouts[this.save.mage.active] = slot;
+    }
+    this.persist();
+    this.hooks.onState();
+    return true;
+  }
+
+  openCharacters(): void {
+    warmCharPortraits();
+    this.screen = 'characters';
+    this.hooks.onState();
+  }
+
   private makeAmbient(): void {
     const lv = getLevel(5) ?? getLevel(1);
     if (!lv) return;
-    const sim = new Sim(lv, modifiersFromSkills(this.save.skills), Math.random);
+    const sim = new Sim(lv, this.computeMods(activeTreeState(this.save)), Math.random);
     sim.ambient = true;
     sim.player.body.enabled = false;
     this.bindSim(sim);
@@ -228,6 +281,11 @@ export class Game {
   private onWindowBlur = (): void => {
     this.pause(true);
   };
+
+  /** Public toast helper for UI screens (hooks stay private). */
+  toast(msg: string): void {
+    this.hooks.onToast?.(msg);
+  }
 
   persist(): void {
     this.save.lang = getLang();
@@ -341,6 +399,12 @@ export class Game {
     return p ? p.stamina / p.staminaMax : 1;
   }
 
+  manaFrac(): number {
+    const p = this.sim?.player;
+    if (!p || p.manaMax <= 0) return 0;
+    return Math.max(0, Math.min(1, p.mana / p.manaMax));
+  }
+
   /** 大聲公: current loudmouth noise drain on the player (stamina/s; 0 outside every zone). */
   noiseDrain(): number {
     return this.sim && !this.sim.ambient ? this.sim.player.noiseDrain : 0;
@@ -414,9 +478,11 @@ export class Game {
     this.doorBannerOpen = openN;
     this.doorBannerT = openN < 3 ? 3.6 : 0;
     this.closedDoorToastAt = -99;
-    this.runSkills = { ...this.save.skills };
-    const sim = new Sim(level, modifiersFromSkills(this.runSkills), Math.random);
+    this.runSkills = { ...activeTreeState(this.save) };
+    this.runMods = this.computeMods(this.runSkills);
+    const sim = new Sim(level, this.runMods, Math.random);
     this.bindSim(sim);
+    this.player.setSkin(characterOf(this.save.character).skin);
     this.player.mesh.visible = true;
     this.resultDelay = -1;
     this.hitStop = 0;
@@ -553,7 +619,7 @@ export class Game {
   }
 
   /** Menu sub-screens (level select, passenger legend). Only from outside a run. */
-  openScreen(screen: 'levels' | 'legend' | 'menu'): void {
+  openScreen(screen: 'levels' | 'legend' | 'menu' | 'characters'): void {
     if (this.level) return this.goMenu();
     this.screen = screen;
     this.hooks.onState();
@@ -609,14 +675,31 @@ export class Game {
 
   /** v0.7: switch active skill loadout (配點1/2/3). Applies from the next run (runSkills is a copy). */
   setLoadout(idx: number): void {
-    switchLoadout(this.save, idx);
+    if (this.save.character === 'mage') {
+      if (!Number.isInteger(idx) || idx < 0 || idx >= 3 || idx === this.save.mage.active) return;
+      this.save.mage.active = idx;
+      const earned = earnedFrom(this.save.cleared);
+      const slot = this.save.mage.loadouts[idx];
+      const spent = slot.str + slot.spd + slot.sta + 10 * ((slot.ultStr?1:0)+(slot.ultSpd?1:0)+(slot.ultSta?1:0));
+      slot.points = Math.max(0, earned - spent);
+      this.save.mage.loadouts[idx] = slot;
+    } else {
+      switchLoadout(this.save, idx);
+    }
     this.persist();
     this.hooks.onState();
   }
 
   /** v0.7: free instant respec of the active loadout (refunds everything incl. ultimates). */
   resetSkills(): void {
-    resetActiveLoadout(this.save);
+    if (this.save.character === 'mage') {
+      const earned = earnedFrom(this.save.cleared);
+      const empty = { str: 0, spd: 0, sta: 0, ultStr: false, ultSpd: false, ultSta: false, points: earned };
+      this.save.mage.loadouts[this.save.mage.active] = { ...empty };
+      this.save.mage.spellBars[this.save.mage.active] = [];
+    } else {
+      resetActiveLoadout(this.save);
+    }
     this.persist();
     this.hooks.onState();
   }
@@ -630,11 +713,33 @@ export class Game {
     return true;
   }
 
+  /** Drop ice cube shells on agents caught in a frost burst. */
+  private paintFreezeShells(x: number, z: number, radius: number): void {
+    if (!this.sim) return;
+    const fx = this.effects;
+    let n = 0;
+    for (const a of this.sim.crowd.agents) {
+      if (n >= 8) break;
+      const d = Math.hypot(a.body.x - x, a.body.z - z);
+      if (d > radius) continue;
+      fx.freezeShell(a.body.x, a.body.z, a.boss ? 1.6 : a.isKid ? 0.7 : 1, 1.5);
+      n++;
+    }
+  }
+
+  /** Drain sim.events into VFX immediately (UI casts happen between frames). */
+  private flushSimEvents(): void {
+    if (!this.sim) return;
+    for (const e of this.sim.events) this.handleEvent(e);
+    this.sim.events.length = 0;
+  }
+
   tryUltimate(kind: UltKind): void {
     const s = this.runSkills;
     const ok = (kind === 'str' && s.ultStr) || (kind === 'spd' && s.ultSpd) || (kind === 'sta' && s.ultSta);
     if (!ok || this.screen !== 'playing' || !this.sim || this.sim.ambient) return;
     if (this.sim.tryUltimate(kind)) {
+      this.flushSimEvents();
       this.audio.ultimate();
       this.hooks.onState();
     }
@@ -656,6 +761,18 @@ export class Game {
     }
   }
 
+  /** v0.8 mage spell bar. */
+  tryAbility(id: string): void {
+    if (this.screen !== 'playing' || !this.sim || this.sim.ambient) return;
+    if (this.sim.tryAbility(id)) {
+      this.flushSimEvents();
+      this.audio.ultimate();
+      this.hooks.onState();
+    } else if (this.sim.player.manaDeniedT > 0) {
+      this.hooks.onToast?.(t().manaEmpty ?? '魔力唔夠！');
+    }
+  }
+
   private onWin(): void {
     if (!this.level) return;
     this.train.setDoorsOpen(true);
@@ -672,7 +789,15 @@ export class Game {
     const awarded = count <= MAX_POINTS_PER_LEVEL;
     if (awarded) {
       this.save.skills.points += POINTS_PER_FIRST_CLEAR;
+      for (const lo of this.save.loadouts) lo.points += POINTS_PER_FIRST_CLEAR;
+      for (const lo of this.save.mage.loadouts) lo.points += POINTS_PER_FIRST_CLEAR;
       this.audio.skillPoint();
+    }
+    {
+      const key = String(id);
+      const list = this.save.clearedWith[key] ?? [];
+      const ch = this.save.character;
+      if (!list.includes(ch)) this.save.clearedWith[key] = [...list, ch];
     }
     if (id === 1) this.completeFtue();
     this.lastClear = { count, awarded };
@@ -805,6 +930,63 @@ export class Game {
       }
       case 'lose':
         cam.addTrauma(0.45);
+        break;
+      case 'cast': {
+        const len = Math.hypot(e.dx, e.dz) || 1;
+        const dx = e.dx / len;
+        const dz = e.dz / len;
+        if (e.ability === 'fire_t1' || e.ability === 'ultFire') {
+          fx.boltTrail(e.x, e.z, dx, dz, e.ability === 'ultFire' ? 2.6 : TUNING.spells.fireBolt.range, 0xff7043);
+          if (e.ability === 'ultFire') fx.shockwave(e.x, e.z, TUNING.ult.str.radius * 0.85, 0xff7043, 0.5);
+          cam.addTrauma(0.18);
+          this.audio.shockwave();
+        } else if (e.ability === 'fire_t3b') {
+          fx.shockwave(e.x, e.z, TUNING.spells.flameBurst.radius, 0xff5722, 0.5);
+          fx.puff(e.x, 0.5, e.z, 28, 0xff7043, 4.2, 1.5, 0.55, 0.9);
+          fx.puff(e.x, 0.8, e.z, 16, 0xffcc80, 3.0, 1.2, 0.45, 1.2);
+          cam.addTrauma(0.35);
+          this.audio.shockwave();
+        } else if (e.ability === 'ice_t1') {
+          fx.iceBurst(e.x, e.z, TUNING.spells.frostBreath.range * 0.7, true, dx, dz);
+          this.paintFreezeShells(e.x, e.z, TUNING.spells.frostBreath.range);
+          cam.addTrauma(0.14);
+        } else if (e.ability === 'ice_t3b' || e.ability === 'ultIce') {
+          const rad = e.ability === 'ultIce' ? TUNING.spells.iceAge.radius : TUNING.spells.flashFreeze.radius;
+          fx.iceBurst(e.x, e.z, rad);
+          this.paintFreezeShells(e.x, e.z, rad + 0.4);
+          cam.addTrauma(0.28);
+          this.audio.shockwave();
+        } else if (e.ability === 'volt_t1' || e.ability === 'volt_t3b' || e.ability === 'ultVolt') {
+          fx.puff(e.x, 1.0, e.z, 12, 0xffd54f, 2.2, 1.2, 0.35, 0.5);
+          fx.shockwave(e.x, e.z, e.ability === 'volt_t3b' ? TUNING.spells.thunderclap.radius : 1.1, 0xffd54f, 0.3);
+          cam.addTrauma(0.16);
+        } else {
+          const colors: Record<string, number> = { fire: 0xff7043, ice: 0x4dd0e1, volt: 0xffd54f };
+          fx.puff(e.x, 0.9, e.z, 10, colors[e.el] ?? 0xce93d8, 1.6, 1.1, 0.45);
+          cam.addTrauma(0.1);
+        }
+        haptic(14, 0);
+        break;
+      }
+      case 'chain': {
+        fx.lightningArc(e.pts);
+        // Flash hit targets so volt reads instantly from iso cam.
+        if (this.sim) {
+          for (const pt of e.pts) {
+            for (const a of this.sim.crowd.agents) {
+              if (a.boss) continue;
+              const d = Math.hypot(a.body.x - pt.x, a.body.z - pt.z);
+              if (d < 0.55) a.bumpAcc = Math.max(a.bumpAcc, 1.4);
+            }
+          }
+        }
+        cam.addTrauma(0.12);
+        break;
+      }
+      case 'status':
+        break;
+      case 'gadget':
+      case 'coins':
         break;
     }
   }

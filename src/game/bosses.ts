@@ -1,4 +1,5 @@
 import type { PassengerKind } from './PassengerTypes';
+import type { CharacterId } from './charactersDef';
 
 /** v0.7 boss passengers: one oversized "king" per special type (L20–L90, all eight at L100). */
 export type BossKind = Exclude<PassengerKind, 'normal'>;
@@ -114,4 +115,24 @@ export const BOSSES: Record<BossKind, BossDef> = {
 /** Boss kind(s) of a level (`boss` field), [] for normal levels. */
 export function bossesOf(level: { boss?: readonly BossKind[] }): readonly BossKind[] {
   return level.boss ?? [];
+}
+
+
+/** Per-character counter blurb for boss cards (v0.8). Falls back to hero copy. */
+export function countersFor(kind: BossKind, char: CharacterId = 'hero'): { zh: string; en: string } {
+  const b = BOSSES[kind];
+  if (char === 'mage') {
+    const mage: Record<BossKind, { zh: string; en: string }> = {
+      luggage: { zh: '✦ 爆炎', en: '✦ Flame Burst' },
+      stench: { zh: '✦ 淨化之火', en: '✦ Cleansing Flame' },
+      squat: { zh: '✦ 冰面滑行 · 雷步', en: '✦ Ice Glide · Thunder Step' },
+      family: { zh: '✦ 急凍 · 雷步', en: '✦ Flash Freeze · Thunder Step' },
+      brat: { zh: '✦ 雷鳴 · 急凍', en: '✦ Thunderclap · Flash Freeze' },
+      couple: { zh: '✦ 熱到放手', en: '✦ Too Hot to Hold' },
+      angry: { zh: '✦ 冷靜一下', en: '✦ Chill Out' },
+      loud: { zh: '✦ 斷線', en: '✦ Dropped Call' },
+    };
+    return mage[kind];
+  }
+  return { zh: b.counterZh, en: b.counterEn };
 }

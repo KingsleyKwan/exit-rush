@@ -13,6 +13,29 @@ export interface SkillState {
   points: number;
 }
 
+/** v0.8 Mage spell loadouts — same SkillState shape (str=fire, spd=volt, sta=ice). */
+export interface MageProgress {
+  loadouts: SkillState[];
+  active: number;
+  /** Up to 3 spell ability ids per loadout slot. */
+  spellBars: string[][];
+}
+
+/** v0.8 Tech kit stub (full grid/shop lands in a later pass). */
+export interface TechProgress {
+  items: Record<string, 0 | 1 | 2 | 3>;
+  gridTier: 0 | 1 | 2 | 3 | 4;
+  sets: { placements: { id: string; tier: 1 | 2 | 3; x: number; y: number; rot: 0 | 1 | 2 | 3 }[] }[];
+  activeSet: number;
+  stock: Record<string, number>;
+  ledger: Record<string, { replays: number; fast: boolean }>;
+  consumableSpend: number;
+  retroGranted: boolean;
+  coinNotice: boolean;
+}
+
+export type CharacterIdSave = 'hero' | 'mage' | 'tech';
+
 /** User-facing graphics setting. `auto` picks low/high from device hints + an FPS probe. */
 export type QualitySetting = 'auto' | 'low' | 'high';
 /** Resolved render tier. */
@@ -51,6 +74,17 @@ export interface SaveData {
   activeLoadout: number;
   /** v0.7: one-time 「技能點已重新計算」 notice pending (economy change refunded a save). */
   respecNotice: boolean;
+  /**
+   * v0.8: selected character. Shared `cleared` / SP; per-character tree in `skills` (hero) / `mage` / `tech`.
+   */
+  character: CharacterIdSave;
+  /** Cache only — StoreKit / RevenueCat is the truth on iOS. */
+  entitlementCache: { mage: boolean; tech: boolean; noAds: boolean; at: number };
+  mage: MageProgress;
+  tech: TechProgress;
+  /** Cosmetic "cleared with" marks per level. */
+  clearedWith: Record<string, CharacterIdSave[]>;
+  trialsPlayed: Record<string, number>;
 }
 
 /** v0.7 economy: 1 skill point per first clear (was 3). Kept here so storage can migrate without importing SkillTree. */
@@ -166,6 +200,26 @@ export function defaultSave(): SaveData {
     loadouts: [defaultSkills(), defaultSkills(), defaultSkills()],
     activeLoadout: 0,
     respecNotice: false,
+    character: 'hero',
+    entitlementCache: { mage: false, tech: false, noAds: false, at: 0 },
+    mage: {
+      loadouts: [defaultSkills(), defaultSkills(), defaultSkills()],
+      active: 0,
+      spellBars: [[], [], []],
+    },
+    tech: {
+      items: {},
+      gridTier: 0,
+      sets: [{ placements: [] }, { placements: [] }, { placements: [] }],
+      activeSet: 0,
+      stock: {},
+      ledger: {},
+      consumableSpend: 0,
+      retroGranted: false,
+      coinNotice: false,
+    },
+    clearedWith: {},
+    trialsPlayed: {},
   };
 }
 
@@ -218,6 +272,62 @@ export function normalizeSave(parsed: Partial<SaveData> | null | undefined): Sav
     loadouts.push(slot);
     refunded ||= r;
   }
+
+  // v0.8 character layer (defaults keep v0.7 hero saves intact).
+  const rawChar = (parsed as { character?: string }).character;
+  const character: CharacterIdSave = rawChar === 'mage' || rawChar === 'tech' || rawChar === 'hero' ? rawChar : 'hero';
+  const ec = (parsed as { entitlementCache?: Partial<{ mage: boolean; tech: boolean; noAds: boolean; at: number }> }).entitlementCache ?? {};
+  const entitlementCache = {
+    mage: ec.mage === true,
+    tech: ec.tech === true,
+    noAds: ec.noAds === true,
+    at: typeof ec.at === 'number' && Number.isFinite(ec.at) ? ec.at : 0,
+  };
+  const rawMage = (parsed as { mage?: Partial<MageProgress> }).mage ?? {};
+  const mageActive = Number.isInteger(rawMage.active) && (rawMage.active as number) >= 0 && (rawMage.active as number) < LOADOUT_SLOTS ? (rawMage.active as number) : 0;
+  const mageRawSlots = Array.isArray(rawMage.loadouts) ? rawMage.loadouts : [];
+  const mageLoadouts: SkillState[] = [];
+  for (let i = 0; i < LOADOUT_SLOTS; i++) {
+    const [slot] = reconcileSlot(toSkills((mageRawSlots[i] ?? {}) as Partial<SkillState>), earned);
+    mageLoadouts.push(slot);
+  }
+  const rawBars = Array.isArray(rawMage.spellBars) ? rawMage.spellBars : [];
+  const spellBars: string[][] = [];
+  for (let i = 0; i < LOADOUT_SLOTS; i++) {
+    const bar = Array.isArray(rawBars[i]) ? rawBars[i].filter((s): s is string => typeof s === 'string').slice(0, 3) : [];
+    spellBars.push(bar);
+  }
+  const rawTech = (parsed as { tech?: Partial<TechProgress> }).tech ?? {};
+  const tech: TechProgress = {
+    items: rawTech.items && typeof rawTech.items === 'object' ? { ...rawTech.items } as TechProgress['items'] : {},
+    gridTier: ([0, 1, 2, 3, 4] as const).includes(rawTech.gridTier as 0) ? (rawTech.gridTier as 0 | 1 | 2 | 3 | 4) : 0,
+    sets: Array.isArray(rawTech.sets) && rawTech.sets.length
+      ? rawTech.sets.slice(0, 3).map((s) => ({ placements: Array.isArray(s?.placements) ? s.placements : [] }))
+      : [{ placements: [] }, { placements: [] }, { placements: [] }],
+    activeSet: Number.isInteger(rawTech.activeSet) && (rawTech.activeSet as number) >= 0 && (rawTech.activeSet as number) < 3 ? (rawTech.activeSet as number) : 0,
+    stock: rawTech.stock && typeof rawTech.stock === 'object' ? { ...rawTech.stock } : {},
+    ledger: rawTech.ledger && typeof rawTech.ledger === 'object' ? { ...rawTech.ledger } : {},
+    consumableSpend: num(rawTech.consumableSpend, 0),
+    retroGranted: rawTech.retroGranted === true,
+    coinNotice: rawTech.coinNotice === true,
+  };
+  while (tech.sets.length < 3) tech.sets.push({ placements: [] });
+  const clearedWith: Record<string, CharacterIdSave[]> = {};
+  const rawCw = (parsed as { clearedWith?: Record<string, unknown> }).clearedWith;
+  if (rawCw && typeof rawCw === 'object') {
+    for (const [k, v] of Object.entries(rawCw)) {
+      if (Array.isArray(v)) {
+        clearedWith[k] = [...new Set(v.filter((c): c is CharacterIdSave => c === 'hero' || c === 'mage' || c === 'tech'))];
+      }
+    }
+  }
+  const trialsPlayed: Record<string, number> = {};
+  const rawTr = (parsed as { trialsPlayed?: Record<string, unknown> }).trialsPlayed;
+  if (rawTr && typeof rawTr === 'object') {
+    for (const [k, v] of Object.entries(rawTr)) {
+      if (typeof v === 'number' && Number.isFinite(v) && v > 0) trialsPlayed[k] = Math.floor(v);
+    }
+  }
   return {
     version: 1,
     lang: parsed.lang === 'en' || parsed.lang === 'zh-HK' ? parsed.lang : d.lang,
@@ -242,6 +352,12 @@ export function normalizeSave(parsed: Partial<SaveData> | null | undefined): Sav
     loadouts,
     activeLoadout: active,
     respecNotice: parsed.respecNotice === true || refunded,
+    character,
+    entitlementCache,
+    mage: { loadouts: mageLoadouts, active: mageActive, spellBars },
+    tech,
+    clearedWith,
+    trialsPlayed,
   };
 }
 

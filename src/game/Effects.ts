@@ -2,6 +2,8 @@ import * as THREE from 'three';
 import { heroGeometry } from './characters';
 
 interface Particle {
+  mesh: THREE.Mesh;
+  mat: THREE.MeshBasicMaterial;
   x: number;
   y: number;
   z: number;
@@ -13,7 +15,6 @@ interface Particle {
   size: number;
   grav: number;
   drag: number;
-  color: THREE.Color;
 }
 
 interface Ring {
@@ -30,15 +31,61 @@ interface Ghost {
   t: number;
 }
 
+/** Travelling spell projectile (fireball etc.). */
+interface Bolt {
+  mesh: THREE.Mesh;
+  glow: THREE.Mesh;
+  trail: THREE.Mesh[];
+  x: number;
+  y: number;
+  z: number;
+  dx: number;
+  dz: number;
+  speed: number;
+  dist: number;
+  travelled: number;
+  life: number;
+  max: number;
+  color: number;
+}
+
+interface ArcSeg {
+  mesh: THREE.Mesh;
+  mat: THREE.MeshBasicMaterial;
+  t: number;
+  dur: number;
+}
+
+interface Crystal {
+  mesh: THREE.Mesh;
+  mat: THREE.MeshBasicMaterial;
+  x: number; y: number; z: number;
+  vx: number; vy: number; vz: number;
+  life: number; max: number; spin: number;
+}
+
+interface IceShell {
+  mesh: THREE.Mesh;
+  mat: THREE.MeshBasicMaterial;
+  t: number; dur: number;
+}
+
 const MAX_PARTICLES = 220;
+const MAX_BOLTS = 4;
+const MAX_ARCS = 64;
+const TRAIL_LEN = 6;
+const MAX_CRYSTALS = 24;
+const MAX_SHELLS = 12;
 
 /**
- * Pooled visual effects: impact puffs (single InstancedMesh draw call),
- * shockwave rings, dash afterimages and the WIS path highlight.
+ * Pooled visual effects: impact puffs, shockwave rings, spell bolts / ice bursts /
+ * lightning arcs, dash afterimages and the WIS path highlight.
+ *
+ * Particles are pooled individual meshes (own MeshBasicMaterial) so element
+ * colours never fall back to black from a missing instanceColor/vertexColor attr.
  */
 export class Effects {
   readonly group = new THREE.Group();
-  private inst: THREE.InstancedMesh;
   private parts: Particle[] = [];
   private free: Particle[] = [];
   private rings: Ring[] = [];
@@ -46,45 +93,70 @@ export class Effects {
   private ghostIdx = 0;
   private dots: THREE.Mesh[] = [];
   private dotMat: THREE.MeshBasicMaterial;
-  private m4 = new THREE.Matrix4();
-  private q = new THREE.Quaternion();
-  private v = new THREE.Vector3();
-  private s = new THREE.Vector3();
+  bolts: Bolt[] = [];
+  private arcs: ArcSeg[] = [];
+  private crystals: Crystal[] = [];
+  private freeCrystals: Crystal[] = [];
+  private shells: IceShell[] = [];
+  fireLight: THREE.PointLight;
 
   constructor() {
-    const geo = new THREE.IcosahedronGeometry(0.07, 0);
-    const mat = new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.85, depthWrite: false });
-    this.inst = new THREE.InstancedMesh(geo, mat, MAX_PARTICLES);
-    this.inst.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
-    this.inst.frustumCulled = false;
+    // Per-particle meshes (NOT InstancedMesh): instanceColor was painting black
+    // octagons when vertex/instance attributes disagreed. Own material = reliable tint.
+    const geo = new THREE.SphereGeometry(0.12, 10, 8);
     for (let i = 0; i < MAX_PARTICLES; i++) {
-      this.inst.setColorAt(i, new THREE.Color(1, 1, 1));
-      this.free.push({ x: 0, y: 0, z: 0, vx: 0, vy: 0, vz: 0, life: 0, max: 1, size: 1, grav: 0, drag: 0, color: new THREE.Color() });
+      const mat = new THREE.MeshBasicMaterial({
+        color: 0xff7043,
+        transparent: true,
+        opacity: 0,
+        depthWrite: false,
+        depthTest: false,
+        blending: THREE.AdditiveBlending,
+        toneMapped: false,
+      });
+      const mesh = new THREE.Mesh(geo, mat);
+      mesh.visible = false;
+      mesh.renderOrder = 30;
+      mesh.frustumCulled = false;
+      this.group.add(mesh);
+      this.free.push({
+        mesh, mat,
+        x: 0, y: 0, z: 0, vx: 0, vy: 0, vz: 0,
+        life: 0, max: 1, size: 1, grav: 0, drag: 0,
+      });
     }
-    this.inst.count = 0;
-    this.group.add(this.inst);
+    this.group.renderOrder = 30;
 
-    const ringGeo = new THREE.RingGeometry(0.86, 1, 48);
-    for (let i = 0; i < 4; i++) {
-      const mat2 = new THREE.MeshBasicMaterial({ color: 0xffb74d, transparent: true, opacity: 0, side: THREE.DoubleSide, depthWrite: false });
+    const ringGeo = new THREE.RingGeometry(0.55, 1.05, 48);
+    for (let i = 0; i < 6; i++) {
+      const mat2 = new THREE.MeshBasicMaterial({
+        color: 0xffb74d,
+        transparent: true,
+        opacity: 0,
+        side: THREE.DoubleSide,
+        depthWrite: false,
+        depthTest: false,
+        blending: THREE.NormalBlending,
+      });
       const mesh = new THREE.Mesh(ringGeo, mat2);
       mesh.rotation.x = -Math.PI / 2;
       mesh.visible = false;
+      mesh.renderOrder = 28;
       this.group.add(mesh);
       this.rings.push({ mesh, mat: mat2, t: 1, dur: 1, maxR: 1 });
     }
 
-    // Dash afterimages reuse the hero silhouette.
     const ghostGeo = heroGeometry();
     for (let i = 0; i < 10; i++) {
-      const mat3 = new THREE.MeshBasicMaterial({ color: 0x4dd0e1, transparent: true, opacity: 0, depthWrite: false });
+      const mat3 = new THREE.MeshBasicMaterial({
+        color: 0x4dd0e1, transparent: true, opacity: 0, depthWrite: false,
+      });
       const mesh = new THREE.Mesh(ghostGeo, mat3);
       mesh.visible = false;
       this.group.add(mesh);
       this.ghosts.push({ mesh, mat: mat3, t: 1 });
     }
 
-    // X-ray style: drawn on top of the crowd so the gap path reads through bodies.
     this.dotMat = new THREE.MeshBasicMaterial({
       color: 0x64ffda,
       transparent: true,
@@ -102,20 +174,116 @@ export class Effects {
       this.group.add(d);
       this.dots.push(d);
     }
+
+    // Fireball: ~0.5 m glowing sphere + thick trail + point light (iso-readable).
+    this.fireLight = new THREE.PointLight(0xff9100, 0, 6, 2);
+    this.fireLight.visible = false;
+    this.group.add(this.fireLight);
+    for (let i = 0; i < MAX_BOLTS; i++) {
+      const coreMat = new THREE.MeshBasicMaterial({
+        color: 0xfff8e1, transparent: false, opacity: 1,
+        depthWrite: false, depthTest: false, toneMapped: false,
+      });
+      const glowMat = new THREE.MeshBasicMaterial({
+        color: 0xff6d00, transparent: true, opacity: 0.95,
+        depthWrite: false, depthTest: false, toneMapped: false,
+        blending: THREE.AdditiveBlending,
+      });
+      // Core ~0.5 m; bright white-hot centre, saturated orange mantle.
+      const mesh = new THREE.Mesh(new THREE.SphereGeometry(0.26, 16, 14), coreMat);
+      const glow = new THREE.Mesh(new THREE.SphereGeometry(0.55, 14, 12), glowMat);
+      mesh.visible = false;
+      glow.visible = false;
+      mesh.renderOrder = 40;
+      glow.renderOrder = 39;
+      this.group.add(mesh, glow);
+      const trail: THREE.Mesh[] = [];
+      for (let t = 0; t < TRAIL_LEN; t++) {
+        const tm = new THREE.Mesh(
+          new THREE.SphereGeometry(0.16 - t * 0.008, 10, 8),
+          new THREE.MeshBasicMaterial({
+            color: 0xff9100, transparent: true, opacity: 0.85,
+            depthWrite: false, depthTest: false, blending: THREE.AdditiveBlending,
+            toneMapped: false,
+          }),
+        );
+        tm.visible = false;
+        tm.renderOrder = 38;
+        this.group.add(tm);
+        trail.push(tm);
+      }
+      this.bolts.push({
+        mesh, glow, trail,
+        x: 0, y: 0, z: 0, dx: 0, dz: 1, speed: 8, dist: 2.5,
+        travelled: 0, life: 0, max: 1, color: 0xff9100,
+      });
+    }
+
+    // Lightning: thick bright boxes (core + soft glow twin via scale).
+    for (let i = 0; i < MAX_ARCS; i++) {
+      const matA = new THREE.MeshBasicMaterial({
+        color: 0xfff59d, transparent: true, opacity: 0,
+        depthWrite: false, depthTest: false, blending: THREE.AdditiveBlending,
+        toneMapped: false,
+      });
+      const mesh = new THREE.Mesh(new THREE.BoxGeometry(1, 0.35, 0.35), matA);
+      mesh.visible = false;
+      mesh.renderOrder = 42;
+      this.group.add(mesh);
+      this.arcs.push({ mesh, mat: matA, t: 1, dur: 1 });
+    }
+
+    // Ice shards (octahedron crystals).
+    const cryGeo = new THREE.OctahedronGeometry(0.18, 0);
+    for (let i = 0; i < MAX_CRYSTALS; i++) {
+      const mat = new THREE.MeshBasicMaterial({
+        color: 0x4dd0e1, transparent: true, opacity: 0,
+        depthWrite: false, depthTest: false, toneMapped: false,
+        blending: THREE.AdditiveBlending,
+      });
+      const mesh = new THREE.Mesh(cryGeo, mat);
+      mesh.visible = false;
+      mesh.renderOrder = 41;
+      this.group.add(mesh);
+      this.freeCrystals.push({
+        mesh, mat, x: 0, y: 0, z: 0, vx: 0, vy: 0, vz: 0, life: 0, max: 1, spin: 0,
+      });
+    }
+
+    // Ice cube shells around frozen targets.
+    for (let i = 0; i < MAX_SHELLS; i++) {
+      const mat = new THREE.MeshBasicMaterial({
+        color: 0xb2ebf2, transparent: true, opacity: 0,
+        depthWrite: false, depthTest: false, toneMapped: false,
+        wireframe: false, blending: THREE.AdditiveBlending,
+      });
+      const mesh = new THREE.Mesh(new THREE.BoxGeometry(0.55, 1.05, 0.55), mat);
+      mesh.visible = false;
+      mesh.renderOrder = 37;
+      this.group.add(mesh);
+      this.shells.push({ mesh, mat, t: 1, dur: 1 });
+    }
+
+    // More rings for bold frost/fire bursts.
+    const ringGeo2 = new THREE.RingGeometry(0.4, 1.15, 48);
+    for (let i = 0; i < 4; i++) {
+      const mat2 = new THREE.MeshBasicMaterial({
+        color: 0x4dd0e1, transparent: true, opacity: 0,
+        side: THREE.DoubleSide, depthWrite: false, depthTest: false,
+        blending: THREE.AdditiveBlending, toneMapped: false,
+      });
+      const mesh = new THREE.Mesh(ringGeo2, mat2);
+      mesh.rotation.x = -Math.PI / 2;
+      mesh.visible = false;
+      mesh.renderOrder = 36;
+      this.group.add(mesh);
+      this.rings.push({ mesh, mat: mat2, t: 1, dur: 1, maxR: 1 });
+    }
   }
 
-  /** Burst of puffs at a point. */
   puff(
-    x: number,
-    y: number,
-    z: number,
-    count: number,
-    color: number,
-    speed = 1.5,
-    size = 1,
-    life = 0.45,
-    up = 0.8,
-    grav = -1.5,
+    x: number, y: number, z: number, count: number, color: number,
+    speed = 1.5, size = 1, life = 0.45, up = 0.8, grav = -1.5,
   ): void {
     for (let i = 0; i < count; i++) {
       const p = this.free.pop();
@@ -132,12 +300,13 @@ export class Effects {
       p.size = size * (0.7 + Math.random() * 0.6);
       p.grav = grav;
       p.drag = 4;
-      p.color.setHex(color);
+      p.mat.color.setHex(color);
+      p.mat.opacity = 1;
+      p.mesh.visible = true;
       this.parts.push(p);
     }
   }
 
-  /** Directional spray (shove cone). */
   spray(x: number, z: number, dx: number, dz: number, count: number, color: number, speed = 3): void {
     for (let i = 0; i < count; i++) {
       const p = this.free.pop();
@@ -158,9 +327,174 @@ export class Effects {
       p.size = 0.8 + Math.random() * 0.5;
       p.grav = -2;
       p.drag = 6;
-      p.color.setHex(color);
+      p.mat.color.setHex(color);
+      p.mat.opacity = 1;
+      p.mesh.visible = true;
       this.parts.push(p);
     }
+  }
+
+  /**
+   * Fireball: ~0.5 m orange-yellow sphere, thick trail, ~0.4 s flight, boom on impact.
+   * Always depthTest:false / high renderOrder so it reads above the crowd.
+   */
+  boltTrail(x: number, z: number, dx: number, dz: number, range: number, color = 0xff9100): void {
+    const len = Math.hypot(dx, dz) || 1;
+    const ndx = dx / len;
+    const ndz = dz / len;
+    const b = this.bolts.find((bb) => bb.life <= 0) ?? this.bolts[0];
+    b.x = x + ndx * 0.4;
+    b.y = 1.15;
+    b.z = z + ndz * 0.4;
+    b.dx = ndx;
+    b.dz = ndz;
+    b.dist = Math.max(2.2, range);
+    // ~0.45 s flight — large sphere stays mid-screen longer.
+    b.speed = b.dist / 0.45;
+    b.travelled = 0;
+    b.life = b.max = 0.48;
+    b.color = color;
+    (b.mesh.material as THREE.MeshBasicMaterial).color.setHex(0xfffde7);
+    (b.glow.material as THREE.MeshBasicMaterial).color.setHex(0xff6d00);
+    b.mesh.visible = true;
+    b.glow.visible = true;
+    b.mesh.scale.setScalar(1);
+    b.glow.scale.setScalar(1);
+    b.mesh.position.set(b.x, b.y, b.z);
+    b.glow.position.set(b.x, b.y, b.z);
+    this.fireLight.intensity = 6.5;
+    this.fireLight.color.setHex(0xff9100);
+    this.fireLight.position.set(b.x, b.y, b.z);
+    this.fireLight.visible = true;
+    for (const t of b.trail) {
+      t.visible = true;
+      (t.material as THREE.MeshBasicMaterial).color.setHex(0xffab40);
+      (t.material as THREE.MeshBasicMaterial).opacity = 0.9;
+      t.position.set(b.x, b.y, b.z);
+    }
+    // Tiny muzzle puff only — keep mid-flight sphere+trail readable from iso cam.
+    this.puff(b.x, b.y, b.z, 6, 0xffe082, 1.4, 1.2, 0.22, 0.55, -0.8);
+  }
+
+  /** Ice: saturated cyan floor rings + flying crystals + freeze shells on targets. */
+  iceBurst(x: number, z: number, radius: number, forward = false, dx = 0, dz = -1): void {
+    const R = Math.max(radius, 2.4);
+    this.shockwave(x, z, R, 0x00e5ff, 0.7);
+    this.shockwave(x, z, R * 0.65, 0xb2ebf2, 0.55);
+    this.shockwave(x, z, R * 0.35, 0xffffff, 0.4);
+    this.puff(x, 0.55, z, 32, 0x00e5ff, 3.6, 2.8, 0.75, 1.8, -0.4);
+    this.puff(x, 0.75, z, 22, 0xe0f7fa, 2.6, 2.2, 0.6, 1.4, -0.25);
+    this.puff(x, 0.35, z, 16, 0xffffff, 1.8, 1.6, 0.5, 0.9, -0.15);
+    // Flying ice crystals
+    for (let i = 0; i < 16; i++) {
+      const c = this.freeCrystals.pop();
+      if (!c) break;
+      const a = (i / 16) * Math.PI * 2 + Math.random() * 0.3;
+      const sp = 2.2 + Math.random() * 2.5;
+      c.x = x; c.y = 0.4 + Math.random() * 0.5; c.z = z;
+      c.vx = Math.cos(a) * sp * (forward ? 0.5 : 1) + (forward ? dx * 2.5 : 0);
+      c.vz = Math.sin(a) * sp * (forward ? 0.5 : 1) + (forward ? dz * 2.5 : 0);
+      c.vy = 2.5 + Math.random() * 3;
+      c.life = c.max = 0.55 + Math.random() * 0.25;
+      c.spin = (Math.random() - 0.5) * 10;
+      c.mat.color.setHex(i % 2 ? 0x00e5ff : 0xe0f7fa);
+      c.mat.opacity = 1;
+      c.mesh.visible = true;
+      c.mesh.scale.setScalar(0.9 + Math.random() * 1.1);
+      this.crystals.push(c);
+    }
+    if (forward) this.spray(x, z, dx, dz, 24, 0x00e5ff, 4.5);
+  }
+
+  /** Place a translucent ice cube shell over a frozen passenger (iso-readable). */
+  freezeShell(x: number, z: number, scale = 1, dur = 1.4): void {
+    const s = this.shells.find((sh) => sh.t >= sh.dur) ?? this.shells[0];
+    s.t = 0;
+    s.dur = dur;
+    s.mat.color.setHex(0x80deea);
+    s.mat.opacity = 0.7;
+    s.mesh.position.set(x, 0.55 * scale, z);
+    s.mesh.scale.set(scale, scale, scale);
+    s.mesh.visible = true;
+  }
+
+  /** Lightning: thick yellow/white zig-zag bolts with glow + flash. */
+  lightningArc(pts: { x: number; z: number }[]): void {
+    if (!pts.length) return;
+    // Build a forced zig-zag polyline so the bolt reads from iso cam (never a short stub).
+    const path: { x: number; z: number }[] = [pts[0]];
+    for (let i = 1; i < pts.length; i++) {
+      const a = path[path.length - 1];
+      const b = pts[i];
+      const dx = b.x - a.x, dz = b.z - a.z;
+      const len = Math.hypot(dx, dz) || 1;
+      const nx = -dz / len, nz = dx / len;
+      const steps = Math.max(2, Math.ceil(len / 1.1));
+      for (let s = 1; s <= steps; s++) {
+        const u = s / steps;
+        const jog = (s === steps ? 0 : ((s % 2) * 2 - 1) * 0.55);
+        path.push({
+          x: a.x + dx * u + nx * jog,
+          z: a.z + dz * u + nz * jog,
+        });
+      }
+    }
+    for (let i = 0; i < path.length; i++) {
+      const p = path[i];
+      this.puff(p.x, 1.45, p.z, 10, 0xffd54f, 2.8, 2.4, 0.4, 0.7, -2);
+      this.puff(p.x, 1.45, p.z, 6, 0xffffff, 1.8, 1.8, 0.3, 0.5, -1.5);
+      if (i + 1 < path.length) {
+        const a = path[i], b = path[i + 1];
+        this.spawnArc(a, b, 0xffffff, 0.85, 1.15);
+        this.spawnArc(a, b, 0xfff176, 0.75, 2.0);
+        this.spawnArc(
+          { x: a.x + 0.1, z: a.z - 0.08 },
+          { x: b.x + 0.1, z: b.z - 0.08 },
+          0xffee58, 0.65, 3.2,
+        );
+        this.spawnArc(
+          { x: a.x - 0.08, z: a.z + 0.06 },
+          { x: b.x - 0.08, z: b.z + 0.06 },
+          0xffffff, 0.55, 1.6,
+        );
+      }
+    }
+    for (const p of pts) this.shockwave(p.x, p.z, 1.4, 0xffd54f, 0.35);
+    this.shockwave(pts[0].x, pts[0].z, 2.0, 0xffecb3, 0.4);
+  }
+
+  private spawnArc(
+    a: { x: number; z: number }, b: { x: number; z: number },
+    color: number, dur = 0.35, thick = 1,
+  ): void {
+    const seg = this.arcs.find((s) => s.t >= s.dur) ?? this.arcs[0];
+    const mx = (a.x + b.x) / 2;
+    const mz = (a.z + b.z) / 2;
+    const dx = b.x - a.x;
+    const dz = b.z - a.z;
+    const len = Math.hypot(dx, dz) || 0.2;
+    // BoxGeometry length is along X → yaw so +X aligns with (dx,dz).
+    const yaw = Math.atan2(-dz, dx);
+    seg.mesh.position.set(mx, 1.55, mz);
+    seg.mesh.rotation.set(0, yaw, (Math.random() - 0.5) * 0.2);
+    // Length along X; cross-section stays readable even on short zigs.
+    const cross = 0.85 * thick;
+    seg.mesh.scale.set(Math.max(len, 0.55), cross, cross);
+    seg.mat.color.setHex(color);
+    seg.mat.opacity = 1;
+    seg.t = 0;
+    seg.dur = dur;
+    seg.mesh.visible = true;
+  }
+
+  private explodeBolt(b: Bolt): void {
+    this.puff(b.x, b.y, b.z, 28, 0xff9100, 4.5, 2.8, 0.55, 1.6, -2);
+    this.puff(b.x, b.y, b.z, 20, 0xffe082, 3.5, 2.2, 0.45, 1.2, -1.5);
+    this.puff(b.x, b.y, b.z, 12, 0xffffff, 2.5, 1.6, 0.35, 0.8, -1);
+    this.shockwave(b.x, b.z, 2.4, 0xff9100, 0.5);
+    this.shockwave(b.x, b.z, 1.4, 0xffe082, 0.35);
+    this.fireLight.intensity = 0;
+    this.fireLight.visible = false;
   }
 
   shockwave(x: number, z: number, radius: number, color = 0xffb74d, dur = 0.5): void {
@@ -190,7 +524,6 @@ export class Effects {
         continue;
       }
       d.visible = true;
-      // Travelling pulse along the path.
       const pulse = 0.75 + 0.45 * Math.max(0, Math.sin(time * 10 - i * 0.7));
       d.position.set(p.x, 0.04, p.z);
       d.scale.setScalar(pulse);
@@ -198,13 +531,45 @@ export class Effects {
     this.dotMat.opacity = pts.length ? 0.85 : 0;
   }
 
+  /** Capture helper: hide floor rings so mid-flight projectiles dominate the frame. */
+  debugHideRings(): void {
+    for (const r of this.rings) { r.t = r.dur; r.mesh.visible = false; }
+  }
+
+  clear(): void {
+    while (this.parts.length) {
+      const p = this.parts.pop()!;
+      p.mesh.visible = false;
+      p.mat.opacity = 0;
+      this.free.push(p);
+    }
+    for (const r of this.rings) { r.t = r.dur; r.mesh.visible = false; }
+    for (const g of this.ghosts) { g.t = 1; g.mesh.visible = false; }
+    for (const b of this.bolts) {
+      b.life = 0;
+      b.mesh.visible = false;
+      b.glow.visible = false;
+      for (const t of b.trail) t.visible = false;
+    }
+    for (const a of this.arcs) { a.t = a.dur; a.mesh.visible = false; }
+    while (this.crystals.length) {
+      const c = this.crystals.pop()!;
+      c.mesh.visible = false;
+      this.freeCrystals.push(c);
+    }
+    for (const s of this.shells) { s.t = s.dur; s.mesh.visible = false; }
+    this.fireLight.intensity = 0;
+    this.fireLight.visible = false;
+    for (const d of this.dots) d.visible = false;
+  }
+
   update(dt: number): void {
-    // Particles.
-    let n = 0;
     for (let i = this.parts.length - 1; i >= 0; i--) {
       const p = this.parts[i];
       p.life -= dt;
       if (p.life <= 0) {
+        p.mesh.visible = false;
+        p.mat.opacity = 0;
         this.parts.splice(i, 1);
         this.free.push(p);
         continue;
@@ -216,50 +581,126 @@ export class Effects {
       p.x += p.vx * dt;
       p.y = Math.max(0.03, p.y + p.vy * dt);
       p.z += p.vz * dt;
-    }
-    for (const p of this.parts) {
       const t = p.life / p.max;
-      const sc = p.size * (0.4 + 0.9 * Math.sin(t * Math.PI));
-      this.v.set(p.x, p.y, p.z);
-      this.s.setScalar(sc);
-      this.m4.compose(this.v, this.q, this.s);
-      this.inst.setMatrixAt(n, this.m4);
-      this.inst.setColorAt(n, p.color);
-      n++;
+      const sc = p.size * (0.55 + 0.85 * Math.sin(t * Math.PI));
+      p.mesh.position.set(p.x, p.y, p.z);
+      p.mesh.scale.setScalar(sc);
+      p.mat.opacity = Math.min(1, t * 1.35);
+      p.mesh.visible = true;
     }
-    this.inst.count = n;
-    this.inst.instanceMatrix.needsUpdate = true;
-    if (this.inst.instanceColor) this.inst.instanceColor.needsUpdate = true;
 
     for (const r of this.rings) {
-      if (r.t >= r.dur) continue;
+      if (r.t >= r.dur) {
+        r.mesh.visible = false;
+        continue;
+      }
       r.t += dt;
       const u = Math.min(1, r.t / r.dur);
       const e = 1 - Math.pow(1 - u, 3);
-      r.mesh.scale.setScalar(0.2 + e * r.maxR);
-      r.mat.opacity = (1 - u) * 0.85;
-      if (u >= 1) r.mesh.visible = false;
+      r.mesh.scale.setScalar(0.25 + e * r.maxR);
+      r.mat.opacity = (1 - u) * 0.9;
+      r.mesh.visible = true;
     }
-    for (const g of this.ghosts) {
-      if (g.t >= 1) continue;
-      g.t += dt / 0.32;
-      g.mat.opacity = Math.max(0, 0.5 * (1 - g.t));
-      if (g.t >= 1) g.mesh.visible = false;
-    }
-  }
 
-  clear(): void {
-    for (const p of this.parts) this.free.push(p);
-    this.parts.length = 0;
-    this.inst.count = 0;
-    for (const r of this.rings) {
-      r.t = r.dur;
-      r.mesh.visible = false;
-    }
     for (const g of this.ghosts) {
-      g.t = 1;
-      g.mesh.visible = false;
+      if (g.t >= 0.35) {
+        g.mesh.visible = false;
+        continue;
+      }
+      g.t += dt;
+      g.mat.opacity = Math.max(0, 0.45 * (1 - g.t / 0.35));
+      g.mesh.visible = true;
     }
-    this.setPath([], 0);
+
+    // Fireballs travel forward; trail beads lag behind; explode on end.
+    for (const b of this.bolts) {
+      if (b.life <= 0) {
+        b.mesh.visible = false;
+        b.glow.visible = false;
+        for (const t of b.trail) t.visible = false;
+        continue;
+      }
+      const prev = b.life;
+      b.life -= dt;
+      if (b.life <= 0 && prev > 0) {
+        this.explodeBolt(b);
+        b.mesh.visible = false;
+        b.glow.visible = false;
+        for (const t of b.trail) t.visible = false;
+        continue;
+      }
+      const step = b.speed * dt;
+      b.x += b.dx * step;
+      b.z += b.dz * step;
+      b.travelled += step;
+      b.y = 1.15 + Math.sin(b.travelled * 10) * 0.06;
+      b.mesh.position.set(b.x, b.y, b.z);
+      b.glow.position.set(b.x, b.y, b.z);
+      this.fireLight.position.set(b.x, b.y, b.z);
+      this.fireLight.intensity = 6.5;
+      this.fireLight.visible = true;
+      const pulse = 1.15 + 0.2 * Math.sin(b.travelled * 16);
+      b.mesh.scale.setScalar(pulse);
+      b.glow.scale.setScalar(pulse * 1.25);
+      b.mesh.visible = true;
+      b.glow.visible = true;
+      for (let i = 0; i < b.trail.length; i++) {
+        const t = b.trail[i];
+        const back = (i + 1) * 0.28;
+        t.position.set(b.x - b.dx * back, b.y - i * 0.015, b.z - b.dz * back);
+        t.visible = true;
+        const tm = t.material as THREE.MeshBasicMaterial;
+        tm.opacity = 0.9 * (1 - i / (b.trail.length + 0.5));
+        // Stretch along flight direction → comet streak from iso cam.
+        const along = 2.8 - i * 0.12;
+        const cross = 0.85 - i * 0.05;
+        t.scale.set(along, cross, cross);
+        t.rotation.y = Math.atan2(-b.dz, b.dx);
+      }
+    }
+
+    // Ice crystals
+    for (let i = this.crystals.length - 1; i >= 0; i--) {
+      const c = this.crystals[i];
+      c.life -= dt;
+      if (c.life <= 0) {
+        c.mesh.visible = false;
+        this.crystals.splice(i, 1);
+        this.freeCrystals.push(c);
+        continue;
+      }
+      c.vy -= 6 * dt;
+      c.x += c.vx * dt;
+      c.y = Math.max(0.08, c.y + c.vy * dt);
+      c.z += c.vz * dt;
+      c.mesh.position.set(c.x, c.y, c.z);
+      c.mesh.rotation.y += c.spin * dt;
+      c.mesh.rotation.x += c.spin * 0.6 * dt;
+      c.mat.opacity = Math.min(1, c.life / c.max * 1.4);
+      c.mesh.visible = true;
+    }
+
+    for (const s of this.shells) {
+      if (s.t >= s.dur) { s.mesh.visible = false; continue; }
+      s.t += dt;
+      const u = s.t / s.dur;
+      s.mat.opacity = (1 - u) * 0.75;
+      s.mesh.rotation.y += dt * 0.8;
+      s.mesh.visible = true;
+    }
+
+    for (const a of this.arcs) {
+      if (a.t >= a.dur) {
+        a.mesh.visible = false;
+        continue;
+      }
+      a.t += dt;
+      const u = Math.min(1, a.t / a.dur);
+      a.mat.opacity = (1 - u) * (0.85 + 0.15 * Math.random());
+      a.mesh.visible = true;
+      // Flicker thickness.
+      a.mesh.scale.y = 0.7 + Math.random() * 0.8;
+      a.mesh.scale.z = 0.7 + Math.random() * 0.8;
+    }
   }
 }

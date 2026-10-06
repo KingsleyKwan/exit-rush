@@ -52,6 +52,10 @@ interface Spec {
   crouch?: boolean;
   /** 大聲公: right hand holds a phone to the ear (bent arm). */
   phoneEar?: boolean;
+  /** Mage: folded umbrella wand. */
+  umbrella?: boolean;
+  /** Mage: floating element orb colour. */
+  orb?: number;
 }
 
 const Y = new THREE.Vector3(0, 1, 0);
@@ -202,6 +206,18 @@ function buildCharacter(s: Spec): { geo: THREE.BufferGeometry; shell: THREE.Buff
     b.add(new THREE.BoxGeometry(TW * 0.8, 0.13, 0.1), shade(torsoCol, 0.85), [0, 0.76, -TD / 2 - 0.02], [-0.3, 0, 0]);
     for (const sx of [-1, 1]) b.add(new THREE.BoxGeometry(0.014, 0.12, 0.012), 0xf2f2f2, [sx * 0.045, 0.67, TD / 2 + 0.008]);
   }
+
+  // Mage: folded umbrella wand (forward +Z) + shoulder orb.
+  if (s.umbrella) {
+    const shaft = 0x5e35b1;
+    const tip = s.orb ?? 0xce93d8;
+    b.add(new THREE.CylinderGeometry(0.018, 0.022, 0.55, 8), shaft, [0.22, 0.55, 0.28], [1.1, 0.2, 0], undefined, O);
+    b.add(new THREE.CylinderGeometry(0.055, 0.022, 0.09, 8), tip, [0.28, 0.78, 0.42], [1.1, 0.2, 0], undefined, O);
+    b.add(new THREE.BoxGeometry(0.12, 0.04, 0.12), 0x311b92, [0.16, 0.38, 0.18], undefined, undefined, O);
+  }
+  if (s.orb !== undefined) {
+    b.add(new THREE.OctahedronGeometry(0.07, 0), s.orb, [-0.28, 0.95, -0.05], undefined, undefined, O);
+  }
   if (s.lanyard) {
     for (const sx of [-1, 1]) b.add(new THREE.BoxGeometry(0.018, 0.2, 0.012), 0x1e3a8a, [sx * 0.05, 0.665, TD / 2 + 0.008], [0, 0, sx * 0.38]);
     b.add(new THREE.BoxGeometry(0.08, 0.1, 0.014), 0xffffff, [0, 0.535, TD / 2 + 0.012]);
@@ -319,8 +335,9 @@ function buildCharacter(s: Spec): { geo: THREE.BufferGeometry; shell: THREE.Buff
   // ---- hair
   const H = s.hair;
   const hairTop = (): void => {
-    const cap = new THREE.SphereGeometry(R * 1.08, 8, 5, 0, Math.PI * 2, 0, Math.PI * 0.6);
-    b.add(cap, H, [0, HY + 0.012, -0.012], [-0.38, 0, 0], [1, 0.9, 1], O);
+    // Boxy cap — SphereGeometry(8 seg) read as black octagons from the iso camera.
+    b.add(new THREE.BoxGeometry(R * 1.7, R * 0.55, R * 1.5), H, [0, HY + R * 0.35, -0.02], undefined, undefined, O);
+    b.add(new THREE.BoxGeometry(R * 1.55, R * 0.35, R * 1.35), shade(H, 1.25), [0, HY + R * 0.55, 0.02], undefined, undefined, O);
     b.add(new THREE.BoxGeometry(R * 1.75, R * 0.85, R * 0.55), H, [0, HY - 0.035, -R * 0.66], undefined, undefined, O);
   };
   const fringe = (): void => {
@@ -345,10 +362,14 @@ function buildCharacter(s: Spec): { geo: THREE.BufferGeometry; shell: THREE.Buff
     b.add(new THREE.BoxGeometry(R * 1.75, R * 0.55, R * 0.5), H, [0, HY - 0.02, -R * 0.68]);
   } else if (s.hat !== undefined) {
     hairTop();
-    const brim = new THREE.CylinderGeometry(R * 1.62, R * 1.62, 0.03, 10);
-    b.add(brim, s.hat, [0, HY + R * 0.6, -0.01], [-0.12, 0, 0], undefined, O);
-    b.add(new THREE.CylinderGeometry(R * 0.9, R * 1.04, R * 0.62, 8), s.hat, [0, HY + R * 0.92, -0.02], [-0.12, 0, 0], undefined, O);
-    b.add(new THREE.CylinderGeometry(R * 1.05, R * 1.05, 0.045, 8), shade(s.hat, 0.6), [0, HY + R * 0.7, -0.015], [-0.12, 0, 0]);
+    // Boxy straw hat — CylinderGeometry tops read as black octagons under flat Lambert + iso cam.
+    const hatCol = s.hat;
+    const band = shade(hatCol, 0.85);
+    b.add(new THREE.BoxGeometry(R * 2.4, 0.035, R * 2.4), hatCol, [0, HY + R * 0.58, -0.01], [-0.08, 0, 0], undefined, O);
+    b.add(new THREE.BoxGeometry(R * 1.55, R * 0.55, R * 1.55), hatCol, [0, HY + R * 0.88, -0.02], [-0.08, 0, 0], undefined, O);
+    b.add(new THREE.BoxGeometry(R * 1.65, 0.04, R * 1.65), band, [0, HY + R * 0.68, -0.015], [-0.08, 0, 0]);
+    // Light top plane so the crown never collapses to black
+    b.add(new THREE.BoxGeometry(R * 1.4, 0.02, R * 1.4), shade(hatCol, 1.35), [0, HY + R * 1.12, -0.02], [-0.08, 0, 0]);
   } else {
     hairTop();
     switch (s.style) {
@@ -365,8 +386,12 @@ function buildCharacter(s: Spec): { geo: THREE.BufferGeometry; shell: THREE.Buff
         break;
       case 'long':
         fringe();
-        b.add(new THREE.BoxGeometry(R * 1.9, 0.36, 0.1), H, [0, HY - 0.2, -R * 0.62], undefined, undefined, O);
-        for (const sx of [-1, 1]) b.add(new THREE.BoxGeometry(0.06, 0.26, 0.12), H, [sx * R * 0.98, HY - 0.1, 0.02], undefined, undefined, O);
+        // Soft purple sheets (no dark icosahedrons — those read as black blobs from iso cam)
+        for (const sx of [-1, 1]) {
+          b.add(new THREE.BoxGeometry(0.12 * hs, 0.38 * hs, 0.14 * hs), H, [sx * R * 0.95, HY - 0.12, -0.08], [0.15, 0, sx * 0.2], undefined, O);
+          b.add(new THREE.BoxGeometry(0.1 * hs, 0.28 * hs, 0.12 * hs), shade(H, 1.15), [sx * R * 1.05, HY - 0.22, -0.02], [0.25, 0, sx * 0.15], undefined, O);
+        }
+        b.add(new THREE.BoxGeometry(R * 1.4, 0.22 * hs, R * 0.7), H, [0, HY - 0.08, -R * 0.85], undefined, undefined, O);
         break;
       case 'pigtails':
         fringe();
@@ -406,8 +431,10 @@ export type Look =
 const SKIN = 0xf2c6a0;
 const DARK_HAIR = 0x2a2830;
 
-const SPECS: Record<Look | 'hero', Spec> = {
+const SPECS: Record<Look | 'hero' | 'mage', Spec> = {
   hero: { skin: SKIN, hair: DARK_HAIR, style: 'spiky', shirt: 0x2f6fdc, sleeves: 'short', pants: 0x1f2d5c, shoes: 0x18181b, lanyard: true, belt: true, brows: 'firm', mouth: 'flat', outline: true },
+  // Mage 「凱婷」: purple hooded cardigan, star clip, umbrella wand, violet outline.
+  mage: { skin: 0xf2c6a0, hair: 0x5e35b1, style: 'long', shirt: 0x7e57c2, jacket: 0x5e35b1, inner: 0xce93d8, sleeves: 'long', pants: 0x2d1b4e, shoes: 0x1a1028, hood: true, blush: true, brows: 'firm', mouth: 'smile', outline: true, umbrella: true, orb: 0xe1bee7, bw: 0.95 },
   // Commuters: several hoodie / shirt colourways so the crowd isn't uniform.
   normal0: { skin: SKIN, hair: DARK_HAIR, style: 'spiky', shirt: 0x8d939c, sleeves: 'long', pants: 0x2a2c31, shoes: 0xe8e8e8, hood: true, phone: true, mouth: 'flat' },
   normal1: { skin: 0xeab98f, hair: 0x4a3426, style: 'short', shirt: 0x34466e, sleeves: 'long', pants: 0x3d5a80, shoes: 0x2a2a2a, hood: true, phone: true, mouth: 'flat' },
@@ -428,7 +455,7 @@ const SPECS: Record<Look | 'hero', Spec> = {
   loud: { skin: 0xeab48c, hair: 0x2a2026, style: 'short', shirt: 0xf39c12, sleeves: 'short', pants: 0x3e3a4a, shoes: 0xf5f5f5, collar: 0xd35400, bw: 1.06, brows: 'firm', mouth: 'shout', phoneEar: true },
 };
 
-export const LOOKS = Object.keys(SPECS).filter((k) => k !== 'hero') as Look[];
+export const LOOKS = Object.keys(SPECS).filter((k) => k !== 'hero' && k !== 'mage') as Look[];
 const NORMALS: Look[] = ['normal0', 'normal1', 'normal2', 'normal3', 'normal4', 'normal5'];
 
 /** Which look an agent wears (deterministic per agent id). */
@@ -447,7 +474,7 @@ export function lookFor(a: Pick<Agent, 'id' | 'kind' | 'isKid'>): Look {
 
 const cache = new Map<string, { geo: THREE.BufferGeometry; shell: THREE.BufferGeometry | null }>();
 
-function get(look: Look | 'hero') {
+function get(look: Look | 'hero' | 'mage') {
   let c = cache.get(look);
   if (!c) {
     c = buildCharacter(SPECS[look]);
@@ -466,6 +493,21 @@ export function heroGeometry(): THREE.BufferGeometry {
 
 export function heroShellGeometry(): THREE.BufferGeometry {
   return get('hero').shell!;
+}
+
+export function mageGeometry(): THREE.BufferGeometry {
+  return get('mage').geo;
+}
+
+export function mageShellGeometry(): THREE.BufferGeometry {
+  return get('mage').shell!;
+}
+
+/** Player look key for CharacterId. */
+export function playerLookGeo(skin: 'hero' | 'mage' | 'tech'): { geo: THREE.BufferGeometry; shell: THREE.BufferGeometry } {
+  if (skin === 'mage') return { geo: mageGeometry(), shell: mageShellGeometry() };
+  // Tech reuses hero until Gear L art ships.
+  return { geo: heroGeometry(), shell: heroShellGeometry() };
 }
 
 /** Shared flat-shaded vertex-colour material for every crowd look. */

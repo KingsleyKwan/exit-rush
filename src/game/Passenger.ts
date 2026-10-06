@@ -253,7 +253,13 @@ export class Passenger {
       this.tint.setRGB(k * (1 + p * 0.5), k * (1 - p * 0.5), k * (1 - p * 0.55));
     } else {
       this.windupP = 0;
-      if (this.flash > 0.01) {
+      if (a.freezeUntil > this.agentTime(time)) {
+        // Frozen: icy cyan tint so freeze reads from iso cam.
+        const pulse = 0.85 + 0.15 * Math.sin(time * 8 + a.id);
+        this.tint.setRGB(0.45 * pulse, 0.95 * pulse, 1.25 * pulse);
+      } else if (a.chillUntil > this.agentTime(time)) {
+        this.tint.setRGB(0.7, 0.95, 1.15);
+      } else if (this.flash > 0.01) {
         const k = 1 + this.flash * 1.6;
         this.tint.setRGB(k, k, k);
       } else if (a.kind === 'angry') {

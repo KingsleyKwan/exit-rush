@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import type { PlayerSim } from './sim/PlayerSim';
 import { TUNING } from './sim/tuning';
-import { heroGeometry, heroShellGeometry } from './characters';
+import { heroGeometry, heroShellGeometry, mageGeometry, mageShellGeometry } from './characters';
 
 /**
  * Player visual (v0.3 chibi hero: blue shirt, lanyard, cyan glow outline).
@@ -25,15 +25,20 @@ export class Player {
   private bob = 0;
   private yaw = Math.PI;
   private lastImpact = 0;
+  private bodyMesh: THREE.Mesh;
+  private glowMesh: THREE.Mesh;
+  private skin: 'hero' | 'mage' | 'tech' = 'hero';
 
   constructor() {
     this.bodyMat = new THREE.MeshLambertMaterial({ vertexColors: true, flatShading: true });
     const body = new THREE.Mesh(heroGeometry(), this.bodyMat);
+    this.bodyMesh = body;
     body.castShadow = true;
     body.renderOrder = 2;
     // Rim glow: inflated back-face shell.
     this.glowMat = new THREE.MeshBasicMaterial({ color: 0x5ad2ff, side: THREE.BackSide, transparent: true, opacity: 0.95 });
     const glow = new THREE.Mesh(heroShellGeometry(), this.glowMat);
+    this.glowMesh = glow;
     glow.renderOrder = 2;
     // X-ray silhouette: drawn in the opaque pass after the crowd (renderOrder 1)
     // but before the hero body (2), with GreaterDepth — so it only lights up
@@ -70,6 +75,20 @@ export class Player {
     this.aim.rotation.x = -Math.PI / 2;
     this.aim.position.y = 0.035;
     this.mesh.add(this.aim);
+  }
+
+  /** Swap player mesh for the selected character (hero / mage). Violet glow for mage. */
+  setSkin(skin: 'hero' | 'mage' | 'tech'): void {
+    if (this.skin === skin) return;
+    this.skin = skin;
+    const geo = skin === 'mage' ? mageGeometry() : heroGeometry();
+    const shell = skin === 'mage' ? mageShellGeometry() : heroShellGeometry();
+    this.bodyMesh.geometry = geo;
+    this.glowMesh.geometry = shell;
+    const col = skin === 'mage' ? 0xb388ff : 0x5ad2ff;
+    this.glowMat.color.setHex(col);
+    this.xrayMat.color.setHex(col);
+    this.ringMat.color.setHex(skin === 'mage' ? 0xce93d8 : 0x4fc3f7);
   }
 
   /** Kick squash externally (e.g. angry hit). */
@@ -120,9 +139,11 @@ export class Player {
     if (p.winded) c.setRGB(0.9, 0.2, 0.2);
     else if (charge > 0) c.setRGB(1, 0.6 - charge * 0.3, 0.1);
     else if (p.isSensing(now)) c.setRGB(0.3, 1, 0.85);
+    else if (this.skin === 'mage') c.setRGB(0.81, 0.58, 0.98); // violet marker
     else c.setRGB(0.3 + (1 - st) * 0.6, 0.76 * st + 0.2, 0.97 * st);
-    this.ring.scale.setScalar(1 + charge * 0.6 + (p.isSensing(now) ? Math.sin(time * 8) * 0.08 : 0));
-    this.ringMat.opacity = p.shoveCd > 0 ? 0.45 : 0.9;
+    const ringBase = this.skin === 'mage' ? 1.22 : 1;
+    this.ring.scale.setScalar(ringBase + charge * 0.6 + (p.isSensing(now) ? Math.sin(time * 8) * 0.08 : 0));
+    this.ringMat.opacity = p.shoveCd > 0 ? 0.45 : 0.95;
 
     // Ult tints.
     if (p.isCharging(now)) {
@@ -143,7 +164,7 @@ export class Player {
     else if (p.isDashing(now)) g.setRGB(0.4, 1, 1);
     else if (p.winded) g.setRGB(1, 0.3, 0.3);
     else g.setRGB(0.35, 0.82, 1);
-    this.glowMat.opacity = 0.75 + 0.25 * Math.sin(time * 4);
+    this.glowMat.opacity = (this.skin === 'mage' ? 0.9 : 0.75) + 0.25 * Math.sin(time * 4);
     this.xrayMat.color.copy(g);
 
     // Aim chevron in front of the player while steering.
