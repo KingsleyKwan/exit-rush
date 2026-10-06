@@ -11,7 +11,8 @@ import { el, portrait, iconBtn, langBtn, qualityLabel, stationName, loadoutStrip
 
 function mageActions(game: Game, dict: ReturnType<typeof t>): string {
   const s = game.runSkills;
-  // One slot per element (highest-tier unlocked), then a single gold-ring ult.
+  // Always one visible slot per element (highest-tier unlocked), then one ult.
+  // Never drop a branch mid-run — cooldown uses a pie overlay, button stays.
   const raw = game.runMods.spellBar ?? [];
   const byBranch = new Map<string, string>();
   for (const id of raw) {
@@ -20,19 +21,27 @@ function mageActions(game: Game, dict: ReturnType<typeof t>): string {
     const prev = byBranch.get(n.branch);
     if (!prev || (spellById(prev)?.at ?? 0) < n.at) byBranch.set(n.branch, id);
   }
-  const bar = ['fire', 'ice', 'volt'].map((b) => byBranch.get(b)).filter((x): x is string => !!x).slice(0, 3);
-  const spellBtn = (id: string) => {
-    const n = spellById(id);
-    if (!n) return '';
-    const ico = n.branch === 'fire' ? 'fire' : n.branch === 'ice' ? 'ice' : 'volt';
+  // Fallback stubs so fire/ice/volt always occupy a slot when that T1 is unlocked.
+  for (const [branch, stub] of [['fire', 'fire_t1'], ['ice', 'ice_t1'], ['volt', 'volt_t1']] as const) {
+    if (!byBranch.has(branch) && spellById(stub) && (branch === 'fire' ? s.str : branch === 'ice' ? s.sta : s.spd) >= 10) {
+      byBranch.set(branch, stub);
+    }
+  }
+  const spellBtn = (branch: 'fire' | 'ice' | 'volt') => {
+    const id = byBranch.get(branch);
+    const ico = branch;
+    if (!id) {
+      return `<button type="button" class="skill-use act-spell el-${branch} dim" disabled title="${branch}" aria-label="${branch}">${icon(ico)}</button>`;
+    }
+    const n = spellById(id)!;
     const title = `${n.nameZh} / ${n.nameEn}`;
-    return `<button type="button" class="skill-use act-spell el-${n.branch}" data-spell="${id}" title="${title}" aria-label="${title}">${icon(ico)}</button>`;
+    return `<button type="button" class="skill-use act-spell el-${branch}" data-spell="${id}" data-branch="${branch}" title="${title}" aria-label="${title}">${icon(ico)}</button>`;
   };
   const ults: string[] = [];
   if (s.ultStr) ults.push(`<button type="button" class="skill-use ult-str ult-mage" data-ult="str" title="${dict.fire}" aria-label="${dict.fire}">${icon('fire')}</button>`);
   if (s.ultSpd) ults.push(`<button type="button" class="skill-use ult-spd ult-mage" data-ult="spd" title="${dict.volt}" aria-label="${dict.volt}">${icon('volt')}</button>`);
   if (s.ultSta) ults.push(`<button type="button" class="skill-use ult-sta ult-mage" data-ult="sta" title="${dict.ice}" aria-label="${dict.ice}">${icon('ice')}</button>`);
-  return [...bar.map(spellBtn), ...ults.slice(0, 1)].join('');
+  return [spellBtn('fire'), spellBtn('ice'), spellBtn('volt'), ...ults.slice(0, 1)].join('');
 }
 
 export function renderPlayHud(game: Game): HTMLElement {
@@ -176,12 +185,13 @@ export function updatePlayHud(root: HTMLElement, game: Game): void {
     root.querySelector('.mana-meter')?.classList.toggle('low', mf < 25);
     root.querySelector('.mana-meter')?.classList.toggle('denied', (game.sim?.player.manaDeniedT ?? 0) > 0);
   }
-  // Spell CD rings
+  // Spell CD rings — button stays fully visible; pie only.
   root.querySelectorAll<HTMLElement>('[data-spell]').forEach((b) => {
     const id = b.dataset.spell!;
     const cd = game.sim?.player.spellCd[id] ?? 0;
     b.classList.toggle('cooling', cd > 0);
-    b.style.setProperty('--cd', String(Math.min(1, cd / 8)));
+    // Typical mage CD 2–6 s; map remaining onto a full pie.
+    b.style.setProperty('--cd', String(Math.min(1, cd / 6)));
   });
   // 大聲公 noise zone: pulse the stamina bar + show the loudmouth chip.
   const noisy = game.noiseDrain() > 0;

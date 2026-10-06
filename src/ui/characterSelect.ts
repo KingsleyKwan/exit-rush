@@ -6,6 +6,8 @@ import { entitlements } from '../game/entitlements';
 import { IS_STORE_BUILD } from '../game/platform';
 import { icon } from './icons';
 import { el, screenBar } from './uiShared';
+import { progressOf } from '../game/storage';
+import { playableLevels, getLevel } from '../game/levels';
 
 /** Gear L is not playable yet (v0.8.1). */
 const COMING_SOON: Partial<Record<CharacterId, boolean>> = { tech: true };
@@ -41,9 +43,26 @@ export function renderCharacters(game: Game): HTMLElement {
       action = `<button type="button" class="primary dim" disabled>${icon('lock', 'sm')}<span>${dict.locked}</span></button>`;
     }
 
+    const EL_TINT: Record<string, string> = { fire: 'tint-fire', ice: 'tint-ice', volt: 'tint-volt' };
     const styleIcos = c.styleIcons
-      .map((k) => icon((['str', 'spd', 'sta', 'fire', 'ice', 'volt', 'shop', 'bag', 'star'] as string[]).includes(k) ? k : 'star', 'sm'))
+      .map((k) => {
+        const name = (['str', 'spd', 'sta', 'fire', 'ice', 'volt', 'shop', 'bag', 'star'] as string[]).includes(k) ? k : 'star';
+        const tint = EL_TINT[k] ?? '';
+        return `<span class="char-style-ico ${tint}">${icon(name, 'sm')}</span>`;
+      })
       .join('');
+
+    const prog = progressOf(game.save, id);
+    const totalLv = playableLevels().length;
+    const clearedN = prog.cleared.length;
+    const pct = Math.round((clearedN / Math.max(1, totalLv)) * 100);
+    const hi = prog.highestCleared;
+    const hiLv = hi > 0 ? getLevel(hi) : null;
+    const hiLabel = hiLv ? `${hi} · ${en ? hiLv.stationEn : hiLv.stationZh}` : (en ? 'Not started' : '未開始');
+    const progHtml = coming ? '' : `<div class="char-prog" aria-label="${clearedN}/${totalLv}">
+          <div class="char-prog-meta"><span>${dict.charCleared}: ${clearedN}/${totalLv}</span><span>${hiLabel}</span></div>
+          <div class="char-prog-bar"><i style="width:${pct}%"></i></div>
+        </div>`;
 
     return `
       <article class="char-row ${selected ? 'selected' : ''} ${coming ? 'coming' : ''} char-${id}" data-char="${id}">
@@ -53,6 +72,7 @@ export function renderCharacters(game: Game): HTMLElement {
           <p class="char-other">${other}</p>
           <div class="char-styles">${styleIcos}</div>
           <p class="char-pitch">${coming ? (en ? 'Shop + backpack grid next' : '商店同背囊格即將推出') : pitch}</p>
+          ${progHtml}
           <div class="char-actions">${action}</div>
         </div>
       </article>`;

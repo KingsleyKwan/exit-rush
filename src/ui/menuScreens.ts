@@ -11,6 +11,8 @@ import {
   PORTRAITS, PortraitKind, asset, langBtn, iconBtn, qualityLabel, loadoutStrip, wireLoadoutStrip,
 } from './uiShared';
 import { CHARACTERS } from '../game/charactersDef';
+import { charPortraitUrl } from '../game/charPortraits';
+import { progressOf } from '../game/storage';
 
 /** v0.7: long Latin station names (e.g. "Down-to-Earth Town") step down a size instead of ellipsizing. */
 function fitCls(name: string): string {
@@ -21,6 +23,20 @@ function fitCls(name: string): string {
 function titleCls(name: string): string {
   if (!/^[\x20-\x7e]+$/.test(name)) return '';
   return name.length >= 15 ? 'wrap wrap-s' : name.length >= 8 ? 'wrap' : '';
+}
+
+function levelsWhoChip(game: Game): string {
+  const dict = t();
+  const en = getLang() === 'en';
+  const id = game.save.character;
+  const c = CHARACTERS[id] ?? CHARACTERS.hero;
+  const name = id === 'hero' ? dict.youOffice : (en ? c.nameEn : c.nameZh);
+  const prog = progressOf(game.save);
+  const port = charPortraitUrl(id);
+  const img = port ? `<img src="${port}" alt="" width="28" height="32" />` : icon('chars', 'xs');
+  const total = 100;
+  const n = prog.cleared.length;
+  return `<button type="button" class="char-chip who" data-act="characters" title="${dict.charProgressOf}: ${name}">${img}<span><b>${name}</b><small class="chip-prog">${n}/${total}</small></span></button>`;
 }
 
 export function renderMenu(game: Game): HTMLElement {
@@ -77,7 +93,7 @@ export function renderLevels(game: Game): HTMLElement {
   const levels = playableLevels();
   const page = el(`
     <div class="sub-screen" data-ui="1">
-      ${screenBar(dict.levelsTitle, 'levels', `<button type="button" class="char-chip" data-act="characters">${icon('chars', 'xs')}<span>${game.save.character === 'mage' ? (getLang()==='en'?CHARACTERS.mage.nameEn:CHARACTERS.mage.nameZh) : dict.youOffice}</span></button>` + pointsChip(game))}
+      ${screenBar(dict.levelsTitle, 'levels', levelsWhoChip(game) + pointsChip(game))}
       <div class="sub-body lv-body">
         <div class="lv-sticky">
           ${loadoutStrip(game, { edit: true, cls: 'pre-level' })}
