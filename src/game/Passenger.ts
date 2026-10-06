@@ -2,7 +2,8 @@ import * as THREE from 'three';
 import { TUNING } from './sim/tuning';
 import type { Agent } from './sim/CrowdSim';
 import { lookFor, type Look } from './characters';
-import { shoutBubbleTexture } from './badges';
+import { bossTagTexture, shoutBubbleTexture } from './badges';
+import { BOSSES } from './bosses';
 
 /** Shared geometry / materials for the per-agent floor decals (never disposed per passenger). */
 export const G = {
@@ -12,11 +13,19 @@ export const G = {
   loudFill: new THREE.CircleGeometry(TUNING.types.loud.radius, 40),
   loudRim: new THREE.RingGeometry(TUNING.types.loud.radius - 0.06, TUNING.types.loud.radius, 48),
   loudWave: new THREE.RingGeometry(0.88, 1, 40),
+  bossRing: new THREE.RingGeometry(0.36, 0.44, 40),
+  crownBand: new THREE.CylinderGeometry(0.15, 0.13, 0.08, 14, 1, true),
+  crownSpike: new THREE.ConeGeometry(0.035, 0.1, 6),
+  crownGem: new THREE.OctahedronGeometry(0.028, 0),
 };
 export const M = {
   familyDisc: new THREE.MeshBasicMaterial({ color: 0xf08a3c, transparent: true, opacity: 0.22, depthWrite: false }),
   shadow: new THREE.MeshBasicMaterial({ color: 0x000000, transparent: true, opacity: 0.24, depthWrite: false }),
   loudFill: new THREE.MeshBasicMaterial({ color: 0xff9f1a, transparent: true, opacity: 0.1, depthWrite: false }),
+  crown: new THREE.MeshLambertMaterial({ color: 0xffc928, emissive: 0x6b4a00, side: THREE.DoubleSide }),
+  gem: new THREE.MeshBasicMaterial({ color: 0xe53935 }),
+  barBg: new THREE.SpriteMaterial({ color: 0x0d0a06, transparent: true, opacity: 0.9, depthTest: false, depthWrite: false }),
+  barFrame: new THREE.SpriteMaterial({ color: 0xffcc33, depthTest: false, depthWrite: false }),
 };
 
 function angleLerp(a: number, b: number, t: number): number {
@@ -44,6 +53,8 @@ export class Passenger {
   readonly caseAnchor: THREE.Object3D | null = null;
   /** Instance tint (multiplies vertex colours; >1 brightens for hit flash). */
   readonly tint = new THREE.Color(1, 1, 1);
+  /** v0.7 cutscene: when set, the figure turns to this yaw (boss poses for the camera). */
+  faceYaw: number | null = null;
   /** 0–1 angry wind-up progress (for the floating icon / steam). */
   windupP = 0;
   private lean = new THREE.Object3D();
@@ -56,6 +67,18 @@ export class Passenger {
     waves: { mesh: THREE.Mesh; mat: THREE.MeshBasicMaterial }[];
     bubble: THREE.Sprite;
     bubbleMat: THREE.SpriteMaterial;
+  } | null = null;
+  /** v0.7 boss: crown, name tag, stubbornness bar, gold floor ring. */
+  private boss: {
+    crown: THREE.Group;
+    ring: THREE.Mesh;
+    ringMat: THREE.MeshBasicMaterial;
+    tag: THREE.Sprite;
+    frame: THREE.Sprite;
+    barBg: THREE.Sprite;
+    bar: THREE.Sprite;
+    barMat: THREE.SpriteMaterial;
+    tint: [number, number, number];
   } | null = null;
   private squash = 0;
   private squashV = 0;
@@ -118,9 +141,68 @@ export class Passenger {
       this.mesh.add(disc);
     }
     if (agent.caseBody) this.caseAnchor = new THREE.Object3D();
+    if (agent.boss) this.buildBoss();
     // Boarders walk in (+Z); riders face random-ish.
     this.yaw = agent.mode === 'boarder' ? 0 : Math.random() * Math.PI * 2;
     this.update(1, 0, 0);
+  }
+
+  private buildBoss(): void {
+    const a = this.agent;
+    const def = BOSSES[a.boss!.kind];
+    const crouch = a.kind === 'squat';
+    const kid = a.kind === 'brat';
+    // Crown sits on the head (follows squash / yaw as a child of the body rig).
+    const crown = new THREE.Group();
+    const band = new THREE.Mesh(G.crownBand, M.crown);
+    crown.add(band);
+    for (let k = 0; k < 5; k++) {
+      const ang = (k / 5) * Math.PI * 2;
+      const sp = new THREE.Mesh(G.crownSpike, M.crown);
+      sp.position.set(Math.sin(ang) * 0.13, 0.08, Math.cos(ang) * 0.13);
+      crown.add(sp);
+    }
+    const gem = new THREE.Mesh(G.crownGem, M.gem);
+    gem.position.set(0, 0.0, 0.15);
+    crown.add(gem);
+    const headTop = (crouch ? 0.72 : 0.99) + (kid ? 0.014 : 0) + 0.215 * (kid ? 1.12 : 1) * 0.9;
+    // Sun hat (luggage) / cap (brat): perch the crown on top of the headwear.
+    const hatLift = a.kind === 'luggage' ? 0.13 : kid ? 0.06 : 0;
+    crown.position.set(0, headTop + 0.02 + hatLift, -0.01);
+    crown.rotation.z = 0.12;
+    this.rig.add(crown);
+    // Gold floor ring.
+    const ringMat = new THREE.MeshBasicMaterial({ color: 0xffc928, transparent: true, opacity: 0.75, depthWrite: false, side: THREE.DoubleSide });
+    const ring = new THREE.Mesh(G.bossRing, ringMat);
+    ring.rotation.x = -Math.PI / 2;
+    ring.position.y = 0.05;
+    ring.renderOrder = 3;
+    this.mesh.add(ring);
+    // Name tag + stubbornness bar (constant world size: undo the body scale).
+    const inv = 1 / a.scale;
+    const tag = new THREE.Sprite(new THREE.SpriteMaterial({ map: bossTagTexture(def.zh, def.en, def.accent), transparent: true, depthTest: false, depthWrite: false }));
+    tag.scale.set(1.45 * inv, 1.45 * (168 / 512) * inv, 1);
+    tag.renderOrder = 8;
+    // Bar just above the crown, tag above the bar (local units; sprite sizes are world-constant).
+    const barY = headTop + hatLift + 0.2 + 0.16 * inv; // clear of the crown spikes (sprites draw over it)
+    tag.position.set(0, barY + 0.16 * inv + 0.12 * inv * 1.45, 0);
+    this.mesh.add(tag);
+    const frame = new THREE.Sprite(M.barFrame);
+    frame.scale.set(1.21 * inv, 0.19 * inv, 1);
+    frame.position.set(0, barY, 0);
+    frame.renderOrder = 8;
+    this.mesh.add(frame);
+    const barBg = new THREE.Sprite(M.barBg);
+    barBg.scale.set(1.15 * inv, 0.13 * inv, 1);
+    barBg.renderOrder = 9;
+    barBg.position.set(0, barY, 0);
+    this.mesh.add(barBg);
+    const barMat = new THREE.SpriteMaterial({ color: 0xff7043, depthTest: false, depthWrite: false });
+    const bar = new THREE.Sprite(barMat);
+    bar.position.copy(barBg.position);
+    bar.renderOrder = 10;
+    this.mesh.add(bar);
+    this.boss = { crown, ring, ringMat, tag, frame, barBg, bar, barMat, tint: def.tint };
   }
 
   update(alpha: number, dt: number, time: number): void {
@@ -153,7 +235,8 @@ export class Passenger {
     const waddle = Math.sin(this.bob) * (a.isKid ? 0.12 : 0.07) * Math.min(1, speed * 1.2);
 
     // Face movement, lean into velocity.
-    if (speed > 0.25) this.yaw = angleLerp(this.yaw, Math.atan2(b.vx, b.vz), 1 - Math.exp(-6 * dt));
+    if (this.faceYaw !== null) this.yaw = angleLerp(this.yaw, this.faceYaw, 1 - Math.exp(-10 * dt));
+    else if (speed > 0.25) this.yaw = angleLerp(this.yaw, Math.atan2(b.vx, b.vz), 1 - Math.exp(-6 * dt));
     this.rig.rotation.set(0, this.yaw, waddle);
     const lx = Math.max(-0.28, Math.min(0.28, b.vz * 0.09));
     const lz = Math.max(-0.28, Math.min(0.28, -b.vx * 0.09));
@@ -210,18 +293,62 @@ export class Passenger {
       }
     }
 
+    if (this.boss && a.boss) {
+      const B = this.boss;
+      const st = a.boss;
+      const yielding = st.yieldUntil > 0 && this.agentTime(time) < st.yieldUntil;
+      const t = B.tint;
+      const k = yielding ? 0.82 : 1;
+      this.tint.setRGB(this.tint.r * t[0] * k, this.tint.g * t[1] * k, this.tint.b * t[2] * k);
+      // Stubbornness bar: full = immovable (red-orange) … empty = yields (green flash).
+      const inv = 1 / a.scale;
+      const w = 1.09 * inv;
+      const f = Math.max(0.001, st.stub);
+      B.bar.visible = this.hudOn && (st.stub > 0.01 || yielding);
+      const shown = yielding ? 1 : f;
+      B.bar.scale.set(w * shown, 0.085 * inv, 1);
+      B.bar.center.set(0.5 / shown, 0.5);
+      if (yielding) B.barMat.color.setRGB(0.45 + 0.3 * Math.sin(time * 14), 0.9, 0.5);
+      else B.barMat.color.setRGB(1, 0.22 + 0.4 * (1 - f), 0.08);
+      B.ringMat.opacity = yielding ? 0.25 : 0.55 + 0.25 * Math.sin(time * 4 + a.id);
+      B.crown.rotation.z = yielding ? 0.5 + Math.sin(time * 10) * 0.15 : 0.12 + Math.sin(time * 2.2) * 0.04;
+    }
+
     if (this.caseAnchor && a.caseBody) {
       const c = a.caseBody;
       const cx = c.px + (c.x - c.px) * alpha;
       const cz = c.pz + (c.z - c.pz) * alpha;
       this.caseAnchor.position.set(cx, 0, cz);
       this.caseAnchor.rotation.set(0, Math.atan2(cx - x, cz - z), Math.max(-0.2, Math.min(0.2, -c.vx * 0.1)));
+      // Boss suitcase: scaled up to its (giant) collider.
+      if (a.boss) this.caseAnchor.scale.setScalar(c.r / TUNING.types.luggage.caseRadius);
       this.caseAnchor.updateMatrix();
     }
   }
 
+  /** L100: tag + bar only on the nearest king (all eight would bury the car). */
+  setTagVisible(on: boolean): void {
+    this.hudOn = on;
+    if (!this.boss) return;
+    this.boss.tag.visible = on;
+    this.boss.frame.visible = on;
+    this.boss.barBg.visible = on;
+  }
+  private hudOn = true;
+
+  /** Boss yield timing is in sim time; the view gets it from the crowd each frame. */
+  simTime = 0;
+  private agentTime(_t: number): number {
+    return this.simTime;
+  }
+
   dispose(): void {
     this.auraMat?.dispose();
+    if (this.boss) {
+      this.boss.ringMat.dispose();
+      this.boss.barMat.dispose();
+      (this.boss.tag.material as THREE.SpriteMaterial).dispose();
+    }
     if (this.loud) {
       this.loud.rimMat.dispose();
       for (const w of this.loud.waves) w.mat.dispose();

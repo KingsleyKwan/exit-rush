@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import { Passenger, G, M } from './Passenger';
-import type { CrowdSim } from './sim/CrowdSim';
+import type { Agent, CrowdSim } from './sim/CrowdSim';
 import { TUNING } from './sim/tuning';
 import { CHAR_MAT, LOOKS, lookGeometry, suitcaseGeometry, type Look } from './characters';
 import { badgeTexture, stinkTexture } from './badges';
@@ -147,6 +147,25 @@ export class Crowd {
     this.sim = null;
   }
 
+  /** v0.7 cutscene: boss figures turn to face the camera (null = normal facing). */
+  /** Cutscene: show every boss name tag regardless of distance. */
+  allBossTags = false;
+
+  faceBosses(cam: THREE.Vector3 | null): void {
+    for (const v of this.views.values()) {
+      if (!v.agent.boss) continue;
+      v.faceYaw = cam ? Math.atan2(cam.x - v.agent.body.x, cam.z - v.agent.body.z) : null;
+    }
+  }
+
+  private bossKindsCache: { sim: CrowdSim | null; n: number } = { sim: null, n: 0 };
+  private bossKinds(): number {
+    if (this.bossKindsCache.sim !== this.sim) {
+      this.bossKindsCache = { sim: this.sim, n: new Set(this.sim!.bosses().map((a) => a.boss!.kind)).size };
+    }
+    return this.bossKindsCache.n;
+  }
+
   /** Release GPU resources owned by the crowd view (app teardown). */
   dispose(): void {
     this.clear();
@@ -196,8 +215,22 @@ export class Crowd {
     this.stink.count = 0;
     this.flies.count = 0;
     const fx = this.detail === 'high';
+    // Boss tags: a lone king always shows his; with several (L100) only the nearest king within
+    // reach is tagged during play (the title card already names all eight in the cutscene).
+    const many = this.bossKinds() > 1;
+    let tagged: Agent | null = null;
+    if (many && focus && !this.allBossTags) {
+      let best = 3.0;
+      for (const a of this.sim.agents) {
+        if (!a.boss) continue;
+        const d = Math.hypot(a.body.x - focus.x, a.body.z - focus.z);
+        if (d < best) { best = d; tagged = a; }
+      }
+    }
     let i = 0;
     for (const v of this.views.values()) {
+      v.simTime = this.sim.time;
+      if (v.agent.boss && focus) v.setTagVisible(!many || v.agent === tagged);
       v.update(alpha, dt, time);
       // Group sits at the origin, so world matrices == group-local instance matrices.
       v.mesh.updateMatrixWorld(true);
@@ -214,7 +247,7 @@ export class Crowd {
       const a = v.agent;
       const p = v.mesh.position;
       const top = 1.5 * a.scale + 0.12;
-      if (this.iconsOn && a.kind !== 'normal' && a.kind !== 'couple' && !a.isKid) {
+      if (this.iconsOn && a.kind !== 'normal' && a.kind !== 'couple' && !a.isKid && !a.boss) {
         const near = this.nearness(focus, p.x, p.z);
         if (near > 0 || v.windupP > 0) {
           const pulse = a.kind === 'angry' ? 1 + v.windupP * 0.7 + Math.sin(time * 40) * 0.08 * v.windupP : 1;
@@ -267,10 +300,12 @@ export class Crowd {
       const dx = bx - ax;
       const dz = bz - az;
       const d = Math.hypot(dx, dz);
-      l.mesh.position.set((ax + bx) / 2, 0.42, (az + bz) / 2);
-      l.mesh.scale.set(Math.max(0.05, d - 0.36), 1, 1);
+      const king = v.agent.boss ? 2 : 1;
+      l.mesh.visible = !(this.sim.isSplit(v.agent));
+      l.mesh.position.set((ax + bx) / 2, 0.42 * (v.agent.boss ? v.agent.scale * 0.9 : 1), (az + bz) / 2);
+      l.mesh.scale.set(Math.max(0.05, d - 0.36 * king), king, king);
       l.mesh.rotation.y = -Math.atan2(dz, dx);
-      const tension = Math.min(1, Math.max(0, (d - rest) / 0.5));
+      const tension = Math.min(1, Math.max(0, (d - (v.agent.boss ? v.agent.boss.rest : rest)) / 0.5));
       l.mat.color.setRGB(0.95, 0.78 - tension * 0.55, 0.63 - tension * 0.5);
       const near = this.nearness(focus, (ax + bx) / 2, (az + bz) / 2);
       if (this.iconsOn && near > 0) {

@@ -469,15 +469,15 @@ export class TrainScene {
       s.fillText(level.stationZh, 48, 118);
       const zw = s.measureText(level.stationZh).width;
       s.font = `700 42px ${font}, ${CJK_FALLBACK}`;
-      s.fillText(level.stationEn, 48 + zw + 28, 112);
+      s.fillText(level.stationEn, 48 + zw + 28, 112, 960 - 40 - (48 + zw + 28));
       s.font = `600 26px ${CJK_FALLBACK}`;
       s.globalAlpha = 0.8;
       const en = `The next station is ${level.stationEn}.`;
       const zh = lang === 'en' ? en : `下一站，${level.stationZh}。請往左邊車門落車。`;
-      s.fillText(lang === 'en' ? en : zh, 48, 178);
+      s.fillText(lang === 'en' ? en : zh, 48, 178, 900);
       if (lang !== 'en') {
         s.font = `500 22px ${CJK_FALLBACK}`;
-        s.fillText(en, 48, 210);
+        s.fillText(en, 48, 210, 900);
       }
       s.globalAlpha = 1;
       s.fillStyle = theme.line;
@@ -561,14 +561,27 @@ export class TrainScene {
       s.fillStyle = '#ffffff';
       s.textBaseline = 'middle';
       s.textAlign = 'left';
-      s.font = `900 104px ${font}, ${CJK_FALLBACK}`;
+      // v0.7: auto-fit long names (e.g. 4-char 中 + 20-char EN) left of the line dots.
+      const right = 960 - 20 - (lines.length - 1) * 54 - 24;
+      let zhPx = 104;
+      let enPx = 60;
+      const widths = () => {
+        s.font = `900 ${zhPx}px ${font}, ${CJK_FALLBACK}`;
+        const zwm = s.measureText(level.stationZh).width;
+        s.font = `700 ${enPx}px ${font}, ${CJK_FALLBACK}`;
+        return [zwm, s.measureText(level.stationEn).width];
+      };
+      let [zw, ew] = widths();
+      while (54 + zw + 40 + ew > right && enPx > 38) [zw, ew] = (enPx -= 2, widths());
+      while (54 + zw + 40 + ew > right && zhPx > 80) [zw, ew] = (zhPx -= 4, widths());
+      s.font = `900 ${zhPx}px ${font}, ${CJK_FALLBACK}`;
       s.fillText(level.stationZh, 54, 118);
-      const zw = s.measureText(level.stationZh).width;
-      s.font = `700 60px ${font}, ${CJK_FALLBACK}`;
-      s.fillText(level.stationEn, 54 + zw + 40, 104);
+      const enX = 54 + zw + 40;
+      s.font = `700 ${enPx}px ${font}, ${CJK_FALLBACK}`;
+      s.fillText(level.stationEn, enX, 104, Math.max(120, right - enX));
       s.font = `500 26px ${CJK_FALLBACK}`;
       s.globalAlpha = 0.6;
-      s.fillText('香城鐵路 HCR · fiction · not affiliated', 54 + zw + 42, 170);
+      s.fillText('香城鐵路 HCR · fiction · not affiliated', enX + 2, 170, Math.max(120, right - enX));
       s.globalAlpha = 1;
       lines.forEach((l, i) => {
         s.fillStyle = LINE_COLORS[l];
@@ -637,9 +650,10 @@ export class TrainScene {
         m.textBaseline = 'alphabetic';
         const fnt = fontStack(th.lettering);
         m.font = `${cur ? 900 : 700} ${cur ? 30 : 26}px ${fnt}, ${CJK_FALLBACK}`;
-        m.fillText(st.stationZh, x, 44);
+        const slot = Math.min(230, (x1 - x0) / (n - 1) - 12);
+        m.fillText(st.stationZh, x, 44, slot);
         m.font = `600 ${cur ? 17 : 15}px ${CJK_FALLBACK}`;
-        m.fillText(st.stationEn, x, 62);
+        m.fillText(st.stationEn, x, 62, slot);
       });
     }
     this.mapTex.needsUpdate = true;
@@ -1006,16 +1020,31 @@ export class TrainScene {
   }
 
   /** Critically-damped follow: from +X looking at the left door wall (−X). */
-  follow(target: { x: number; z: number }, dt: number): void {
+  follow(target: { x: number; z: number }, dt: number, focus: { x: number; z: number; k: number } | null = null): void {
     const wall = doorWallX();
     // ¾ view along the car: elevated on the far side, framing doors on the left.
     const want = this.tmp.set(Math.max(target.x + 4.2, 3.6), 7.0, target.z + 1.5);
+    // v0.7 boss cutscene: swoop down to a low close-up on the boss (k = blend 0…1).
+    const fk = focus ? focus.k : 0;
+    if (focus && fk > 0) {
+      // Low ¾ close-up from the car side; boss framed in the upper half (title card sits below).
+      const wide = focus.k < 0.99 ? 1.5 : 1;
+      want.set(
+        want.x + (focus.x + 4.4 * wide - want.x) * fk,
+        want.y + (3.5 * wide - want.y) * fk,
+        want.z + (focus.z + 2.4 * wide - want.z) * fk,
+      );
+    }
     const w = 5;
-    this.camVel.addScaledVector(want.sub(this.camPos), w * w * dt).multiplyScalar(Math.max(0, 1 - 2 * w * dt));
+    // exp() damping: identical feel at 60 fps, but never stalls on long (clamped) frames.
+    this.camVel.addScaledVector(want.sub(this.camPos), w * w * dt).multiplyScalar(Math.exp(-2 * w * dt));
     this.camPos.addScaledVector(this.camVel, dt);
     const lookWant = this.tmp.set(wall - 0.8, 0.45, target.z * 0.55);
+    if (focus && fk > 0) {
+      lookWant.set(lookWant.x + (focus.x - lookWant.x) * fk, lookWant.y + (0.85 - lookWant.y) * fk, lookWant.z + (focus.z - 0.35 - lookWant.z) * fk);
+    }
     const wl = 7;
-    this.lookVel.addScaledVector(lookWant.sub(this.look), wl * wl * dt).multiplyScalar(Math.max(0, 1 - 2 * wl * dt));
+    this.lookVel.addScaledVector(lookWant.sub(this.look), wl * wl * dt).multiplyScalar(Math.exp(-2 * wl * dt));
     this.look.addScaledVector(this.lookVel, dt);
 
     this.kickVel.addScaledVector(this.kick, -140 * dt).multiplyScalar(Math.exp(-12 * dt));

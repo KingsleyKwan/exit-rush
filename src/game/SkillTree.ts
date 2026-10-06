@@ -1,4 +1,4 @@
-import type { SkillState } from './storage';
+import { LOADOUT_SLOTS, SP_PER_CLEAR, defaultSkills, earnedFrom, reconcileSlot, spentOf, type SaveData, type SkillState } from './storage';
 import type { PassengerKind } from './PassengerTypes';
 import { TUNING } from './sim/tuning';
 
@@ -9,13 +9,12 @@ export const ULTIMATE_COST = 10;
 export const BRANCH_TOTAL = BRANCH_FILL + ULTIMATE_COST;
 
 /**
- * v0.5/v0.6 skill-point economy (see docs/BALANCE.md):
- * - First clear of each playable level awards POINTS_PER_FIRST_CLEAR.
- * - Replays award nothing.
- * - 31 playable clears × 3 = 93 SP — enough for one full branch+ult (70)
- *   and a strong L100 loadout (~90).
+ * v0.7 skill-point economy (see docs/SKILL_TREE.md):
+ * - First clear of each level awards POINTS_PER_FIRST_CLEAR = 1 (was 3). Replays award nothing.
+ * - 100 levels → 100 SP total vs 70 for one full branch + ultimate: one branch maxed + part of a second,
+ *   so free respec + 3 loadouts (配點1/2/3) matter.
  */
-export const POINTS_PER_FIRST_CLEAR = 3;
+export const POINTS_PER_FIRST_CLEAR = SP_PER_CLEAR;
 /** Kept for UI/docs: only the first clear of a level awards points. */
 export const MAX_POINTS_PER_LEVEL = 1;
 
@@ -427,4 +426,36 @@ export function branchProgressLabel(s: SkillState, branch: Branch, ultLabel = 'U
 export function nextNodeAt(filled: number): number | null {
   for (const t of NODE_THRESHOLDS) if (filled < t) return t;
   return null;
+}
+
+// ------------------------------------------------------------------ v0.7 respec + loadouts
+
+/** Total points earned (1 per distinct first clear). */
+export function earnedPoints(save: Pick<SaveData, 'cleared'>): number {
+  return earnedFrom(save.cleared);
+}
+export { spentOf as spentPoints };
+
+/** Free, instant respec of the ACTIVE loadout: refunds every spent point (incl. ultimates). */
+export function resetActiveLoadout(save: SaveData): SaveData {
+  save.skills = { ...defaultSkills(), points: earnedPoints(save) };
+  save.loadouts[save.activeLoadout] = { ...save.skills };
+  return save;
+}
+
+/** Switch the active loadout; the slot's spare points are re-derived from the shared earned total. */
+export function switchLoadout(save: SaveData, idx: number): SaveData {
+  if (!Number.isInteger(idx) || idx < 0 || idx >= LOADOUT_SLOTS || idx === save.activeLoadout) return save;
+  save.loadouts[save.activeLoadout] = { ...save.skills };
+  const [slot] = reconcileSlot(save.loadouts[idx] ?? defaultSkills(), earnedPoints(save));
+  save.activeLoadout = idx;
+  save.loadouts[idx] = slot;
+  save.skills = { ...slot };
+  return save;
+}
+
+/** Short label for a loadout's spend, e.g. "40·10·9" (+★ per ultimate). */
+export function loadoutSummary(s: SkillState): string {
+  const u = (s.ultStr ? 1 : 0) + (s.ultSpd ? 1 : 0) + (s.ultSta ? 1 : 0);
+  return `${s.str}·${s.spd}·${s.sta}${u ? ' ' + '★'.repeat(u) : ''}`;
 }

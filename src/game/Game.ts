@@ -8,7 +8,7 @@ import { InputController } from './Input';
 import { GameAudio } from './Audio';
 import { haptic } from './haptics';
 import { getLevel, playableLevels, isFinaleUnlocked, type LevelDef } from './levels';
-import { MAX_POINTS_PER_LEVEL, POINTS_PER_FIRST_CLEAR, modifiersFromSkills } from './SkillTree';
+import { MAX_POINTS_PER_LEVEL, POINTS_PER_FIRST_CLEAR, modifiersFromSkills, resetActiveLoadout, switchLoadout } from './SkillTree';
 import type { IntroKind } from './intros';
 import type { PassengerKind } from './PassengerTypes';
 import { loadSave, writeSave, type QualityLevel, type QualitySetting, type SaveData, type SkillState } from './storage';
@@ -19,7 +19,11 @@ import { TUNING } from './sim/tuning';
 import type { SimEvent, UltKind } from './sim/events';
 import type { PlayerInput } from './sim/PlayerSim';
 
-export type GameScreen = 'menu' | 'levels' | 'legend' | 'intro' | 'playing' | 'paused' | 'skills' | 'win' | 'lose';
+export type GameScreen = 'menu' | 'levels' | 'legend' | 'boss' | 'intro' | 'playing' | 'paused' | 'skills' | 'win' | 'lose';
+
+/** v0.7 boss entrance cutscene lengths (s): first time / repeat visits. */
+export const BOSS_CUT_FULL = 2.6;
+export const BOSS_CUT_SHORT = 1.1;
 
 /** Screens drawn over the full-bleed key art (the 3D view is hidden, so skip rendering it). */
 const BACKDROP_SCREENS: GameScreen[] = ['menu', 'levels', 'legend'];
@@ -61,6 +65,8 @@ export class Game {
   /** Skills the current run was started with (spending mid-run applies on the next run). */
   runSkills: SkillState;
   lastClear: ClearResult | null = null;
+  /** v0.7: running boss entrance cutscene (screen === 'boss'). */
+  bossCut: { t: number; start: number; dur: number; full: boolean; slammed: boolean; hold?: boolean } | null = null;
   /** Active intro card kind (screen === 'intro'). */
   pendingIntro: IntroKind | null = null;
   /** HUD tip chip kind while playing a reinforce level. */
@@ -172,7 +178,7 @@ export class Game {
     sim.player.body.enabled = false;
     this.bindSim(sim);
     this.setStationFor(lv);
-    this.train.setOpenBays(openDoorBays(lv.id));
+    this.train.setOpenBays(openDoorBays(lv.id, lv.openDoors));
   }
 
   /** Platform sign + strip map: this level's station with its neighbours in the level list. */
@@ -396,15 +402,15 @@ export class Game {
     this.audio.announce(getLang());
     this.level = level;
     this.setStationFor(level);
-    this.train.setOpenBays(openDoorBays(level.id));
+    this.train.setOpenBays(openDoorBays(level.id, level.openDoors));
     this.train.flashAnnouncement(level, getLang());
     this.audio.startAmbience(level.density, level.id === 100);
     this.lastClear = null;
     this.autoPaused = false;
     this.pendingIntro = null;
     this.activeTip = level.tipKind ?? null;
-    const openN = openDoorBays(level.id).length;
-    // Banner when fewer than 3 doors open (L8–15: 2, L16+: 1).
+    const openN = openDoorBays(level.id, level.openDoors).length;
+    // Banner when fewer than 3 doors open (L8–15: 2, L16+: 1, v0.7 relief levels: 2).
     this.doorBannerOpen = openN;
     this.doorBannerT = openN < 3 ? 3.6 : 0;
     this.closedDoorToastAt = -99;
@@ -431,7 +437,41 @@ export class Game {
     } else {
       this.screen = 'playing';
     }
+    // v0.7: boss levels open on the entrance cutscene (full length the first time only).
+    this.bossCut = null;
+    if (level.boss?.length) {
+      const full = !this.save.seenBosses.includes(level.id);
+      this.bossCut = { t: 0, start: performance.now(), dur: full ? BOSS_CUT_FULL : BOSS_CUT_SHORT, full, slammed: false };
+      this.screen = 'boss';
+    }
     this.hooks.onState();
+  }
+
+  /** Tap to skip (or natural end) of the boss cutscene → intro card or play. */
+  skipBossCut(): void {
+    if (this.screen !== 'boss' || !this.bossCut || !this.level) return;
+    if (!this.save.seenBosses.includes(this.level.id)) {
+      this.save.seenBosses.push(this.level.id);
+      this.persist();
+    }
+    this.bossCut = null;
+    this.screen = this.pendingIntro ? 'intro' : 'playing';
+    this.lastT = performance.now();
+    this.audio.unlock();
+    this.hooks.onState();
+  }
+
+  /** Where the cutscene camera looks: the boss (or the middle of the L100 gauntlet). */
+  private bossFocus(sim: Sim): { x: number; z: number; k: number } | null {
+    const bs = sim.crowd.bosses();
+    if (!bs.length) return null;
+    let x = 0;
+    let z = 0;
+    for (const a of bs) {
+      x += a.body.x;
+      z += a.body.z;
+    }
+    return { x: x / bs.length, z: z / bs.length, k: bs.length > 2 ? 0.55 : 1 };
   }
 
   /** Dismiss the intro card and start the door timer. */
@@ -560,10 +600,34 @@ export class Game {
   /** Close the skill tree and return to wherever it was opened from. */
   closeSkills(): void {
     if (this.screen !== 'skills') return;
-    this.screen = this.level ? this.skillsReturn : 'menu';
+    // v0.7: back to the level select / legend when opened from there (pre-level respec).
+    this.screen = this.level || BACKDROP_SCREENS.includes(this.skillsReturn) ? this.skillsReturn : 'menu';
     this.skillsReturn = 'menu';
     this.persist();
     this.hooks.onState();
+  }
+
+  /** v0.7: switch active skill loadout (配點1/2/3). Applies from the next run (runSkills is a copy). */
+  setLoadout(idx: number): void {
+    switchLoadout(this.save, idx);
+    this.persist();
+    this.hooks.onState();
+  }
+
+  /** v0.7: free instant respec of the active loadout (refunds everything incl. ultimates). */
+  resetSkills(): void {
+    resetActiveLoadout(this.save);
+    this.persist();
+    this.hooks.onState();
+  }
+
+  /** v0.7: one-time 「技能點已重新計算」 notice after the 3→1 SP economy migration. */
+  consumeRespecNotice(): boolean {
+    if (!this.save.respecNotice) return false;
+    this.save.respecNotice = false;
+    this.persist();
+    this.hooks.onToast?.(t().respecNotice);
+    return true;
   }
 
   tryUltimate(kind: UltKind): void {
@@ -668,6 +732,21 @@ export class Game {
         if (a) fx.puff(a.body.x, 1.45, a.body.z, 4, 0xff5252, 0.4, 0.9, 0.45, 1.2, 0);
         break;
       }
+      case 'bossBounce':
+        cam.addTrauma(0.3);
+        cam.kickCamera(e.dx, e.dz, 1.6);
+        this.hitStop = Math.max(this.hitStop, 0.04);
+        fx.puff(e.x, 0.7, e.z, 8, 0xffc928, 2, 1, 0.4);
+        this.player.punch(2.5);
+        this.audio.thud(0.8);
+        haptic(25, 0);
+        break;
+      case 'bossYield':
+        fx.puff(e.x, 1.2, e.z, 16, 0x9ccc65, 2.2, 1.2, 0.55);
+        this.audio.milestone(0.75);
+        this.hooks.onToast?.(t().bossYield);
+        haptic([20, 30, 20], 0);
+        break;
       case 'angryHit':
         cam.addTrauma(0.55);
         cam.kickCamera(e.dx, e.dz, 2.6);
@@ -809,12 +888,45 @@ export class Game {
       if (!sim.ambient) this.updatePlayFrame(sim, dt);
       this.train.setDoorOpenValue(sim.doorOpen);
       const pb = sim.player.body;
-      this.crowd.update(alpha, dt, this.clock, this.train.camera, sim.ambient ? null : { x: pb.x, z: pb.z });
+      const cut = this.screen === 'boss';
+      this.crowd.faceBosses(cut ? this.train.camera.position : null);
+      this.crowd.allBossTags = cut;
+      // Cutscene: no type badges (focus far away) so the king owns the frame.
+      this.crowd.update(alpha, dt, this.clock, this.train.camera, sim.ambient ? null : cut ? { x: 99, z: 99 } : { x: pb.x, z: pb.z });
       this.player.mesh.visible = !sim.ambient;
       this.player.update(sim.player, alpha, dt, sim.time, this.clock);
       const b = sim.player.body;
       const camTarget = sim.ambient ? { x: 0, z: PLAYER_START.z + Math.sin(this.clock * 0.2) * 0.6 } : { x: b.px + (b.x - b.px) * alpha, z: b.pz + (b.z - b.pz) * alpha };
-      this.train.follow(camTarget, dt);
+      let focus: { x: number; z: number; k: number } | null = null;
+      if (this.screen === 'boss' && this.bossCut) {
+        const c = this.bossCut;
+        const prevT = c.t;
+        // Wall clock, so the 3D camera stays in sync with the CSS title-card timeline.
+        if (!c.hold) c.t = (performance.now() - c.start) / 1000;
+        const f = this.bossFocus(sim);
+        if (f) {
+          // Ease in over 0.45 s, hold, ease back out over the last 0.35 s.
+          const ein = Math.min(1, c.t / 0.45);
+          const eout = Math.min(1, Math.max(0, (c.dur - c.t) / 0.35));
+          f.k *= Math.min(ein * ein * (3 - 2 * ein), eout);
+          focus = f;
+          // Boss pose: a stomp + puff when the title slams in.
+          if (!c.slammed && c.t > (c.full ? 0.55 : 0.25)) {
+            c.slammed = true;
+            for (const a of sim.crowd.bosses()) {
+              a.bumpAcc = 1;
+              this.effects.puff(a.body.x, 0.3, a.body.z, 14, 0xffc928, 2.2, 1.1, 0.5);
+            }
+            this.train.addTrauma(0.35);
+            this.audio.angryHit();
+            haptic([30, 40, 60], 0);
+          } else if (c.slammed && Math.floor(c.t * 3) !== Math.floor(prevT * 3)) {
+            for (const a of sim.crowd.bosses()) a.bumpAcc = Math.max(a.bumpAcc, 0.45);
+          }
+        }
+        if (c.t >= c.dur && !c.hold) this.skipBossCut();
+      }
+      this.train.follow(camTarget, dt, focus);
     } else {
       this.train.follow({ x: 0, z: PLAYER_START.z }, dt);
     }

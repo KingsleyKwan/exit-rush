@@ -39,8 +39,36 @@ export interface SaveData {
   muted: boolean;
   /** v0.5: passenger kinds whose intro card has been shown (or re-viewed from legend). */
   seenIntros: string[];
+  /** v0.7: boss levels whose full entrance cutscene has played (repeats get the short cut). */
+  seenBosses: number[];
   /** v0.5: first-run FTUE (auto L1 + ghost hand) completed. */
   ftueDone: boolean;
+  /**
+   * v0.7: three skill loadouts (配點1/2/3). Each stores its own allocation from the SAME earned total;
+   * `skills` is always the active slot (kept in sync on switch / persist). `points` = earned − spent.
+   */
+  loadouts: SkillState[];
+  activeLoadout: number;
+  /** v0.7: one-time 「技能點已重新計算」 notice pending (economy change refunded a save). */
+  respecNotice: boolean;
+}
+
+/** v0.7 economy: 1 skill point per first clear (was 3). Kept here so storage can migrate without importing SkillTree. */
+export const SP_PER_CLEAR = 1;
+export const LOADOUT_SLOTS = 3;
+/** Points a slot has spent (branch fill + 10 per ultimate). */
+export function spentOf(s: SkillState): number {
+  return s.str + s.spd + s.sta + 10 * ((s.ultStr ? 1 : 0) + (s.ultSpd ? 1 : 0) + (s.ultSta ? 1 : 0));
+}
+/** Points earned so far: one per distinct cleared level. */
+export function earnedFrom(cleared: readonly number[]): number {
+  return new Set(cleared).size * SP_PER_CLEAR;
+}
+/** Re-derive `points` from earned − spent; refund everything if over-spent. Returns [state, wasRefunded]. */
+export function reconcileSlot(s: SkillState, earned: number): [SkillState, boolean] {
+  const spent = spentOf(s);
+  if (spent > earned) return [{ ...defaultSkills(), points: earned }, true];
+  return [{ ...s, points: earned - spent }, false];
 }
 
 /** Save key (v0.6.3: renamed with the repo → `exit-rush`). */
@@ -133,7 +161,11 @@ export function defaultSave(): SaveData {
     sfxVol: DEFAULT_AUDIO.sfx,
     muted: DEFAULT_AUDIO.muted,
     seenIntros: [],
+    seenBosses: [],
     ftueDone: false,
+    loadouts: [defaultSkills(), defaultSkills(), defaultSkills()],
+    activeLoadout: 0,
+    respecNotice: false,
   };
 }
 
@@ -164,18 +196,32 @@ export function normalizeSave(parsed: Partial<SaveData> | null | undefined): Sav
   // v0.6: Wisdom → Stamina. Prefer `sta` / `ultSta`; fall back to old `wis` / `ultWis`.
   const sta = num(sk.sta, num(sk.wis, 0));
   const ultSta = bool(sk.ultSta) || bool(sk.ultWis);
+  const cap = (v: number) => Math.min(60, Math.floor(v));
+  const toSkills = (o: Partial<SkillState> & { wis?: number; ultWis?: boolean }): SkillState => ({
+    str: cap(num(o.str, 0)),
+    spd: cap(num(o.spd, 0)),
+    sta: cap(num(o.sta, num(o.wis, 0))),
+    ultStr: bool(o.ultStr),
+    ultSpd: bool(o.ultSpd),
+    ultSta: bool(o.ultSta) || bool(o.ultWis),
+    points: 0,
+  });
+  // v0.7: loadouts. Old saves → current allocation becomes slot 1; points re-derived (1 per cleared level).
+  const earned = earnedFrom(cleared);
+  const active = Number.isInteger(parsed.activeLoadout) && (parsed.activeLoadout as number) >= 0 && (parsed.activeLoadout as number) < LOADOUT_SLOTS ? (parsed.activeLoadout as number) : 0;
+  const rawSlots = Array.isArray(parsed.loadouts) ? parsed.loadouts : [];
+  let refunded = false;
+  const loadouts: SkillState[] = [];
+  for (let i = 0; i < LOADOUT_SLOTS; i++) {
+    const src = i === active ? { ...sk, sta, ultSta } : ((rawSlots[i] ?? {}) as Partial<SkillState>);
+    const [slot, r] = reconcileSlot(toSkills(src), earned);
+    loadouts.push(slot);
+    refunded ||= r;
+  }
   return {
     version: 1,
     lang: parsed.lang === 'en' || parsed.lang === 'zh-HK' ? parsed.lang : d.lang,
-    skills: {
-      str: num(sk.str, 0),
-      spd: num(sk.spd, 0),
-      sta,
-      ultStr: bool(sk.ultStr),
-      ultSpd: bool(sk.ultSpd),
-      ultSta,
-      points: num(sk.points, 0),
-    },
+    skills: { ...loadouts[active] },
     highestCleared: num(parsed.highestCleared, 0),
     cleared,
     clears,
@@ -189,7 +235,13 @@ export function normalizeSave(parsed: Partial<SaveData> | null | undefined): Sav
     seenIntros: Array.isArray(parsed.seenIntros)
       ? [...new Set(parsed.seenIntros.filter((s): s is string => typeof s === 'string'))]
       : [],
+    seenBosses: Array.isArray(parsed.seenBosses)
+      ? [...new Set(parsed.seenBosses.filter((n): n is number => Number.isInteger(n) && n >= 1 && n <= 100))]
+      : [],
     ftueDone: parsed.ftueDone === true,
+    loadouts,
+    activeLoadout: active,
+    respecNotice: parsed.respecNotice === true || refunded,
   };
 }
 
@@ -219,6 +271,8 @@ export function loadSave(): SaveData {
  * session and `false` is returned so the caller can warn the player once.
  */
 export function writeSave(data: SaveData): boolean {
+  // v0.7: the active loadout slot mirrors `skills`.
+  if (Array.isArray(data.loadouts) && data.loadouts[data.activeLoadout]) data.loadouts[data.activeLoadout] = { ...data.skills };
   let json: string;
   try {
     json = JSON.stringify(data);

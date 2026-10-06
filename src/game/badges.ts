@@ -109,3 +109,76 @@ export function shoutBubbleTexture(): THREE.CanvasTexture {
   bubble.anisotropy = 2;
   return bubble;
 }
+
+const bossTags = new Map<string, THREE.CanvasTexture>();
+
+/** v0.7 boss name tag: gold-rimmed pill, 粵 name large + EN small (both always shown). */
+export function bossTagTexture(zh: string, en: string, accent: string): THREE.CanvasTexture {
+  const key = `${zh}|${en}`;
+  let tex = bossTags.get(key);
+  if (tex) return tex;
+  const W = 512;
+  const H = 168;
+  const canvas = document.createElement('canvas');
+  canvas.width = W;
+  canvas.height = H;
+  const ctx = canvas.getContext('2d')!;
+  const r = 44;
+  const pill = (x: number, y: number, w: number, h: number, rr: number) => {
+    ctx.beginPath();
+    ctx.moveTo(x + rr, y);
+    ctx.arcTo(x + w, y, x + w, y + h, rr);
+    ctx.arcTo(x + w, y + h, x, y + h, rr);
+    ctx.arcTo(x, y + h, x, y, rr);
+    ctx.arcTo(x, y, x + w, y, rr);
+    ctx.closePath();
+  };
+  ctx.shadowColor = 'rgba(0,0,0,0.4)';
+  ctx.shadowBlur = 10;
+  ctx.shadowOffsetY = 4;
+  pill(10, 10, W - 20, H - 26, r);
+  ctx.fillStyle = 'rgba(28,22,14,0.92)';
+  ctx.fill();
+  ctx.shadowColor = 'transparent';
+  ctx.lineWidth = 7;
+  ctx.strokeStyle = '#ffcc33';
+  ctx.stroke();
+  // Accent stripe on the left (type colour) with a tiny crown.
+  ctx.fillStyle = accent;
+  ctx.beginPath();
+  ctx.arc(10 + r, 10 + (H - 26) / 2, 30, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.fillStyle = '#ffd54f';
+  const cx = 10 + r;
+  const cy = 10 + (H - 26) / 2;
+  ctx.beginPath();
+  ctx.moveTo(cx - 20, cy + 12);
+  ctx.lineTo(cx - 20, cy - 10);
+  ctx.lineTo(cx - 10, cy);
+  ctx.lineTo(cx, cy - 16);
+  ctx.lineTo(cx + 10, cy);
+  ctx.lineTo(cx + 20, cy - 10);
+  ctx.lineTo(cx + 20, cy + 12);
+  ctx.closePath();
+  ctx.fill();
+  const tx = 10 + r * 2 + 18;
+  const maxW = W - tx - 34;
+  ctx.textBaseline = 'alphabetic';
+  ctx.fillStyle = '#fff4d6';
+  let zs = 62;
+  const zhFont = (s: number) => `900 ${s}px "Noto Sans HK","PingFang HK","Microsoft JhengHei",sans-serif`;
+  ctx.font = zhFont(zs);
+  while (ctx.measureText(zh).width > maxW && zs > 34) ctx.font = zhFont((zs -= 2));
+  ctx.fillText(zh, tx, 82);
+  ctx.fillStyle = '#ffcc33';
+  let es = 32;
+  const enFont = (s: number) => `800 ${s}px system-ui,"Segoe UI",Roboto,sans-serif`;
+  ctx.font = enFont(es);
+  while (ctx.measureText(en).width > maxW && es > 18) ctx.font = enFont((es -= 1));
+  ctx.fillText(en, tx, 124);
+  tex = new THREE.CanvasTexture(canvas);
+  tex.colorSpace = THREE.SRGBColorSpace;
+  tex.anisotropy = 2;
+  bossTags.set(key, tex);
+  return tex;
+}
