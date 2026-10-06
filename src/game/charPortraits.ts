@@ -1,14 +1,20 @@
 /**
  * Offscreen Three.js portraits for the character-select cards.
- * Renders the real in-game voxel meshes (hero / mage) at a polished ¾ angle.
+ * Renders the real in-game voxel meshes (hero / mage / tech) at a polished ¾ angle.
  */
 import * as THREE from 'three';
-import { heroGeometry, heroShellGeometry, mageGeometry, mageShellGeometry } from './characters';
+import { playerLookGeo } from './characters';
 import type { CharacterId } from './charactersDef';
 
 const cache = new Map<CharacterId, string>();
 
-function renderOnce(skin: 'hero' | 'mage', w = 256, h = 288): string {
+const CARD: Record<CharacterId, { bg: number; tint: number }> = {
+  hero: { bg: 0x152238, tint: 0x5ad2ff },
+  mage: { bg: 0x1a1030, tint: 0xb388ff },
+  tech: { bg: 0x1c160c, tint: 0xffb03a },
+};
+
+function renderOnce(skin: CharacterId, w = 256, h = 288): string {
   const canvas = document.createElement('canvas');
   canvas.width = w;
   canvas.height = h;
@@ -25,8 +31,8 @@ function renderOnce(skin: 'hero' | 'mage', w = 256, h = 288): string {
   renderer.outputColorSpace = THREE.SRGBColorSpace;
 
   const scene = new THREE.Scene();
-  const bg = skin === 'mage' ? 0x1a1030 : 0x152238;
-  scene.background = new THREE.Color(bg);
+  const card = CARD[skin];
+  scene.background = new THREE.Color(card.bg);
 
   const cam = new THREE.PerspectiveCamera(32, w / h, 0.1, 20);
   // ¾ view: slightly above and to the right, looking at mid-torso.
@@ -38,7 +44,7 @@ function renderOnce(skin: 'hero' | 'mage', w = 256, h = 288): string {
   const key = new THREE.DirectionalLight(0xffffff, 1.35);
   key.position.set(2.2, 4.0, 2.5);
   scene.add(key);
-  const fill = new THREE.DirectionalLight(skin === 'mage' ? 0xb388ff : 0x5ad2ff, 0.55);
+  const fill = new THREE.DirectionalLight(card.tint, 0.55);
   fill.position.set(-2.0, 1.5, -1.0);
   scene.add(fill);
   const rim = new THREE.DirectionalLight(0xffffff, 0.35);
@@ -46,18 +52,18 @@ function renderOnce(skin: 'hero' | 'mage', w = 256, h = 288): string {
   scene.add(rim);
 
   const mat = new THREE.MeshLambertMaterial({ vertexColors: true, flatShading: true });
-  const geo = skin === 'mage' ? mageGeometry() : heroGeometry();
-  const body = new THREE.Mesh(geo, mat);
+  const look = playerLookGeo(skin);
+  const body = new THREE.Mesh(look.geo, mat);
   body.rotation.y = -0.55;
   scene.add(body);
 
   const shellMat = new THREE.MeshBasicMaterial({
-    color: skin === 'mage' ? 0xb388ff : 0x5ad2ff,
+    color: card.tint,
     side: THREE.BackSide,
     transparent: true,
     opacity: 0.55,
   });
-  const shell = new THREE.Mesh(skin === 'mage' ? mageShellGeometry() : heroShellGeometry(), shellMat);
+  const shell = new THREE.Mesh(look.shell, shellMat);
   shell.rotation.y = -0.55;
   scene.add(shell);
 
@@ -82,53 +88,13 @@ function renderOnce(skin: 'hero' | 'mage', w = 256, h = 288): string {
   return url;
 }
 
-/** Tech "coming soon" silhouette — no full kit art yet. */
-function renderTechPlaceholder(w = 256, h = 288): string {
-  const canvas = document.createElement('canvas');
-  canvas.width = w;
-  canvas.height = h;
-  const ctx = canvas.getContext('2d')!;
-  const g = ctx.createLinearGradient(0, 0, 0, h);
-  g.addColorStop(0, '#1a2a1c');
-  g.addColorStop(1, '#0d1410');
-  ctx.fillStyle = g;
-  ctx.fillRect(0, 0, w, h);
-  ctx.fillStyle = 'rgba(67,160,71,0.25)';
-  // Simple hooded silhouette
-  ctx.beginPath();
-  ctx.ellipse(w / 2, h * 0.72, 48, 18, 0, 0, Math.PI * 2);
-  ctx.fill();
-  ctx.fillStyle = 'rgba(120,160,120,0.45)';
-  const rx = w / 2 - 36, ry = h * 0.38, rw = 72, rh = 90, rr = 12;
-  ctx.beginPath();
-  ctx.moveTo(rx + rr, ry);
-  ctx.arcTo(rx + rw, ry, rx + rw, ry + rh, rr);
-  ctx.arcTo(rx + rw, ry + rh, rx, ry + rh, rr);
-  ctx.arcTo(rx, ry + rh, rx, ry, rr);
-  ctx.arcTo(rx, ry, rx + rw, ry, rr);
-  ctx.closePath();
-  ctx.fill();
-  ctx.beginPath();
-  ctx.arc(w / 2, h * 0.32, 34, 0, Math.PI * 2);
-  ctx.fill();
-  ctx.fillStyle = 'rgba(0,230,118,0.35)';
-  ctx.fillRect(w / 2 - 28, h * 0.22, 56, 14);
-  ctx.fillStyle = 'rgba(255,255,255,0.55)';
-  ctx.font = 'bold 28px system-ui,sans-serif';
-  ctx.textAlign = 'center';
-  ctx.fillText('?', w / 2, h * 0.55);
-  return canvas.toDataURL('image/png');
-}
-
 /** Returns a data-URL PNG for the character card portrait (cached per session). */
 export function charPortraitUrl(id: CharacterId): string {
   const hit = cache.get(id);
   if (hit) return hit;
   let url: string;
   try {
-    if (id === 'tech') url = renderTechPlaceholder();
-    else if (typeof document === 'undefined') url = '';
-    else url = renderOnce(id === 'mage' ? 'mage' : 'hero');
+    url = typeof document === 'undefined' ? '' : renderOnce(id);
   } catch {
     url = '';
   }

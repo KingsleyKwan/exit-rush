@@ -688,6 +688,10 @@ button {
   background-repeat: no-repeat;
   background-size: 800% 100%;
 }
+.portrait.portrait-one {
+  background-size: cover;
+  background-position: center 18%;
+}
 .portrait.lg {
   width: 112px;
   height: 112px;

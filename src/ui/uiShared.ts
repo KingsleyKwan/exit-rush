@@ -19,8 +19,10 @@ export const PORTRAITS: PortraitKind[] = ['hero', 'normal', 'stench', 'family', 
 
 /** Character portrait cropped from the concept sheet (public/art/portraits.webp). */
 export function portrait(kind: PortraitKind, cls = ''): string {
+  // Squat and loud were never on the 8-frame strip. Their busts are separate files
+  // so the strip's 800% crop math stays put.
   if (kind === 'squat' || kind === 'loud') {
-    return `<span class="portrait portrait-ico portrait-${kind} ${cls}" aria-hidden="true">${icon(`kind_${kind}`)}</span>`;
+    return `<span class="portrait portrait-one ${cls}" aria-hidden="true" style="background-image:url('${asset(`art/portrait-${kind}.webp`)}')"></span>`;
   }
   const sheet: PortraitKind[] = ['hero', 'normal', 'stench', 'family', 'brat', 'couple', 'angry', 'luggage'];
   const i = Math.max(0, sheet.indexOf(kind));

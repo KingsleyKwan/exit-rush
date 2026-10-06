@@ -56,6 +56,16 @@ interface Spec {
   umbrella?: boolean;
   /** Mage: floating element orb colour. */
   orb?: number;
+  /** Gear L: LED visor colour across the forehead. */
+  visor?: number;
+  /** Gear L: backpack colour (antenna + coiled cable). */
+  pack?: number;
+  /** Gear L: thick-soled sneakers. */
+  chunky?: boolean;
+  /** Gear L: thigh pockets on shorts. */
+  cargo?: boolean;
+  /** Gear L: hood shell around the back of the head. */
+  bigHood?: boolean;
 }
 
 const Y = new THREE.Vector3(0, 1, 0);
@@ -176,8 +186,21 @@ function buildCharacter(s: Spec): { geo: THREE.BufferGeometry; shell: THREE.Buff
     } else {
       b.add(new THREE.BoxGeometry(0.118, 0.34, 0.135), s.pants, [x, 0.205, 0], undefined, undefined, O);
     }
-    b.add(new THREE.BoxGeometry(0.13, 0.068, 0.2), s.shoes, [x, 0.034, crouch ? 0.1 : 0.028], undefined, undefined, O);
-    b.add(new THREE.BoxGeometry(0.132, 0.02, 0.205), shade(s.shoes, 1.6), [x, 0.008, crouch ? 0.1 : 0.028]);
+    const shoeZ = crouch ? 0.1 : 0.028;
+    if (s.chunky) {
+      b.add(new THREE.BoxGeometry(0.16, 0.1, 0.24), s.shoes, [x, 0.05, shoeZ], undefined, undefined, O);
+      b.add(new THREE.BoxGeometry(0.168, 0.032, 0.25), 0xffb03a, [x, 0.016, shoeZ]);
+    } else {
+      b.add(new THREE.BoxGeometry(0.13, 0.068, 0.2), s.shoes, [x, 0.034, shoeZ], undefined, undefined, O);
+      b.add(new THREE.BoxGeometry(0.132, 0.02, 0.205), shade(s.shoes, 1.6), [x, 0.008, shoeZ]);
+    }
+  }
+  if (s.cargo) {
+    for (const sx of [-1, 1]) {
+      const x = sx * (0.075 * bw + 0.055);
+      b.add(new THREE.BoxGeometry(0.07, 0.08, 0.05), shade(s.pants, 0.82), [x, 0.28, 0.06], undefined, undefined, O);
+      b.add(new THREE.BoxGeometry(0.074, 0.016, 0.052), shade(s.pants, 1.2), [x, 0.318, 0.062]);
+    }
   }
   // hips
   b.add(new THREE.BoxGeometry(TW * 0.94, 0.09, TD * 0.95), s.dress ? s.dress : s.pants, [0, crouch ? 0.28 : 0.385, crouch ? 0.04 : 0], undefined, undefined, O);
@@ -206,6 +229,17 @@ function buildCharacter(s: Spec): { geo: THREE.BufferGeometry; shell: THREE.Buff
     b.add(new THREE.BoxGeometry(TW * 0.8, 0.13, 0.1), shade(torsoCol, 0.85), [0, 0.76, -TD / 2 - 0.02], [-0.3, 0, 0]);
     for (const sx of [-1, 1]) b.add(new THREE.BoxGeometry(0.014, 0.12, 0.012), 0xf2f2f2, [sx * 0.045, 0.67, TD / 2 + 0.008]);
   }
+  if (s.bigHood) {
+    const hoodCol = shade(torsoCol, 0.78);
+    // Hood stays behind the skull. A forward shell plus the gold outline hid the face
+    // on the ¾ card, so these pieces are not outlined.
+    b.add(new THREE.BoxGeometry(R * 2.05, R * 1.05, R * 0.36), hoodCol, [0, HY - 0.01, -R * 1.02]);
+    b.add(new THREE.BoxGeometry(R * 1.9, R * 0.28, R * 0.95), hoodCol, [0, HY + R * 0.72, -R * 0.55]);
+    for (const sx of [-1, 1]) {
+      b.add(new THREE.BoxGeometry(R * 0.28, R * 0.85, R * 0.62), hoodCol, [sx * R * 0.98, HY - 0.02, -R * 0.62]);
+    }
+    b.add(new THREE.BoxGeometry(TW * 0.55, 0.11, 0.045), shade(torsoCol, 0.9), [0, crouch ? 0.4 : 0.5, TD / 2 + 0.02]);
+  }
 
   // Mage: folded umbrella wand (forward +Z) + shoulder orb.
   if (s.umbrella) {
@@ -229,6 +263,22 @@ function buildCharacter(s: Spec): { geo: THREE.BufferGeometry; shell: THREE.Buff
     const lens = new THREE.CylinderGeometry(0.03, 0.03, 0.04, 8);
     lens.rotateX(Math.PI / 2);
     b.add(lens, 0x4a4f57, [-0.02, 0.555, TD / 2 + 0.075]);
+  }
+  // Gear L: backpack sits on the back (−Z). Antenna and cable sit on the character's right (+X)
+  // so the ¾ portrait (camera on +X) still shows them.
+  if (s.pack !== undefined) {
+    const P = s.pack;
+    const pz = -(TD / 2 + 0.12);
+    const py = crouch ? 0.48 : 0.62;
+    b.add(new THREE.BoxGeometry(0.3, 0.38, 0.16), P, [0, py, pz], undefined, undefined, O);
+    b.add(new THREE.BoxGeometry(0.28, 0.045, 0.15), shade(P, 1.28), [0, py + 0.19, pz]);
+    b.add(new THREE.BoxGeometry(0.08, 0.12, 0.05), shade(P, 0.72), [0.14, py - 0.02, pz + 0.01]);
+    b.add(new THREE.CylinderGeometry(0.012, 0.015, 0.36, 5), 0xb0bec5, [0.07, py + 0.38, pz]);
+    b.add(new THREE.BoxGeometry(0.046, 0.046, 0.046), s.visor ?? 0x39ff8a, [0.07, py + 0.58, pz]);
+    const coil = new THREE.TorusGeometry(0.048, 0.013, 4, 8);
+    coil.rotateY(Math.PI / 2);
+    b.add(coil, 0xffb03a, [0.16, py + 0.02, pz + 0.02]);
+    b.add(new THREE.BoxGeometry(0.022, 0.022, 0.12), 0xffb03a, [0.16, py - 0.05, pz + 0.1]);
   }
 
   // ---- arms + hands
@@ -409,6 +459,17 @@ function buildCharacter(s: Spec): { geo: THREE.BufferGeometry; shell: THREE.Buff
         fringe();
     }
   }
+  if (s.visor !== undefined) {
+    const vy = HY + R * 0.04;
+    const vz = zOn(0, vy) + 0.03;
+    // Brow tips forward (+rotX sends the top of the bar toward +Z).
+    const tilt: V3 = [0.35, 0, 0];
+    b.add(new THREE.BoxGeometry(R * 1.75, R * 0.34, 0.03), 0x121418, [0, vy, vz], tilt);
+    b.add(new THREE.BoxGeometry(R * 1.45, R * 0.16, 0.016), s.visor, [0, vy, vz + 0.018], tilt);
+    for (const sx of [-1, 1]) {
+      b.add(new THREE.BoxGeometry(0.034, 0.02, 0.01), 0xf4fff8, [sx * R * 0.38, vy, vz + 0.026], tilt);
+    }
+  }
   return { geo: b.build(), shell: b.buildShell() };
 }
 
@@ -436,10 +497,12 @@ export type Look =
 const SKIN = 0xf2c6a0;
 const DARK_HAIR = 0x2a2830;
 
-const SPECS: Record<Look | 'hero' | 'mage', Spec> = {
+const SPECS: Record<Look | 'hero' | 'mage' | 'tech', Spec> = {
   hero: { skin: SKIN, hair: DARK_HAIR, style: 'spiky', shirt: 0x2f6fdc, sleeves: 'short', pants: 0x1f2d5c, shoes: 0x18181b, lanyard: true, belt: true, brows: 'firm', mouth: 'flat', outline: true },
   // Mage 「凱婷」: purple hooded cardigan, star clip, umbrella wand, violet outline.
   mage: { skin: 0xf2c6a0, hair: 0x5e35b1, style: 'long', shirt: 0x7e57c2, jacket: 0x5e35b1, inner: 0xce93d8, sleeves: 'long', pants: 0x2d1b4e, shoes: 0x1a1028, hood: true, blush: true, brows: 'firm', mouth: 'smile', outline: true, umbrella: true, orb: 0xe1bee7, bw: 0.95 },
+  // Gear L 「裝備L」: oversized hoodie, LED visor, antenna backpack, cargo shorts, chunky sneakers.
+  tech: { skin: SKIN, hair: 0x1a1814, style: 'short', shirt: 0x152028, jacket: 0x243044, inner: 0x102028, sleeves: 'long', pants: 0x3e4a3a, shorts: true, shoes: 0xf4f4f6, hood: true, bigHood: true, cargo: true, chunky: true, visor: 0x39ff8a, pack: 0x1a2228, brows: 'firm', mouth: 'flat', outline: true, bw: 1.08 },
   // Commuters: several hoodie / shirt colourways so the crowd isn't uniform.
   normal0: { skin: SKIN, hair: DARK_HAIR, style: 'spiky', shirt: 0x8d939c, sleeves: 'long', pants: 0x2a2c31, shoes: 0xe8e8e8, hood: true, phone: true, mouth: 'flat' },
   normal1: { skin: 0xeab98f, hair: 0x4a3426, style: 'short', shirt: 0x34466e, sleeves: 'long', pants: 0x3d5a80, shoes: 0x2a2a2a, hood: true, phone: true, mouth: 'flat' },
@@ -460,7 +523,7 @@ const SPECS: Record<Look | 'hero' | 'mage', Spec> = {
   loud: { skin: 0xeab48c, hair: 0x2a2026, style: 'short', shirt: 0xf39c12, sleeves: 'short', pants: 0x3e3a4a, shoes: 0xf5f5f5, collar: 0xd35400, bw: 1.06, brows: 'firm', mouth: 'shout', phoneEar: true },
 };
 
-export const LOOKS = Object.keys(SPECS).filter((k) => k !== 'hero' && k !== 'mage') as Look[];
+export const LOOKS = Object.keys(SPECS).filter((k) => k !== 'hero' && k !== 'mage' && k !== 'tech') as Look[];
 const NORMALS: Look[] = ['normal0', 'normal1', 'normal2', 'normal3', 'normal4', 'normal5'];
 
 /** Which look an agent wears (deterministic per agent id). */
@@ -479,7 +542,7 @@ export function lookFor(a: Pick<Agent, 'id' | 'kind' | 'isKid'>): Look {
 
 const cache = new Map<string, { geo: THREE.BufferGeometry; shell: THREE.BufferGeometry | null }>();
 
-function get(look: Look | 'hero' | 'mage') {
+function get(look: Look | 'hero' | 'mage' | 'tech') {
   let c = cache.get(look);
   if (!c) {
     c = buildCharacter(SPECS[look]);
@@ -508,10 +571,18 @@ export function mageShellGeometry(): THREE.BufferGeometry {
   return get('mage').shell!;
 }
 
+export function techGeometry(): THREE.BufferGeometry {
+  return get('tech').geo;
+}
+
+export function techShellGeometry(): THREE.BufferGeometry {
+  return get('tech').shell!;
+}
+
 /** Player look key for CharacterId. */
 export function playerLookGeo(skin: 'hero' | 'mage' | 'tech'): { geo: THREE.BufferGeometry; shell: THREE.BufferGeometry } {
   if (skin === 'mage') return { geo: mageGeometry(), shell: mageShellGeometry() };
-  // Tech reuses hero until Gear L art ships.
+  if (skin === 'tech') return { geo: techGeometry(), shell: techShellGeometry() };
   return { geo: heroGeometry(), shell: heroShellGeometry() };
 }
 

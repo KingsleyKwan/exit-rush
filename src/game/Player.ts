@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import type { PlayerSim } from './sim/PlayerSim';
 import { TUNING } from './sim/tuning';
-import { heroGeometry, heroShellGeometry, mageGeometry, mageShellGeometry } from './characters';
+import { playerLookGeo } from './characters';
 
 /**
  * Player visual (v0.3 chibi hero: blue shirt, lanyard, cyan glow outline).
@@ -31,13 +31,14 @@ export class Player {
 
   constructor() {
     this.bodyMat = new THREE.MeshLambertMaterial({ vertexColors: true, flatShading: true });
-    const body = new THREE.Mesh(heroGeometry(), this.bodyMat);
+    const hero = playerLookGeo('hero');
+    const body = new THREE.Mesh(hero.geo, this.bodyMat);
     this.bodyMesh = body;
     body.castShadow = true;
     body.renderOrder = 2;
     // Rim glow: inflated back-face shell.
     this.glowMat = new THREE.MeshBasicMaterial({ color: 0x5ad2ff, side: THREE.BackSide, transparent: true, opacity: 0.95 });
-    const glow = new THREE.Mesh(heroShellGeometry(), this.glowMat);
+    const glow = new THREE.Mesh(hero.shell, this.glowMat);
     this.glowMesh = glow;
     glow.renderOrder = 2;
     // X-ray silhouette: drawn in the opaque pass after the crowd (renderOrder 1)
@@ -77,18 +78,17 @@ export class Player {
     this.mesh.add(this.aim);
   }
 
-  /** Swap player mesh for the selected character (hero / mage). Violet glow for mage. */
+  /** Swap player mesh for the selected character. Glow matches the card ring. */
   setSkin(skin: 'hero' | 'mage' | 'tech'): void {
     if (this.skin === skin) return;
     this.skin = skin;
-    const geo = skin === 'mage' ? mageGeometry() : heroGeometry();
-    const shell = skin === 'mage' ? mageShellGeometry() : heroShellGeometry();
-    this.bodyMesh.geometry = geo;
-    this.glowMesh.geometry = shell;
+    const look = playerLookGeo(skin);
+    this.bodyMesh.geometry = look.geo;
+    this.glowMesh.geometry = look.shell;
     const col = skin === 'mage' ? 0xb388ff : skin === 'tech' ? 0xffb03a : 0x5ad2ff;
     this.glowMat.color.setHex(col);
     this.xrayMat.color.setHex(col);
-    this.ringMat.color.setHex(skin === 'mage' ? 0xce93d8 : 0x4fc3f7);
+    this.ringMat.color.setHex(skin === 'mage' ? 0xce93d8 : skin === 'tech' ? 0xffb03a : 0x4fc3f7);
   }
 
   /** Kick squash externally (e.g. angry hit). */
