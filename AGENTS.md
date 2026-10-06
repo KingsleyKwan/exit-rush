@@ -17,7 +17,7 @@ of each type every 10 levels from L20 (v0.7, `src/game/bosses.ts`, `docs/BOSSES.
 3-branch constellation skill tree (力量 STR / 速度 SPD / 體力 STA), per-station themes, original synthesised audio,
 and EN + 粵 (zh-HK) UI.
 
-- Version: see `package.json` → `version` (0.7.0 when this file was written).
+- Version: see `package.json` → `version` (0.8.0 when this file was written).
 - Levels **1–100** are playable. L20/30/…/90 are boss levels (one king each), L99 is the final exam, and L100 (頓沙嘴 · 十一煙花後, all eight kings) unlocks after you clear L99.
 - Each **first** clear gives +1 skill point; replays give 0 (100 SP cap). Points are derived from `cleared`. Free respec, plus 3 loadouts (`save.loadouts`, `activeLoadout`).
 

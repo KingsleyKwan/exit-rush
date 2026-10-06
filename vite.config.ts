@@ -5,7 +5,12 @@ import { defineConfig } from 'vite';
 const raw = process.env.BASE_PATH?.trim() || '/';
 const base = raw.endsWith('/') ? raw : `${raw}/`;
 
+const platform = process.env.VITE_PLATFORM === 'ios' ? 'ios' : 'web';
+
 export default defineConfig({
+  define: {
+    __PLATFORM__: JSON.stringify(platform),
+  },
   base,
   server: {
     host: true,
