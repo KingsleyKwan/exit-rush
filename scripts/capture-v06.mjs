@@ -2,7 +2,7 @@ import { chromium } from 'playwright';
 import fs from 'fs';
 import path from 'path';
 
-const OUT = '/workspace/hk-mtr-exit-rush/docs/screens-v06';
+const OUT = process.env.OUT ?? new URL('../docs/screens-v06', import.meta.url).pathname;
 fs.mkdirSync(OUT, { recursive: true });
 
 async function shot(page, name) {
@@ -44,7 +44,7 @@ const save = {
 };
 
 await page.goto('http://127.0.0.1:4173/', { waitUntil: 'networkidle', timeout: 60000 });
-await page.evaluate((s) => localStorage.setItem('hk-mtr-exit-rush-v1', JSON.stringify(s)), save);
+await page.evaluate((s) => localStorage.setItem('exit-rush-v1', JSON.stringify(s)), save);
 await page.reload({ waitUntil: 'networkidle' });
 await page.waitForTimeout(900);
 
@@ -53,7 +53,7 @@ await page.waitForTimeout(900);
 await shot(page, '01-skill-tree.jpg');
 
 // Fresh nav from menu for levels (avoid flaky skills back)
-await page.evaluate((s) => localStorage.setItem('hk-mtr-exit-rush-v1', JSON.stringify(s)), save);
+await page.evaluate((s) => localStorage.setItem('exit-rush-v1', JSON.stringify(s)), save);
 await page.goto('http://127.0.0.1:4173/', { waitUntil: 'networkidle' });
 await page.waitForTimeout(900);
 

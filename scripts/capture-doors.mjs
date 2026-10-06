@@ -47,7 +47,7 @@ const URL = 'http://127.0.0.1:4173/?debug=1';
 
 async function boot(save) {
   await page.goto(URL, { waitUntil: 'networkidle', timeout: 60000 });
-  await page.evaluate((s) => localStorage.setItem('hk-mtr-exit-rush-v1', JSON.stringify(s)), save);
+  await page.evaluate((s) => localStorage.setItem('exit-rush-v1', JSON.stringify(s)), save);
   await page.reload({ waitUntil: 'networkidle' });
   await page.waitForTimeout(700);
 }

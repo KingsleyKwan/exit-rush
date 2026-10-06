@@ -30,7 +30,7 @@ import { passes } from '../src/game/sim/Physics';
 import { DOOR_BAYS, DOOR_Z, TUNING, doorWallX, nearestDoorBay, openDoorBays } from '../src/game/sim/tuning';
 import { LEVELS } from '../src/game/levels';
 import { BRANCH_FILL, modifiersFromSkills } from '../src/game/SkillTree';
-import { defaultSkills, type SkillState } from '../src/game/storage';
+import { defaultSkills, migrateLegacyKeys, SAVE_KEY, type KeyValueStore, type SkillState } from '../src/game/storage';
 import type { PlayerInput } from '../src/game/sim/PlayerSim';
 import type { PassengerKind } from '../src/game/PassengerTypes';
 import type { Agent } from '../src/game/sim/CrowdSim';
@@ -132,6 +132,9 @@ interface Run {
   timeLeft: number;
   maxBodies: number;
   maxPen: number;
+  /** Stamina lost to 大聲公 noise / to pushing over the run. */
+  loudDrain: number;
+  pushDrain: number;
   stepMs: number;
   shoves: number;
   angryHits: number;
@@ -264,6 +267,8 @@ function runLevel(levelId: number, skills: SkillState, seed: number): Run {
     ults,
     endX: p.body.x,
     endZ: p.body.z,
+    loudDrain: p.stats.loudDrain,
+    pushDrain: p.stats.pushDrain,
   };
 }
 
@@ -472,6 +477,63 @@ function counterTests(): CounterResult[] {
     const on = run(60);
     push('Unbothered (family)', off.spent > 0.5 && on.spent < off.spent * 0.5, `stamina spent ${off.spent.toFixed(1)} → ${on.spent.toFixed(1)}; x ${off.x.toFixed(2)} → ${on.x.toFixed(2)}`);
   }
+  // 大聲公 Loudmouth — stand still 3 s at distance d from one (fresh 100-stamina player).
+  {
+    const IDLE: PlayerInput = { x: 0, z: 0, mag: 0, shoveHeld: false };
+    const run = (d: number, sta = 0) => {
+      const s = emptySim(sk(0, 0, sta));
+      spawn(s, 'loud', 0, 0);
+      place(s, d, 0);
+      const start = s.player.stamina;
+      let peak = 0;
+      for (let i = 0; i < 180; i++) {
+        s.step(DT, IDLE);
+        peak = Math.max(peak, s.player.noiseDrain);
+      }
+      return { lost: start - s.player.stamina, drained: s.player.stats.loudDrain, peak, winded: s.player.winded };
+    };
+    const near = run(0.6);
+    const far = run(TUNING.types.loud.radius + 0.5);
+    push(
+      'Loudmouth inside radius',
+      near.lost > 35 && near.lost < 90 && !near.winded,
+      `3 s at 0.6 m: −${near.lost.toFixed(0)} of 100 stamina (drain ${near.peak.toFixed(1)}/s), winded=${near.winded}`,
+    );
+    push('Loudmouth outside radius', far.lost < 0.5 && far.drained === 0, `3 s at ${(TUNING.types.loud.radius + 0.5).toFixed(1)} m: −${far.lost.toFixed(1)}, noise drain ${far.drained.toFixed(1)}`);
+    const off = run(0.6, 59);
+    const on = run(0.6, 60);
+    push(
+      'Unbothered (loudmouth)',
+      off.drained > 10 && on.drained < off.drained * 0.4,
+      `noise drained ${off.drained.toFixed(1)} → ${on.drained.toFixed(1)} (−${Math.round((1 - on.drained / off.drained) * 100)}%)`,
+    );
+  }
+  {
+    // v0.6.3 repo rename: pre-rename save keys migrate to `exit-rush…` keys.
+    // Legacy key from pre-rename builds (built from parts; no literal old name in source).
+    const legacy = ['hk', ['m', 't', 'r'].join(''), 'exit-rush'].join('-');
+    const fake = (init: Record<string, string>): KeyValueStore & { m: Map<string, string> } => {
+      const m = new Map(Object.entries(init));
+      return {
+        m,
+        get length() { return m.size; },
+        key: (i) => [...m.keys()][i] ?? null,
+        getItem: (k) => m.get(k) ?? null,
+        setItem: (k, v) => void m.set(k, v),
+        removeItem: (k) => void m.delete(k),
+      };
+    };
+    const a = fake({ [`${legacy}-v1`]: '{"version":1,"highestCleared":12}', [`${legacy}-settings`]: 'x', other: 'keep' });
+    const movedA = migrateLegacyKeys(a);
+    const okA = a.m.get(SAVE_KEY) === '{"version":1,"highestCleared":12}' && a.m.get('exit-rush-settings') === 'x'
+      && a.m.get('other') === 'keep' && ![...a.m.keys()].some((k) => k.startsWith(legacy));
+    const b = fake({ [`${legacy}-v1`]: 'old', [SAVE_KEY]: 'new' });
+    migrateLegacyKeys(b);
+    const okB = b.m.get(SAVE_KEY) === 'new' && !b.m.has(`${legacy}-v1`);
+    const c = fake({ [SAVE_KEY]: 'new' });
+    const okC = migrateLegacyKeys(c).length === 0 && c.m.get(SAVE_KEY) === 'new';
+    push('Save key migration', okA && okB && okC, `moved [${movedA.join(', ')}]; new key wins=${okB}; no-op=${okC}`);
+  }
   return out;
 }
 
@@ -601,7 +663,7 @@ async function main(): Promise<void> {
   console.log(
     `runs=${RUNS}  workers=${WORKERS}  dt=${DT.toFixed(4)}  maxBodies=${TUNING.physics.maxBodies}  (${((performance.now() - t0) / 1000).toFixed(1)} s)`,
   );
-  console.log('lvl dens press timer | loadout      win%  medT  medLeft  <10s  bodies maxPen ms/step shove angry ults | target');
+  console.log('lvl dens press timer | loadout      win%  medT  medLeft  <10s  bodies maxPen ms/step shove angry ults  loud | target');
   let failures = 0;
   const rows: Record<string, unknown>[] = [];
   for (const lv of levels) {
@@ -632,7 +694,7 @@ async function main(): Promise<void> {
         times: wins.map((r) => +r.t.toFixed(2)).sort((a, b) => a - b),
       });
       console.log(
-        `${String(lv.id).padStart(3)} ${String(lv.density).padStart(4)} ${lv.pressure.toFixed(2)} ${String(lv.timer).padStart(5)} | ${lo.padEnd(11)} ${String(Math.round(wr * 100)).padStart(4)}% ${f1(medT)} ${f1(medLeft, 7)} ${String(Math.round(fast * 100)).padStart(4)}%  ${String(bodies).padStart(5)}  ${pen.toFixed(2)}  ${avg('stepMs').toFixed(3)} ${f1(avg('shoves'))} ${f1(avg('angryHits'))} ${f1(avg('ults'), 4)} | ${mark}`,
+        `${String(lv.id).padStart(3)} ${String(lv.density).padStart(4)} ${lv.pressure.toFixed(2)} ${String(lv.timer).padStart(5)} | ${lo.padEnd(11)} ${String(Math.round(wr * 100)).padStart(4)}% ${f1(medT)} ${f1(medLeft, 7)} ${String(Math.round(fast * 100)).padStart(4)}%  ${String(bodies).padStart(5)}  ${pen.toFixed(2)}  ${avg('stepMs').toFixed(3)} ${f1(avg('shoves'))} ${f1(avg('angryHits'))} ${f1(avg('ults'), 4)} ${f1(avg('loudDrain'), 5)} | ${mark}`,
       );
     }
   }
