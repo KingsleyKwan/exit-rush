@@ -1,4 +1,4 @@
-<!-- v0.6.0: constellation skill tree (STA replaces WIS); 踎低 squat; longer between-bay benches; denser car/platform -->
+<!-- v0.6.2: constellation skill tree (STA replaces WIS); 踎低 squat; longer between-bay benches; denser car/platform -->
 <!-- v0.5.1: benches between door bays only (no seats in doorways) -->
 <!-- v0.5.0: short levels, intro cards, FTUE, L100 gated behind L30 -->
 <!-- v0.4.1: side-wall sliding doors; car ends = gangway -->
@@ -66,16 +66,16 @@ See **[`SKILL_TREE.md`](SKILL_TREE.md)** for the full v0.6 constellation node ma
 
 - **+3 skill points** on the **first** clear of each playable level. Replays award **0**. 31 clears → 93 SP (full branch+ult = 70).
 - Three branches: **Strength (STR)** · **Speed (SPD)** · **Stamina (STA)** — STA replaces Wisdom; old `wis` saves migrate.
-- **Constellation UI:** 3 coloured arms from centre; major skill icons every ~10 points; Tier 3 marked 「第三層暫定」.
+- **Constellation UI:** 3 coloured arms from centre; major skill icons every ~10 points; Tier 3 = special-passenger counters (v0.6.2).
 - Per branch: **4 passive + 2 active + 1 ultimate**. **60** to fill, **+10** ultimate → **70**.
 
 ### Branch fantasy
 
 | Branch | Passive / actives | Ultimate (10 pts after fill) |
 |--------|-------------------|------------------------------|
-| STR | Push, front shove, charged shove, wider cone / knockback (T3 TBD) | **鐵牛撞門** — shockwave charge |
-| SPD | Speed, clear-lane, blocked-drag cut, brief dash (T3 TBD) | **閃身落車** — burst dash |
-| STA | Pool / regen / buffer, aura shrug, second wind (T3 TBD) | **鐵馬企穩** — burst regen + iron stance |
+| STR | Push, front shove, charged shove, T3: Split (couple) / Ground Pound (luggage) / Stand Firm (angry) | **鐵牛撞門** — shockwave charge |
+| SPD | Speed, clear-lane, blocked-drag cut, T3: Hurdle (luggage) / Leap (squat, kids) / Thread (couple) | **閃身落車** — burst dash |
+| STA | Pool / regen / buffer, T3: Hold Breath (stench) / Second Wind (brat) / Unbothered (family) | **鐵馬企穩** — burst regen + iron stance |
 
 Spending persisted in `localStorage`. Ultimates 10 s cooldown each.
 

@@ -44,7 +44,9 @@ RUNS=40 LEVEL=1,5,6,12,21,30,100 LOADOUTS=none,earned,ult-spd npm run test:sim
 
 ## Skill tree (v0.6)
 
-Constellation redesign: see [`SKILL_TREE.md`](SKILL_TREE.md). Wisdom → **Stamina**. Continuous fill still scales soft stats; major nodes unlock at 10/20/30/40/50/60. Tier 3 numbers are **TBD placeholders**.
+Constellation redesign: see [`SKILL_TREE.md`](SKILL_TREE.md). Wisdom → **Stamina**. Continuous fill still scales soft stats; major nodes unlock at 10/20/30/40/50/60. Tier 3 (v0.6.2) = counters to special passengers (see SKILL_TREE.md); only reachable with 40+ in a branch, i.e. endgame / L100 builds.
+
+v0.6.2 L100 check (`COUNTERS=0 LEVEL=100 RUNS=120`, main → v0.6.2): pts20 3% → 3%, ult-str 3% → 6%, **ult-spd 38% → 47%** (target 30–50%), ult-sta 6% → 8%. Hurdle was the big lever (passing owners too gave ~90%); it now hops suitcases only at ×0.7 pace, Leap cd 6 s. ult-str / ult-sta were already below band on main.
 
 L8 introduces **踎低 / squat** (hard shove, lateral weave). Bot win-rate on L8 may sit below the L6–15 band until further tuning.
 
