@@ -48,6 +48,8 @@ const P: Record<string, string> = {
   kind_angry: `<path d="M20 5c0 7-1 11-6 13M28 5c0 7 1 11 6 13M20 43c0-7-1-11-6-13M28 43c0-7 1-11 6-13M5 20c7 0 11 1 13 6M5 28c7 0 11-1 13-6M43 20c-7 0-11 1-13 6M43 28c-7 0-11-1-13-6" stroke="currentColor" ${S(5.2)}/>`,
   kind_luggage: `<path d="M18 11V7.5A3.5 3.5 0 0 1 21.5 4h5A3.5 3.5 0 0 1 30 7.5V11" stroke="currentColor" ${S(3.6)}/><rect x="9" y="10" width="30" height="29" rx="6" fill="currentColor"/><path d="M18 15v19M30 15v19" class="ws" ${S(3)} opacity=".7"/><circle cx="15" cy="42" r="3.2" fill="currentColor"/><circle cx="33" cy="42" r="3.2" fill="currentColor"/>`,
   kind_squat: `<path d="M10 42c0-6 4-8 8-10V22a6 6 0 0 1 12 0v10c4 2 8 4 8 10z" fill="currentColor"/><circle cx="24" cy="14" r="7" fill="currentColor"/><path d="M14 42h20M12 38h24" class="ws" stroke-width="3" stroke-linecap="round" fill="none"/>`,
+  // 大聲公 Loudmouth: phone + sound waves.
+  kind_loud: `<rect x="6" y="6" width="17" height="36" rx="4.5" fill="currentColor"/><rect x="9.5" y="11" width="10" height="21.5" rx="1.5" class="w"/><circle cx="14.5" cy="37.3" r="2.1" class="w"/><path d="M28.5 18.5c2.4 3 2.4 8 0 11M34 13.5c4.8 5.4 4.8 15.6 0 21M39.5 8.5c7 8 7 23 0 31" stroke="currentColor" ${S(3.8)}/>`,
 };
 
 export type IconName = keyof typeof P;
@@ -75,6 +77,7 @@ export const KIND_BADGE: Record<string, { ring: string; glyph: string }> = {
   angry: { ring: '#d32f2f', glyph: '#e53935' },
   luggage: { ring: '#7a5541', glyph: '#7a5541' },
   squat: { ring: '#5c6bc0', glyph: '#3f51b5' },
+  loud: { ring: '#f39c12', glyph: '#e67e22' },
 };
 
 /**

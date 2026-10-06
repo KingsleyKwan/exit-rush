@@ -37,6 +37,7 @@ export function renderPlayHud(game: Game): HTMLElement {
         <div class="hud-top">
           <div class="hud-row">
             <div class="station-chip" style="--line:${lineColor(lv.stationEn)}"><span class="lv-badge sm">${lv.id}</span><span>${stationName(lv)}</span></div>
+            <span class="noise-chip" id="m-noise" aria-live="polite">${icon('kind_loud', 'xs')}<b>${dict.loudHud}</b></span>
             <button type="button" class="icon-btn pause-btn" id="btn-pause" title="${dict.pause}" aria-label="${dict.pause}">${icon('pause')}</button>
           </div>
           <div class="meters">
@@ -127,6 +128,10 @@ export function updatePlayHud(root: HTMLElement, game: Game): void {
   if (st) st.style.width = `${stam}%`;
   root.querySelector('.stam-meter')?.classList.toggle('winded', game.isWinded());
   root.querySelector('.stam-meter')?.classList.toggle('low', stam < 25);
+  // 大聲公 noise zone: pulse the stamina bar + show the loudmouth chip.
+  const noisy = game.noiseDrain() > 0;
+  root.querySelector('.stam-meter')?.classList.toggle('noisy', noisy);
+  root.querySelector('#m-noise')?.classList.toggle('on', noisy);
   const tv = q('#m-time');
   if (tv) tv.textContent = time.toFixed(1);
   q('#m-timer')?.classList.toggle('urgent', time < 10);

@@ -11,16 +11,16 @@ export function el(html: string): HTMLElement {
   return d.firstElementChild as HTMLElement;
 }
 
-/** Absolute URL for a file in /public (resolves against the page URL — works under /hk-mtr-exit-rush/). */
+/** Absolute URL for a file in /public (resolves against the page URL — works under /exit-rush/). */
 export const asset = (f: string): string => new URL(f, document.baseURI).href;
 
 export type PortraitKind = 'hero' | PassengerKind;
-export const PORTRAITS: PortraitKind[] = ['hero', 'normal', 'stench', 'family', 'brat', 'couple', 'angry', 'luggage', 'squat'];
+export const PORTRAITS: PortraitKind[] = ['hero', 'normal', 'stench', 'family', 'brat', 'couple', 'angry', 'luggage', 'squat', 'loud'];
 
 /** Character portrait cropped from the concept sheet (public/art/portraits.webp). */
 export function portrait(kind: PortraitKind, cls = ''): string {
-  if (kind === 'squat') {
-    return `<span class="portrait portrait-ico ${cls}" aria-hidden="true">${icon('kind_squat')}</span>`;
+  if (kind === 'squat' || kind === 'loud') {
+    return `<span class="portrait portrait-ico portrait-${kind} ${cls}" aria-hidden="true">${icon(`kind_${kind}`)}</span>`;
   }
   const sheet: PortraitKind[] = ['hero', 'normal', 'stench', 'family', 'brat', 'couple', 'angry', 'luggage'];
   const i = Math.max(0, sheet.indexOf(kind));

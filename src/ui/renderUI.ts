@@ -127,8 +127,8 @@ function renderIntroCard(game: Game): HTMLElement {
   const block = en ? copy.blockEn : copy.blockZh;
   const tip = en ? copy.tipEn : copy.tipZh;
   const otherName = en
-    ? ({ luggage: '拉行李喼', stench: '惡臭人', family: '一家大細', brat: '百厭仔', couple: '情侶', angry: '暴躁男', squat: '踎低客' } as Record<string, string>)[kind]
-    : ({ luggage: 'Luggage', stench: 'Stench', family: 'Family', brat: 'Brat', couple: 'Couple', angry: 'Angry man', squat: 'Squatter' } as Record<string, string>)[kind];
+    ? ({ luggage: '拉行李喼', stench: '惡臭人', family: '一家大細', brat: '百厭仔', couple: '情侶', angry: '暴躁男', squat: '踎低客', loud: '大聲公' } as Record<string, string>)[kind]
+    : ({ luggage: 'Luggage', stench: 'Stench', family: 'Family', brat: 'Brat', couple: 'Couple', angry: 'Angry man', squat: 'Squatter', loud: 'Loudmouth' } as Record<string, string>)[kind];
 
   const inLevel = !!game.level;
   const panel = el(`
