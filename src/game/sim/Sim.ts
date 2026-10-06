@@ -14,6 +14,8 @@ import {
 import type { SimEvent, UltKind } from './events';
 import type { LevelDef } from '../levels';
 import type { SkillModifiers } from '../SkillTree';
+import type { PlayerMods } from '../charactersDef';
+import { abilitiesForBar, castMageUlt, type AbilityCtx } from './abilities';
 import type { Rng } from './rng';
 
 export type SimResult = 'win' | 'lose' | null;
@@ -50,15 +52,20 @@ export class Sim {
   private progressBest = 0;
   private lastAngryHit = -99;
   private doors: DoorLeafPair[] = [];
+  /** v0.8 full mods (hero path still SkillModifiers-compatible). */
+  readonly playerMods: SkillModifiers | PlayerMods;
+  private readonly rng: Rng;
   private emit = (e: SimEvent): void => {
     this.events.push(e);
   };
 
-  constructor(level: LevelDef, mods: SkillModifiers, rng: Rng) {
+  constructor(level: LevelDef, mods: SkillModifiers | PlayerMods, rng: Rng) {
     resetBodyIds();
     resetAgentIds();
     const P = TUNING.physics;
     this.level = level;
+    this.playerMods = mods;
+    this.rng = rng;
     this.timeLeft = level.timer;
     this.openBays = openDoorBays(level.id, level.openDoors);
     this.world = new World({
@@ -238,7 +245,36 @@ export class Sim {
 
   tryUltimate(kind: UltKind): boolean {
     if (this.result) return false;
+    const pm = this.playerMods as PlayerMods;
+    if (pm.characterId === 'mage') {
+      return castMageUlt(kind, this.abilityCtx());
+    }
     return this.player.activateUltimate(kind, this.time, this.world, this.crowd, this.emit);
+  }
+
+  /** v0.8: cast a bar spell by ability id (mage). */
+  tryAbility(abilityId: string): boolean {
+    if (this.result) return false;
+    const pm = this.playerMods as PlayerMods;
+    if (pm.characterId !== 'mage') return false;
+    const defs = abilitiesForBar([abilityId], pm);
+    const def = defs[0];
+    if (!def) return false;
+    if (!this.player.beginSpell(def.id, def.cost, def.cd)) return false;
+    return def.cast(this.abilityCtx());
+  }
+
+  private abilityCtx(): AbilityCtx {
+    return {
+      world: this.world,
+      crowd: this.crowd,
+      player: this.player,
+      time: this.time,
+      rng: this.rng,
+      emit: this.emit,
+      level: this.level,
+      mods: this.playerMods as PlayerMods,
+    };
   }
 
   /** Advance one fixed step. After a result, keeps simulating for ambience (player walks out on win). */
@@ -281,6 +317,10 @@ export class Sim {
     const nearDoor = this.crowd.activeBoardersNearDoor(wall, this.openBays);
     const pressureField = boardingActive ? this.level.pressure * Math.min(1, nearDoor / 4) : 0;
 
+    {
+      const pm = this.playerMods as PlayerMods;
+      pl.burningUrgencyActive = !!(pm.burningUrgency && !this.ambient && this.timeLeft <= 5 && this.timeLeft > 0);
+    }
     if (!this.ambient && (!this.result || this.result === 'win')) {
       this.crowd.tickBoarding(dt, this.level, this.openBays, now, this.doorOpen);
     }
@@ -308,7 +348,9 @@ export class Sim {
       // STR 60 Stand Firm: angry shoves barely move you.
       angryResist: pl.mods.standFirm
         ? 1 - TUNING.skills.standFirmMul
-        : Math.min(0.85, pl.mods.resist * 1.2),
+        : (pl.mods as PlayerMods).chillOut
+          ? 1 - TUNING.spells.angryShoveMul
+          : Math.min(0.85, pl.mods.resist * 1.2),
       threadCouples: pl.mods.threadCouples,
       pushForce: pl.mods.pushForce,
       standFirm: pl.mods.standFirm,

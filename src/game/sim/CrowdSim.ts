@@ -42,6 +42,21 @@ export interface Agent {
   splitUntil: number;
   /** Brats: no zigzag / darting until this sim time (STA Second Wind). */
   dazedUntil: number;
+  // ---- v0.8 mage status (defaults 0 = inactive)
+  /** Ice chill: drive ×0, anchor ×1.5. */
+  chillUntil: number;
+  /** Ice freeze: rigid statue. */
+  freezeUntil: number;
+  /** Radius before freeze-shrink (0 = unset). */
+  baseR: number;
+  /** Brief no-collision window after freeze lands. */
+  freezeGhostUntil: number;
+  /** Fire cleanse: stench aura off. */
+  auraOffUntil: number;
+  /** Volt dropped call: loudmouth noise off. */
+  callOffUntil: number;
+  /** Chill Out: angry wind-up suppressed until. */
+  chillWindupUntil: number;
   /** v0.7 boss state (shared by both halves of the couple boss); null for ordinary passengers. */
   boss: BossState | null;
   /** Original standing spot (bosses step aside from it while yielding, then return). */
@@ -214,6 +229,13 @@ export class CrowdSim {
       scale,
       splitUntil: -1,
       dazedUntil: -1,
+      chillUntil: -1,
+      freezeUntil: -1,
+      baseR: 0,
+      freezeGhostUntil: -1,
+      auraOffUntil: -1,
+      callOffUntil: -1,
+      chillWindupUntil: -1,
       boss: null,
       originX: x,
       originZ: z,
@@ -691,6 +713,7 @@ export class CrowdSim {
     let n = 0;
     for (const a of this.agents) {
       if (!PASSENGER_DEFS[a.kind].noise) continue;
+      if (a.callOffUntil > this.now) continue;
       const R = L.radius * (a.boss ? a.boss.size : 1);
       const d = Math.hypot(a.body.x - x, a.body.z - z);
       if (d < R) n += L.edge + (1 - L.edge) * (1 - d / R);
@@ -704,6 +727,7 @@ export class CrowdSim {
     for (const a of this.agents) {
       const def = PASSENGER_DEFS[a.kind];
       if (!def.auraSlow) continue;
+      if (a.auraOffUntil > this.now) continue;
       const k = a.boss ? a.boss.size : 1;
       const Ra = R * k;
       const d = Math.hypot(a.body.x - x, a.body.z - z);
@@ -766,6 +790,34 @@ export class CrowdSim {
       let fz = 0;
       a.age += dt;
 
+      // v0.8 status: frozen = ice statue (no AI). First ~1.3s: no collision so the
+      // mage can dash the opened lane; then shrunk solid ice for the rest.
+      if (a.freezeUntil > ctx.time) {
+        if (!a.baseR) a.baseR = b.r;
+        b.vx *= 0.08;
+        b.vz *= 0.08;
+        if (a.freezeGhostUntil > ctx.time) {
+          b.enabled = false;
+          if (a.caseBody) a.caseBody.enabled = false;
+        } else {
+          b.enabled = true;
+          if (a.caseBody) a.caseBody.enabled = true;
+          b.r = a.baseR * (a.boss ? 0.78 : 0.5);
+        }
+        continue;
+      }
+      if (a.baseR) {
+        b.r = a.baseR;
+        a.baseR = 0;
+        b.enabled = true;
+        if (a.caseBody) a.caseBody.enabled = true;
+      }
+      const chilled = a.chillUntil > ctx.time;
+      const dazed = a.dazedUntil > ctx.time;
+      const statusDrive = chilled || dazed ? 0 : 1;
+      const statusYield = dazed ? 3 : 1;
+      const statusAnchor = chilled ? 1.5 : 1;
+
       if (a.mode === 'boarder' && ctx.boardingActive) {
         // Funnel through a side doorway (−X → +X), then settle deep in the car.
         const inside = b.x > ctx.doorWallX + 0.25;
@@ -779,7 +831,7 @@ export class CrowdSim {
         const vdz = (dz / dist) * speed;
         fx = (vdx - b.vx) * C.boardAccel * m;
         fz = (vdz - b.vz) * C.boardAccel * m;
-        const cap = C.boardMaxDrive * def.driveMul * m * ai;
+        const cap = C.boardMaxDrive * def.driveMul * m * ai * statusDrive;
         const fm = Math.hypot(fx, fz);
         if (fm > cap) {
           fx *= cap / fm;
@@ -802,7 +854,7 @@ export class CrowdSim {
         const dx = a.homeX - b.x;
         const dz = a.homeZ - b.z;
         const bossYield = !!a.boss && a.boss.yieldUntil > ctx.time;
-        const anchorMul = a.boss ? Math.max(1.3, def.anchorMul) * (bossYield ? TUNING.boss.yieldAnchor : TUNING.boss.anchorMul) : def.anchorMul;
+        const anchorMul = (a.boss ? Math.max(1.3, def.anchorMul) * (bossYield ? TUNING.boss.yieldAnchor : TUNING.boss.anchorMul) : def.anchorMul) * statusAnchor;
         const k = C.anchorK * anchorMul * m;
         fx = dx * k;
         fz = dz * k;
@@ -841,7 +893,7 @@ export class CrowdSim {
           if (along > 0 && along < 1.1) {
             const lat = rx * -ctx.playerDirZ + rz * ctx.playerDirX;
             if (Math.abs(lat) < 0.8) {
-              const s = (lat >= 0 ? 1 : -1) * ctx.yieldK * (1 - Math.abs(lat) / 0.8) * (1 - along / 1.1) * ctx.playerMoving;
+              const s = (lat >= 0 ? 1 : -1) * ctx.yieldK * statusYield * (1 - Math.abs(lat) / 0.8) * (1 - along / 1.1) * ctx.playerMoving;
               fx += -ctx.playerDirZ * s * m;
               fz += ctx.playerDirX * s * m;
             }
@@ -854,7 +906,7 @@ export class CrowdSim {
       fx += Math.sin(a.phase * 1.3 + a.id) * C.wander * m * ai;
       fz += Math.cos(a.phase * 0.9 + a.id * 1.7) * C.wander * m * ai;
 
-      if (def.zigzag && a.dazedUntil <= ctx.time) {
+      if (def.zigzag && a.dazedUntil <= ctx.time && !chilled) {
         a.zig += dt * T.brat.zigFreq;
         fx += Math.sin(a.zig) * T.brat.zigForce * m * ai;
         a.dartT -= dt * ai;
@@ -878,6 +930,10 @@ export class CrowdSim {
   }
 
   private updateAngry(a: Agent, dt: number, ctx: CrowdCtx): void {
+    if (a.chillWindupUntil > ctx.time || a.chillUntil > ctx.time || a.freezeUntil > ctx.time) {
+      a.windup = -1;
+      return;
+    }
     const T = TUNING.types.angry;
     const def = PASSENGER_DEFS.angry;
     const pl = ctx.player;

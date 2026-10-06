@@ -1,5 +1,6 @@
 import { PASS_KID, PASS_LUGGAGE, PASS_SQUAT, applyImpulse, createBody, setMass, type Body, type World } from './Physics';
 import type { SkillModifiers } from '../SkillTree';
+import type { PlayerMods } from '../charactersDef';
 import type { CrowdSim } from './CrowdSim';
 import { PASSENGER_DEFS } from '../PassengerTypes';
 import type { Emit, UltKind } from './events';
@@ -38,6 +39,20 @@ export class PlayerSim {
   ultCd: Record<UltKind, number> = { str: 0, spd: 0, sta: 0 };
   /** Cooldowns for Tier3 actives (SPD 飛身 Leap, STA 回魂 Second Wind). */
   activeCd: { leap: number; wind: number } = { leap: 0, wind: 0 };
+  // ---- v0.8 mage
+  mana = 0;
+  manaMax = 0;
+  /** Per-spell cooldown remaining (ability id → s). */
+  spellCd: Record<string, number> = {};
+  /** Thunder Step / similar: phase past squat+kid until. */
+  phaseUntil = 0;
+  manaRegenBurstUntil = 0;
+  manaRegenBurstMul = 1;
+  blinkSpeedMul = 1;
+  /** Last cast failed for mana (HUD buzz). */
+  manaDeniedT = 0;
+  /** Set by Sim when mage Burning Urgency window is active. */
+  burningUrgencyActive = false;
   /** SPD 50 Leap airtime ends at this sim time. */
   leapUntil = 0;
   leapStart = 0;
@@ -80,6 +95,9 @@ export class PlayerSim {
     this.staminaMax = mods.staminaMax;
     // STA T2b buffer is spendable but does not raise the regen cap.
     this.stamina = this.staminaMax + mods.staminaBuffer;
+    const pm = mods as SkillModifiers & Partial<PlayerMods>;
+    this.manaMax = pm.manaMax ?? 0;
+    this.mana = this.manaMax;
   }
 
   isCharging(now: number): boolean {
@@ -113,7 +131,9 @@ export class PlayerSim {
 
   baseMass(): number {
     const P = TUNING.player;
-    return P.baseMass + this.mods.resist * P.massPerResist;
+    const pm = this.mods as SkillModifiers & Partial<PlayerMods>;
+    const base = pm.mass0 ?? P.baseMass;
+    return base + this.mods.resist * P.massPerResist;
   }
 
   step(dt: number, now: number, input: PlayerInput, world: World, crowd: CrowdSim, emit: Emit): void {
@@ -129,9 +149,26 @@ export class PlayerSim {
     for (const k of ULTS) this.ultCd[k] = Math.max(0, this.ultCd[k] - dt);
     this.activeCd.leap = Math.max(0, this.activeCd.leap - dt);
     this.activeCd.wind = Math.max(0, this.activeCd.wind - dt);
+    for (const k of Object.keys(this.spellCd)) this.spellCd[k] = Math.max(0, (this.spellCd[k] ?? 0) - dt);
+    this.manaDeniedT = Math.max(0, this.manaDeniedT - dt);
     const leaping = this.isLeaping(now);
-    // Tier 3 pass-through: Hurdle (luggage) always; Leap (squat + kids) while airborne.
-    b.passMask = (this.mods.hurdle ? PASS_LUGGAGE : 0) | (leaping ? PASS_SQUAT | PASS_KID : 0);
+    const phasing = now < this.phaseUntil;
+    // Tier 3 pass-through: Hurdle (luggage) always; Leap (squat + kids) while airborne; Thunder Step while phasing.
+    const mageMods = this.mods as { characterId?: string; iceGlide?: boolean };
+    const magePhase = phasing && mageMods.characterId === 'mage';
+    b.passMask =
+      (this.mods.hurdle || magePhase ? PASS_LUGGAGE : 0) |
+      ((leaping || phasing) ? PASS_SQUAT | PASS_KID : 0);
+    // Mage: slip through any currently-frozen obstacle (Flash Freeze / Ice Age pathing).
+    if (mageMods.characterId === 'mage') {
+      for (const a of crowd.agents) {
+        if (a.freezeUntil > now || (mageMods.iceGlide && a.chillUntil > now)) {
+          b.passMask |= PASS_SQUAT | PASS_KID | PASS_LUGGAGE;
+          break;
+        }
+      }
+    }
+    // Ice Glide: squatters no longer add lateral weave (handled below) + shoveMul via mods flag.
     if (this.mods.hurdle && now >= this.hopUntil && this.overlapsTag(world, PASS_LUGGAGE)) {
       this.hopStart = now;
       this.hopUntil = now + TUNING.skills.hurdleHop;
@@ -178,12 +215,17 @@ export class PlayerSim {
     const slow = this.mods.holdBreath ? 0 : crowd.auraSlowAt(b.x, b.z) * (1 - auraR);
     this.drag = this.crowdDrag(world, crowd, dashing || leaping);
     // Squatting neighbours add lateral weave friction (harder to slip past) — not while leaping over them.
-    if (!leaping) this.drag = Math.min(0.85, this.drag + crowd.squatLateralDrag(b.x, b.z, this.aimX, this.aimZ));
+    const iceGlide = !!(this.mods as SkillModifiers & Partial<PlayerMods>).iceGlide;
+    if (!leaping && !iceGlide) this.drag = Math.min(0.85, this.drag + crowd.squatLateralDrag(b.x, b.z, this.aimX, this.aimZ));
     const St = P.stamina;
     const clear = b.contacts === 0 && b.pressure < 0.002;
-    let maxV = P.maxSpeed * this.mods.moveSpeed * (clear ? this.mods.clearSpeed : 1) * (1 - slow) * (1 - this.drag);
+    const pm = this.mods as SkillModifiers & Partial<PlayerMods>;
+    const charSpeed = pm.speedMul ?? 1;
+    let maxV = P.maxSpeed * this.mods.moveSpeed * charSpeed * (clear ? this.mods.clearSpeed : 1) * (1 - slow) * (1 - this.drag);
     if (charging) maxV *= 1.3;
-    if (dashing) maxV *= U.spd.speedMul;
+    if (dashing) maxV *= U.spd.speedMul * (this.blinkSpeedMul > 1 ? this.blinkSpeedMul / U.spd.speedMul : 1);
+    // Burning Urgency: last 5 s of door timer — set by Sim via flag on player.
+    if (this.burningUrgencyActive) maxV *= 1.1;
     // Hurdle: clearing a suitcase costs a little pace (no block, but not free).
     if (now < this.hopUntil) maxV *= TUNING.skills.hurdleHopSpeed;
     if (this.winded) maxV *= St.windedSpeedMul;
@@ -199,7 +241,7 @@ export class PlayerSim {
       fx = -b.vx * P.brake * mass;
       fz = -b.vz * P.brake * mass;
     }
-    let cap = P.maxDrive * this.mods.pushForce * mass;
+    let cap = P.maxDrive * this.mods.pushForce * (pm.pushMul ?? 1) * mass;
     if (charging) cap *= U.str.driveMul;
     if (this.winded) cap *= St.windedDriveMul;
     const fm = Math.hypot(fx, fz);
@@ -283,6 +325,19 @@ export class PlayerSim {
       this.stats.loudDrain += this.noiseDrain * dt;
     } else {
       this.noiseDrain = 0;
+    }
+    // ---- v0.8 Mana (mage only).
+    if (this.manaMax > 0) {
+      const mpm = this.mods as SkillModifiers & Partial<PlayerMods>;
+      let mRegen = (mpm.manaRegen ?? 0);
+      if (now < this.manaRegenBurstUntil) mRegen *= this.manaRegenBurstMul;
+      if (this.burningUrgencyActive) mRegen *= 2;
+      if (noise > 0) mRegen *= TUNING.mage.manaNoiseMul;
+      // Dropped Call passive: noise drain −30 % (on top of unbothered path above for stamina).
+      if (mpm.droppedCall && noise > 0) {
+        /* mana already halved by manaNoiseMul; stamina noise uses unbothered or full */
+      }
+      this.mana = Math.min(this.manaMax, this.mana + mRegen * dt);
     }
     // Non-regen buffer (above max) slowly bleeds to the regen cap unless in Iron Stance.
     if (this.stamina > this.staminaMax) {
@@ -478,6 +533,18 @@ export class PlayerSim {
       this.path = [];
     }
     emit({ t: 'ult', kind, x: b.x, z: b.z, dx: this.faceX, dz: this.faceZ });
+    return true;
+  }
+
+  /** Spend mana + start cooldown for a spell id. Returns false if denied. */
+  beginSpell(id: string, cost: number, cd: number): boolean {
+    if ((this.spellCd[id] ?? 0) > 0) return false;
+    if (this.mana < cost) {
+      this.manaDeniedT = 0.45;
+      return false;
+    }
+    this.mana -= cost;
+    this.spellCd[id] = cd;
     return true;
   }
 

@@ -329,6 +329,52 @@ export const TUNING = {
     sta: { duration: 2.8, regenMul: 3.2, massMul: 2.4, auraResist: 0.85, calm: 0.4 },
   },
 
+
+  /** Mage base stats & shared boss multipliers (v0.8). */
+  mage: {
+    baseMass: 1.1,
+    pushMul: 1.0,
+    speedMul: 1.0,
+    staminaMax: 105,
+    staminaRegen: 15,
+    manaMax: 130,
+    manaRegen: 12,
+    /** Mana regen × this inside a loudmouth noise zone. */
+    manaNoiseMul: 0.5,
+    /** Boss disable (freeze/daze/chill) duration multiplier. */
+    bossDisableMul: 0.65,
+    /** Counter ability stubbornness drain vs boss. */
+    bossCounterDrainMul: 3.2,
+  },
+
+  /** Mage spell numbers (v0.8) — see docs/CHARACTERS.md §3. */
+  spells: {
+    fillPush: 0.65,
+    fillSpeed: 0.6,
+    fillStamina: 50,
+    fillMana: 45,
+    fillAura: 0.45,
+    fillGap: 0.3,
+    fillCdr: 0.15,
+    fillSpellPower: 0.45,
+    frostBuffer: 25,
+    fireBolt: { range: 3.3, width: 0.95, impulse: 3.15, mana: 15, cd: 3.2 },
+    flameBurst: { radius: 2.6, impulse: 4.0, luggageMul: 5.4, mana: 25, cd: 5.0 },
+    hotHold: 5.0,
+    cleanseAura: 3,
+    frostBreath: { range: 3.2, halfAngleDeg: 48, chill: 2.4, mana: 16, cd: 3.6 },
+    flashFreeze: { radius: 2.7, freeze: 2.55, mana: 28, cd: 5.8 },
+    chillOutWindup: 4,
+    angryShoveMul: 0.28,
+    zap: { range: 3.0, count: 5, daze: 2.2, mana: 12, cd: 2.0 },
+    thunderclap: { radius: 3.0, bratDaze: 4.8, otherDaze: 1.5, bratImpulse: 4.8, mana: 19, cd: 4.2 },
+    droppedCall: 4.2,
+    thunderStep: 1.5,
+    noisePassiveCut: 0.3,
+    iceAge: { radius: 3.2, freeze: 2.2, regenDur: 2.8, regenMul: 3 },
+    thunderBlink: { range: 2.2, speedDur: 0.8, speedMul: 1.6 },
+  },
+
   door: {
     /** Warning lights + accelerating beeps for the last N seconds. */
     warnTime: 5,
