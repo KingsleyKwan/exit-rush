@@ -27,6 +27,8 @@ export interface Dict {
   ultWis: string; // legacy
   ultSta: string;
   skCounters: string;
+  /** 大聲公 HUD chip while the noise zone drains you. */
+  loudHud: string;
   skLeap: string;
   skSecondWind: string;
   skillNodePassive: string;
@@ -66,6 +68,7 @@ export interface Dict {
     angry: string;
     luggage: string;
     squat: string;
+    loud: string;
   };
   sfxNote: string;
   mute: string;
@@ -88,6 +91,7 @@ export interface Dict {
     angry: string;
     luggage: string;
     squat: string;
+    loud: string;
   };
   typeIcons: string;
   on: string;
@@ -144,6 +148,7 @@ export const en: Dict = {
   ultWis: 'Iron Stance',
   ultSta: 'Iron Stance',
   skCounters: 'Counters',
+  loudHud: 'Noise!',
   skLeap: 'Leap',
   skSecondWind: 'Second Wind',
   skillNodePassive: 'Passive',
@@ -181,6 +186,7 @@ export const en: Dict = {
     angry: 'Angry man',
     luggage: 'Luggage',
     squat: 'Squatter',
+    loud: 'Loudmouth',
   },
   sfxNote: 'All sounds are original. Fiction: 香城鐵路 / Hong City Rail — not affiliated with any real railway.',
   mute: 'Mute',
@@ -202,6 +208,7 @@ export const en: Dict = {
     angry: 'Winds up, then shoves hard.',
     luggage: 'That giant suitcase blocks the aisle.',
     squat: 'Crouched low — shove barely works; weave wide.',
+    loud: 'Shouting into the phone. The noise ring drains stamina.',
   },
   typeIcons: 'Type icons',
   on: 'On',
