@@ -2,7 +2,7 @@
 
 Mobile-first 3D crowd-exit game set on the fictional **香城鐵路 / Hong City Rail (HCR)**: get **off** the train while rush-hour crowds **force on** (逼上車). **Parody** of Hong Kong metro vibes (coloured stations, bilingual signs) — **original art & audio only**; not affiliated with the real-world operator or any real railway. Station names are playful parodies (see [`docs/STATIONS.md`](docs/STATIONS.md)).
 
-> Vertical slice (**v0.5.0**). Steam-store polish is the aspiration; v0.2 added real crowd physics, counterflow boarding, joystick + shove controls and a juice pass; v0.2.1 was a balance pass (see [`docs/BALANCE.md`](docs/BALANCE.md)); v0.2.2 was a bug-fix / mobile-robustness pass; **v0.3.0 was the art & icon pass**; **v0.5.0 short levels + special intros**; v0.4.1 added audio, per-station themes, and HK-style side-wall sliding doors** (car ends are gangways only — see below).
+> **v0.7.0**: 100 levels, eight boss kings, free respec + 3 loadouts. Vertical slice history: Steam-store polish is the aspiration; v0.2 added real crowd physics, counterflow boarding, joystick + shove controls and a juice pass; v0.2.1 was a balance pass (see [`docs/BALANCE.md`](docs/BALANCE.md)); v0.2.2 was a bug-fix / mobile-robustness pass; **v0.3.0 was the art & icon pass**; **v0.5.0 short levels + special intros**; v0.4.1 added audio, per-station themes, and HK-style side-wall sliding doors** (car ends are gangways only — see below).
 
 <p align="center">
   <img src="docs/screens/ingame-l100.jpg" width="240" alt="Level 100 in-game, phone portrait">
@@ -12,6 +12,18 @@ Mobile-first 3D crowd-exit game set on the fictional **香城鐵路 / Hong City 
 <p align="center"><img src="docs/screens/desktop-l100.jpg" width="640" alt="Level 100, landscape"></p>
 
 <p align="center"><em>v0.4.1 — exits on the <strong>side wall</strong> (left); car ends are gangways. Screenshots: mid-run crowds boarding through open doors.</em></p>
+
+## v0.7.0 — 100 levels · 八王 bosses · respec & loadouts
+
+- **Levels 31–99 are playable**, with themed mixes along each line stretch and a level select for all 100: act headers per ten and a sticky jump bar. **L100 unlocks after L99.** Station names follow Kingsley's [`STATIONS.md`](docs/STATIONS.md) edits (e.g. L19 紅館).
+- **Boss kings** at L20/30/…/90 replace the old exam levels (stations unchanged); L99 is the final 大考 exam, and **L100 has all eight**. Each king is about 1.75× size and 3× mass, with a crown, tint, name tag (粵 + EN) and an exaggerated version of his type's mechanic: a bouncing giant suitcase, a car-wide stench, a door-blocking squat, a kid trail, dashes, an aisle-closing hand-hold, charges and car-wide noise.
+  - You **wear him down** rather than defeat him: leaning in drains his stubbornness 「牛脾氣」 bar, and at zero he steps aside for 3.2 s.
+  - Counter skills matter: Hurdle, Hold Breath, Leap, Unbothered, Second Wind, Thread, Stand Firm.
+  - An entrance **cutscene** (letterbox, camera close-up, stomp and title card; 2.6 s first time, 1.1 s after, tap to skip) plays before the timer.
+  - See [`docs/BOSSES.md`](docs/BOSSES.md).
+- **Economy:** **1 SP per first clear** (100 max). Old saves are recalculated and refunded once, with a notice. **Free respec** and **3 loadouts** (配點1/2/3) are switchable from the tree, level select and result card.
+- **Balance:** every level 6–99 is in its band with earned builds (bot, deterministic seeds). L100 ult builds clear 26–45%. See [`docs/BALANCE.md`](docs/BALANCE.md).
+- **Fixes:** camera follow damping no longer stalls at clamped frame dt; sim ids reset per run (results identical for any worker count); station signs auto-fit long names.
 
 ## v0.6.3 — 大聲公 Loudmouth
 
@@ -103,9 +115,9 @@ The Pages deploy builds with `BASE_PATH=/exit-rush/` so assets resolve under tha
 
 | Input | Action |
 |--------|--------|
-| Drag anywhere (floating joystick) | Steer / push toward exit (small aim-assist toward gaps; stronger with WIS) |
+| Drag anywhere (floating joystick) | Steer / push toward exit (small aim-assist toward gaps; stronger with SPD) |
 | Hold fist button → release | Charged shove burst (stamina cost, short cooldown) |
-| STR / SPD / WIS ult buttons | Ultimates (if unlocked): shockwave · dash · path sense (10 s cooldown) |
+| STR / SPD / STA ult buttons | Ultimates (if unlocked): Iron Bull Charge · Slip-Off Dash · Iron Stance |
 | Keyboard | WASD / arrows steer · Space = shove · 1/2/3 = ults · P / Esc = pause |
 | 粵 / EN glyph | Language toggle EN ↔ 粵 |
 | Skill-tree icon | Skill tree — from the menu, or from the pause / result overlay (returns to the run) |
@@ -138,7 +150,7 @@ The Pages deploy builds with `BASE_PATH=/exit-rush/` so assets resolve under tha
 - **Skill-point economy (stop-gap):** with only 21 playable levels, a level now awards a point on its first clear **and on replays, up to 5 points per level** (`MAX_POINTS_PER_LEVEL` in `SkillTree.ts`) → 105 points reachable, enough for a full branch + ultimate and the ~99-point L100 loadout. Set it back to 1 when levels 21–99 ship.
 - Mobile polish: brand bar hidden during a run (HUD moves up under the notch), safe-area insets on all sides, every button ≥ 44 px, `prefers-reduced-motion` followed live, three.js split into its own cached chunk.
 
-## Status (v0.5.0)
+## Status (v0.7.0)
 
 | Area | Status |
 |------|--------|
@@ -153,7 +165,9 @@ The Pages deploy builds with `BASE_PATH=/exit-rush/` so assets resolve under tha
 | Door-closing warning (flashing lights, accelerating beeps, leaves physically close) | ✅ v0.2 |
 | Ultimates: STR shockwave · SPD dash + afterimages · WIS path highlight | ✅ v0.2 |
 | Headless sim test (`npm run test:sim`) | ✅ v0.2 |
-| Levels **1–30 + 100** playable, short timers, staged specials; L100 needs L30 clear + strong skills (~93 SP cap) | ✅ v0.5 |
+| Levels **1–100** playable, short timers, staged specials; L100 needs L99 clear + strong skills (100 SP cap) | ✅ v0.7 |
+| Boss kings L20–L90 + all eight at L100, entrance cutscenes | ✅ v0.7 |
+| Free respec + 3 skill loadouts | ✅ v0.7 |
 | HUD (door progress + milestones, stamina, timer, cooldowns) | ✅ |
 | Skill tree (overlay from pause, returns to run) + localStorage with in-memory fallback | ✅ v0.2.2 |
 | Auto-pause on background / blur, audio suspend & resume | ✅ v0.2.2 |
@@ -161,7 +175,6 @@ The Pages deploy builds with `BASE_PATH=/exit-rush/` so assets resolve under tha
 | i18n EN + zh-HK (all UI strings in dictionaries, `<html lang>` synced) | ✅ v0.2.2 |
 | Original metro-style Web Audio SFX + mixer + mute | ✅ v0.4 |
 | Per-station wall/pillar themes + OFL sign fonts | ✅ v0.4 |
-| Levels 31–99 content | 📝 TBD (see `docs/LEVELS.md`) |
 | Balance pass: crowd drag, skill-point scaling, ult parity (SPD dash toned down), multi-run sim harness | ✅ v0.2.1 |
 | Capacitor / App Store (native haptics) | ⏳ Roadmap |
 | Further foley / optional offline JA TTS | ⏳ jingle + sign flash shipped |
@@ -170,7 +183,7 @@ Physics & feel tuning knobs live in [`src/game/sim/tuning.ts`](src/game/sim/tuni
 
 ## Roadmap
 
-1. **Content** — Fill levels 31–99; polish level 100 (十一煙花後頓沙嘴).
+1. **Content** — Human playtest of L31–100 and the boss kings; polish level 100 (十一煙花後頓沙嘴).
 2. **Feel** — Animated low-poly characters, per-type SFX, native haptics via Capacitor; playtest the v0.2.1 curve with humans.
 3. **Audio** — ✅ v0.4 original synthesised metro-*style* cues (never use real-railway audio). Further polish / foley welcome.
 4. **Mobile wrap** — Capacitor → iOS / Android. **App Store requires an Apple Developer account** ($99/yr).
@@ -179,7 +192,8 @@ Physics & feel tuning knobs live in [`src/game/sim/tuning.ts`](src/game/sim/tuni
 ## Docs
 
 - [`docs/GAME_DESIGN.md`](docs/GAME_DESIGN.md) — full design
-- [`docs/LEVELS.md`](docs/LEVELS.md) — station / difficulty draft
+- [`docs/LEVELS.md`](docs/LEVELS.md) — all 100 levels: stations / difficulty
+- [`docs/BOSSES.md`](docs/BOSSES.md) — the eight boss kings, cutscene, counters
 - [`docs/BALANCE.md`](docs/BALANCE.md) — v0.2.1 balance table + how to rerun the sim
 
 ## License / assets
