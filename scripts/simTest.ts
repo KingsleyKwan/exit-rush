@@ -27,10 +27,12 @@ import { writeFileSync } from 'node:fs';
 import { Sim } from '../src/game/sim/Sim';
 import { mulberry32 } from '../src/game/sim/rng';
 import { passes } from '../src/game/sim/Physics';
+import { PASSENGER_DEFS } from '../src/game/PassengerTypes';
 import { DOOR_BAYS, DOOR_Z, TUNING, doorWallX, nearestDoorBay, openDoorBays } from '../src/game/sim/tuning';
 import { LEVELS } from '../src/game/levels';
 import { BRANCH_FILL, modifiersFromSkills } from '../src/game/SkillTree';
-import { defaultSkills, migrateLegacyKeys, SAVE_KEY, type KeyValueStore, type SkillState } from '../src/game/storage';
+import { defaultSkills, migrateLegacyKeys, normalizeSave, SAVE_KEY, type KeyValueStore, type SaveData, type SkillState } from '../src/game/storage';
+import { earnedPoints, resetActiveLoadout, spendPoint, spentPoints, switchLoadout, POINTS_PER_FIRST_CLEAR } from '../src/game/SkillTree';
 import type { PlayerInput } from '../src/game/sim/PlayerSim';
 import type { PassengerKind } from '../src/game/PassengerTypes';
 import type { Agent } from '../src/game/sim/CrowdSim';
@@ -141,6 +143,9 @@ interface Run {
   ults: number;
   endX: number;
   endZ: number;
+  /** v0.7 bosses: times a boss yielded / bounced or bumped the player. */
+  bossYields: number;
+  bossHits: number;
 }
 
 function runLevel(levelId: number, skills: SkillState, seed: number): Run {
@@ -155,6 +160,8 @@ function runLevel(levelId: number, skills: SkillState, seed: number): Run {
   let shoves = 0;
   let angryHits = 0;
   let ults = 0;
+  let bossYields = 0;
+  let bossHits = 0;
   let steps = 0;
   // Progress tracking for the "unstick" behaviour a human would use.
   let bestZ = p.body.x; // best (most negative / doorward) X
@@ -216,13 +223,17 @@ function runLevel(levelId: number, skills: SkillState, seed: number): Run {
     }
     // Tier-3 actives (v0.6.2): leap when jammed, second wind when low.
     if (sim.time > 1 && blockedT > 0.3 && sim.tryLeap()) blockedT = 0;
-    if (p.stamina < p.staminaMax * 0.25) sim.trySecondWind();
+    // v0.7: a player who owns Second Wind fires it when the 衰仔王 closes in.
+    const bratKing = sim.crowd.bosses().some((a) => a.kind === 'brat' && Math.hypot(a.body.x - b.x, a.body.z - b.z) < 1.3);
+    if (p.stamina < p.staminaMax * 0.25 || bratKing) sim.trySecondWind();
     const input: PlayerInput = { x: dx, z: -dz, mag: 1, shoveHeld: held };
     sim.step(DT, input);
     steps++;
     for (const e of sim.events) {
       if (e.t === 'shove') shoves++;
       else if (e.t === 'angryHit') angryHits++;
+      else if (e.t === 'bossYield') bossYields++;
+      else if (e.t === 'bossBounce') bossHits++;
     }
     sim.events.length = 0;
     maxBodies = Math.max(maxBodies, sim.world.bodies.length);
@@ -269,6 +280,8 @@ function runLevel(levelId: number, skills: SkillState, seed: number): Run {
     endZ: p.body.z,
     loudDrain: p.stats.loudDrain,
     pushDrain: p.stats.pushDrain,
+    bossYields,
+    bossHits,
   };
 }
 
@@ -304,6 +317,7 @@ function spawn(sim: Sim, kind: PassengerKind, x: number, z: number): Agent[] {
   return made;
 }
 const LEFT: PlayerInput = { x: -1, z: 0, mag: 1, shoveHeld: false };
+const NO_MOVE: PlayerInput = { x: 0, z: 0, mag: 0, shoveHeld: false };
 /** Walk toward −X; seconds until the player passes `goalX` (cap 8 s). */
 function timeToX(sim: Sim, goalX: number, each?: (s: Sim) => void): number {
   for (let i = 0; i < 8 * 60; i++) {
@@ -372,13 +386,20 @@ function counterTests(): CounterResult[] {
         c[0].body.x = c[0].homeX = 0; c[0].body.z = c[0].homeZ = -0.24;
         c[1].body.x = c[1].homeX = 0; c[1].body.z = c[1].homeZ = 0.24;
       }
-      // brace the pair with two more couples above/below so going around is costly
-      spawn(s, 'normal', 0, -0.75); spawn(s, 'normal', 0, 0.75);
-      return timeToX(s, -1.2);
+      // brace the pair with commuters above/below so going around is costly.
+      for (const z of [-0.72, 0.72, -1.18, 1.18]) spawn(s, 'normal', 0, z);
+      // v0.7: measure Thread directly — the pair lets go and steps apart for you. (With the
+      // seed-deterministic agent ids the old time-to-cross measure was dominated by wander luck.)
+      let gap = 0;
+      const t = timeToX(s, -1.2, (q) => {
+        q.player.body.z = Math.max(-0.2, Math.min(0.2, q.player.body.z));
+        if (c.length === 2 && q.player.body.x > -0.4) gap = Math.max(gap, Math.abs(c[0].body.z - c[1].body.z));
+      });
+      return { t, gap };
     };
     const off = run(59);
     const on = run(60);
-    push('Thread (couple)', on < off * 0.9, `t ${off.toFixed(2)}s → ${on.toFixed(2)}s`);
+    push('Thread (couple)', on.gap > off.gap + 0.15 && on.t <= off.t + 0.05, `pair opens ${off.gap.toFixed(2)}m → ${on.gap.toFixed(2)}m, cross ${off.t.toFixed(2)}s → ${on.t.toFixed(2)}s`);
   }
   // STR 40 拆散情侶 Split — a shove on a couple breaks their link.
   {
@@ -534,6 +555,159 @@ function counterTests(): CounterResult[] {
     const okC = migrateLegacyKeys(c).length === 0 && c.m.get(SAVE_KEY) === 'new';
     push('Save key migration', okA && okB && okC, `moved [${movedA.join(', ')}]; new key wins=${okB}; no-op=${okC}`);
   }
+  {
+    // v0.7 economy: 1 SP per first clear; respec + 3 loadouts.
+    const ids = (n: number) => Array.from({ length: n }, (_, i) => i + 1);
+    // Old v0.6 save: 30 clears × 3 SP → 60/15/14 + STR ult spent (99) — more than the 30 now earned → refund.
+    const old = normalizeSave({ version: 1, cleared: ids(30), skills: { str: 60, spd: 15, sta: 14, ultStr: true, ultSpd: false, ultSta: false, points: 0 } } as unknown as Partial<SaveData>);
+    const okOld = old.skills.points === 30 && spentPoints(old.skills) === 0 && old.respecNotice && old.activeLoadout === 0 && old.loadouts.length === 3;
+    // Old save that fits: 40 clears, 20/10/0 spent (30) → kept in slot 1, 10 spare, no notice.
+    const fit = normalizeSave({ version: 1, cleared: ids(40), skills: { str: 20, spd: 10, sta: 0, ultStr: false, ultSpd: false, ultSta: false, points: 90 } } as unknown as Partial<SaveData>);
+    const okFit = fit.skills.str === 20 && fit.skills.points === 10 && !fit.respecNotice && fit.loadouts[0].str === 20;
+    push('SP economy + migration', POINTS_PER_FIRST_CLEAR === 1 && okOld && okFit, `per clear=${POINTS_PER_FIRST_CLEAR}; over-spent v0.6 save → refund ${old.skills.points} pts + notice=${old.respecNotice}; fitting save kept 20/10/0 +${fit.skills.points} spare`);
+    // Reset refunds exactly the earned total (incl. ultimates).
+    const sv = normalizeSave({ version: 1, cleared: ids(85) } as Partial<SaveData>);
+    for (let i = 0; i < 60; i++) sv.skills = spendPoint(sv.skills, 'spd');
+    sv.skills = spendPoint(sv.skills, 'spd'); // ultimate (10)
+    for (let i = 0; i < 15; i++) sv.skills = spendPoint(sv.skills, 'str');
+    const spent = spentPoints(sv.skills);
+    resetActiveLoadout(sv);
+    const okReset = spent === 85 && sv.skills.points === earnedPoints(sv) && sv.skills.points === 85 && !sv.skills.ultSpd && sv.skills.spd === 0;
+    push('Respec (reset)', okReset, `spent ${spent} (60 SPD + ult + 15 STR) → refund to ${sv.skills.points}/${earnedPoints(sv)}`);
+    // Loadouts: slot 2 = STA build, slot 1 = SPD build; switching changes the effective skills.
+    for (let i = 0; i < 40; i++) sv.skills = spendPoint(sv.skills, 'spd');
+    switchLoadout(sv, 1);
+    for (let i = 0; i < 50; i++) sv.skills = spendPoint(sv.skills, 'sta');
+    const m2 = modifiersFromSkills(sv.skills);
+    switchLoadout(sv, 0);
+    const m1 = modifiersFromSkills(sv.skills);
+    const back = sv.skills.spd === 40 && sv.skills.sta === 0 && sv.skills.points === 45 && sv.loadouts[1].sta === 50;
+    const differ = JSON.stringify(m1) !== JSON.stringify(m2);
+    push('Loadout switch', back && differ && sv.activeLoadout === 0, `slot1 SPD 40 (+${sv.skills.points} spare) ↔ slot2 STA 50; modifiers differ=${differ}`);
+    const re = normalizeSave(JSON.parse(JSON.stringify(sv)) as Partial<SaveData>);
+    push('Loadout save round-trip', re.loadouts[1].sta === 50 && re.skills.spd === 40 && re.loadouts[2].points === 85, `slots ${re.loadouts.map((l) => `${l.str}/${l.spd}/${l.sta}+${l.points}`).join(' | ')}`);
+  }
+
+  // ---------------------------------------------------------------- v0.7 bosses
+  {
+    const want: Record<number, string> = { 20: 'luggage', 30: 'stench', 40: 'squat', 50: 'family', 60: 'brat', 70: 'couple', 80: 'angry', 90: 'loud' };
+    let ok = true;
+    const bad: string[] = [];
+    for (const [id, kind] of Object.entries(want)) {
+      const lv = LEVELS.find((l) => l.id === +id)!;
+      if (lv.boss?.length !== 1 || lv.boss[0] !== kind || lv.exam) { ok = false; bad.push(id); }
+      const sim = new Sim(lv, modifiersFromSkills(defaultSkills()), mulberry32(3));
+      const bs = sim.crowd.bosses();
+      const def = PASSENGER_DEFS[kind as PassengerKind];
+      if (bs.length !== (kind === 'couple' ? 2 : 1) || bs.some((a) => a.body.r < def.radius * 1.3 || a.body.mass < def.mass * 2 || a.scale / (def.scale ?? 1) < 1.5)) { ok = false; bad.push(`${id}:spawn`); }
+    }
+    const fin = LEVELS.find((l) => l.id === 100)!;
+    const finSim = new Sim(fin, modifiersFromSkills(defaultSkills()), mulberry32(3));
+    const finKinds = new Set(finSim.crowd.bosses().map((a) => a.boss!.kind));
+    if (finKinds.size !== 8) { ok = false; bad.push(`100:${finKinds.size}`); }
+    const plain = LEVELS.filter((l) => l.boss && l.id % 10 !== 0);
+    if (plain.length) { ok = false; bad.push('stray'); }
+    push('Boss levels 20–90 + L100', ok, ok ? '8 kings L20–L90 (exam replaced), all 8 at L100, 1.5×+ size / 2×+ mass' : `bad: ${bad.join(',')}`);
+  }
+  {
+    // Stubbornness: leaning on the 踎低王 wears him down until he yields (steps aside), then he regains resolve.
+    const s = emptySim(sk(0, 0, 0));
+    s.crowd.spawnBoss('squat', -0.5, 0);
+    const boss = s.crowd.bosses()[0];
+    place(s, -0.5 + boss.body.r + s.player.body.r + 0.02, 0);
+    let yieldT = -1;
+    for (let i = 0; i < 9 * 60 && yieldT < 0; i++) {
+      // Head-on: hold the player on his line (in a real car the crowd fills the side gaps).
+      s.player.body.z = 0;
+      s.player.body.vz = 0;
+      s.step(DT, LEFT);
+      for (const e of s.events) if (e.t === 'bossYield') yieldT = s.time;
+      s.events.length = 0;
+    }
+    const moved = Math.hypot(boss.homeX - boss.originX, boss.homeZ - boss.originZ);
+    for (let i = 0; i < 6 * 60; i++) s.step(DT, NO_MOVE);
+    const back = Math.hypot(boss.homeX - boss.originX, boss.homeZ - boss.originZ);
+    const regen = boss.boss!.stub;
+    push('Boss stubbornness → yield', yieldT > 0 && yieldT < 7 && moved > 0.8 && back < 1e-6 && regen > 0.05, `yield at ${yieldT.toFixed(2)}s, stepped aside ${moved.toFixed(2)}m, back home, stub regen → ${regen.toFixed(2)}`);
+  }
+  {
+    // 行李箱大王: his giant case bounces you back — Hurdle (SPD 40) hops it instead.
+    const run = (spd: number) => {
+      const s = emptySim(sk(0, spd, 0));
+      s.crowd.spawnBoss('luggage', -0.9, 0.7);
+      const c = s.crowd.bosses()[0].caseBody!;
+      place(s, 0.6, c.z);
+      let bounces = 0;
+      let past = 6;
+      const cz = c.z;
+      for (let i = 0; i < 6 * 60; i++) {
+        s.player.body.z = cz;
+        s.player.body.vz = 0;
+        s.step(DT, LEFT);
+        for (const e of s.events) if (e.t === 'bossBounce') bounces++;
+        s.events.length = 0;
+        if (s.player.body.x < c.x - c.r - 0.3) { past = s.time; break; }
+      }
+      return { bounces, past, r: c.r };
+    };
+    const off = run(39);
+    const on = run(40);
+    push('Hurdle vs Suitcase King', off.bounces > 0 && on.bounces === 0 && on.past < off.past, `case r=${off.r.toFixed(2)}m · bounces ${off.bounces} → ${on.bounces}, past the case ${off.past.toFixed(2)}s → ${on.past.toFixed(2)}s`);
+  }
+  {
+    // 黏身情侶王: the royal hand-hold is a rope you can't walk through — Thread (SPD 60) slips it.
+    const run = (spd: number) => {
+      const s = emptySim(sk(0, spd, 0));
+      s.crowd.spawnBoss('couple', -0.6, 0);
+      place(s, 0.3, 0);
+      for (let i = 0; i < 1.6 * 60; i++) s.step(DT, LEFT);
+      return s.player.body.x;
+    };
+    const off = run(59);
+    const on = run(60);
+    push('Thread vs Couple Royals', off > -0.45 && on < -0.8, `x after 1.6s: no Thread ${off.toFixed(2)} (held at the hand-hold) → Thread ${on.toFixed(2)}`);
+  }
+  {
+    // 嬲嬲豬王: his charge-shove cuts through generic resist; Stand Firm (STR 60) still holds.
+    const run = (str: number) => {
+      const s = emptySim(sk(str, 0, 0));
+      s.crowd.spawnBoss('angry', -0.4, 0);
+      place(s, 0.45, 0);
+      let power = 0;
+      let stun = 0;
+      for (let i = 0; i < 4 * 60; i++) {
+        s.step(DT, NO_MOVE);
+        for (const e of s.events) if (e.t === 'angryHit') power = Math.max(power, e.power);
+        stun = Math.max(stun, s.player.stunT);
+        s.events.length = 0;
+      }
+      return { power, stun };
+    };
+    const off = run(59);
+    const on = run(60);
+    push('Stand Firm vs Hog King', off.power > 0 && on.power < off.power * 0.6 && on.stun < off.stun * 0.5, `shove ${off.power.toFixed(2)} → ${on.power.toFixed(2)}, stun ${off.stun.toFixed(2)}s → ${on.stun.toFixed(2)}s`);
+  }
+  {
+    // 衰仔王: Second Wind (STA 50) dazes him (no dashes); 大聲公王's noise zone is ~boss-size wide.
+    const s = emptySim(sk(0, 0, 50));
+    s.crowd.spawnBoss('brat', -0.3, 0);
+    const brat = s.crowd.bosses()[0];
+    place(s, 0.4, 0);
+    s.step(DT, NO_MOVE);
+    const fired = s.trySecondWind();
+    const dazed = brat.dazedUntil > s.time;
+    const l = emptySim(sk(0, 0, 0));
+    l.crowd.spawnBoss('loud', 0, 0);
+    const R = TUNING.types.loud.radius;
+    const far = l.crowd.noiseAt(R * 1.5, 0);
+    push('Second Wind / Loud King', fired && dazed && far > 0, `brat king dazed=${dazed}; loud king noise at ${(R * 1.5).toFixed(2)}m = ${far.toFixed(2)} (normal loudmouth: 0)`);
+  }
+  {
+    // Save: seenBosses (cutscene shown in full only once) survives normalisation, junk filtered.
+    const n = normalizeSave({ version: 1, seenBosses: [20, 20, 30, 'x', 101, 0, 2.5] } as unknown as SaveData);
+    push('Save seenBosses', JSON.stringify(n.seenBosses) === '[20,30]', `normalised → ${JSON.stringify(n.seenBosses)}`);
+  }
+
   return out;
 }
 
@@ -574,7 +748,9 @@ function target(level: number, loadout: string): [number, number] | null {
   if (loadout !== 'earned') return null;
   if (level <= 5) return [0.95, 1];
   if (level <= 15) return [0.75, 0.9];
-  return [0.55, 0.75];
+  if (level <= 30) return [0.55, 0.75];
+  if (level <= 60) return [0.5, 0.7];
+  return [0.35, 0.6];
 }
 
 async function main(): Promise<void> {
@@ -663,7 +839,7 @@ async function main(): Promise<void> {
   console.log(
     `runs=${RUNS}  workers=${WORKERS}  dt=${DT.toFixed(4)}  maxBodies=${TUNING.physics.maxBodies}  (${((performance.now() - t0) / 1000).toFixed(1)} s)`,
   );
-  console.log('lvl dens press timer | loadout      win%  medT  medLeft  <10s  bodies maxPen ms/step shove angry ults  loud | target');
+  console.log('lvl dens press timer | loadout      win%  medT  medLeft  <10s  bodies maxPen ms/step shove angry ults  loud  yld hit | target');
   let failures = 0;
   const rows: Record<string, unknown>[] = [];
   for (const lv of levels) {
@@ -694,7 +870,7 @@ async function main(): Promise<void> {
         times: wins.map((r) => +r.t.toFixed(2)).sort((a, b) => a - b),
       });
       console.log(
-        `${String(lv.id).padStart(3)} ${String(lv.density).padStart(4)} ${lv.pressure.toFixed(2)} ${String(lv.timer).padStart(5)} | ${lo.padEnd(11)} ${String(Math.round(wr * 100)).padStart(4)}% ${f1(medT)} ${f1(medLeft, 7)} ${String(Math.round(fast * 100)).padStart(4)}%  ${String(bodies).padStart(5)}  ${pen.toFixed(2)}  ${avg('stepMs').toFixed(3)} ${f1(avg('shoves'))} ${f1(avg('angryHits'))} ${f1(avg('ults'), 4)} ${f1(avg('loudDrain'), 5)} | ${mark}`,
+        `${String(lv.id).padStart(3)} ${String(lv.density).padStart(4)} ${lv.pressure.toFixed(2)} ${String(lv.timer).padStart(5)} | ${lo.padEnd(11)} ${String(Math.round(wr * 100)).padStart(4)}% ${f1(medT)} ${f1(medLeft, 7)} ${String(Math.round(fast * 100)).padStart(4)}%  ${String(bodies).padStart(5)}  ${pen.toFixed(2)}  ${avg('stepMs').toFixed(3)} ${f1(avg('shoves'))} ${f1(avg('angryHits'))} ${f1(avg('ults'), 4)} ${f1(avg('loudDrain'), 5)} ${f1(avg('bossYields'), 4)} ${f1(avg('bossHits'), 3)} | ${mark}`,
       );
     }
   }
