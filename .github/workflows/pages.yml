@@ -32,7 +32,7 @@ jobs:
 
       - name: Build
         env:
-          BASE_PATH: /hk-mtr-exit-rush/
+          BASE_PATH: /exit-rush/
         run: npm run build
 
       - name: Setup Pages
