@@ -7,9 +7,9 @@ import type { Emit, UltKind } from './events';
 import { DOOR_Z, PLAYER_START_X, PLAYER_START_Z, TUNING, doorWallX } from './tuning';
 
 export interface PlayerInput {
-  /** Stick x: + = screen right (+X world). */
+  /** World +X. Negative walks toward the −X doors. Screen axes are converted before this. */
   x: number;
-  /** Stick forward: + = toward the door (−Z world). */
+  /** Negated on use (`dz = -z`), so +z is world −Z, along the car. Not toward the doors. */
   z: number;
   /** 0–1 stick deflection. */
   mag: number;

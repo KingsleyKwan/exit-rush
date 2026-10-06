@@ -1182,6 +1182,18 @@ export class Game {
     set('f', v.f);
   }
 
+  /**
+   * Screen stick → sim input. intentX is screen-right, intentZ is screen-up.
+   * The sim applies world (x, −z), so pass world X and negated world Z.
+   * Basis is the camera from the previous frame (follow runs after this sample).
+   */
+  private stickInput(d: { intentX: number; intentZ: number; magnitude: number }): PlayerInput {
+    const { fx, fz, rx, rz } = this.train.groundAxes();
+    const wx = d.intentX * rx + d.intentZ * fx;
+    const wz = d.intentX * rz + d.intentZ * fz;
+    return { x: wx, z: -wz, mag: d.magnitude, shoveHeld: this.shoveBtn || this.input.shoveKey };
+  }
+
   // -------------------------------------------------------------------- loop
 
   private loop(now: number): void {
@@ -1212,7 +1224,7 @@ export class Game {
         const d = this.input.drag;
         const input: PlayerInput =
           this.screen === 'playing' && !sim.ambient && this.resultDelay < 0
-            ? { x: d.intentX, z: d.intentZ, mag: d.magnitude, shoveHeld: this.shoveBtn || this.input.shoveKey }
+            ? this.stickInput(d)
             : NO_INPUT;
         let steps = 0;
         while (this.acc >= fixed && steps < TUNING.physics.maxSubSteps) {
@@ -1331,7 +1343,8 @@ export class Game {
     // Closed-door push feedback (toast + flash + buzz), rate-limited ~2s.
     if (!sim.result) {
       const d = this.input.drag;
-      const bay = sim.closedBayPush(d.intentX, d.magnitude);
+      // Same world X the sim stepped with. Raw screen intentX is no longer "toward the door".
+      const bay = sim.closedBayPush(this.stickInput(d).x, d.magnitude);
       if (bay !== null && now - this.closedDoorToastAt >= 2) {
         this.closedDoorToastAt = now;
         this.train.flashClosedBay(bay);

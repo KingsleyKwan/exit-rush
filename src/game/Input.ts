@@ -1,8 +1,8 @@
 export interface DragState {
   active: boolean;
-  /** Stick x: + = right. */
+  /** Screen right, −1…1. Game.ts maps this through the camera; it is not a world axis. */
   intentX: number;
-  /** Stick forward: + = up on screen = toward the door. */
+  /** Screen up, −1…1. Game.ts maps this through the camera; it is not a world axis. */
   intentZ: number;
   /** 0–1 deflection. */
   magnitude: number;
@@ -42,6 +42,8 @@ export class InputController {
   private keys = new Set<string>();
   private keyX = 0;
   private keyZ = 0;
+  private safeLeft = 0;
+  private safeBottom = 0;
 
   constructor(el: HTMLElement, overlayParent: HTMLElement) {
     this.el = el;
@@ -60,6 +62,8 @@ export class InputController {
     window.addEventListener('keydown', this.onKeyDown);
     window.addEventListener('keyup', this.onKeyUp);
     window.addEventListener('blur', this.onBlur);
+    window.addEventListener('resize', this.onResize);
+    this.readSafe();
   }
 
   dispose(): void {
@@ -71,6 +75,7 @@ export class InputController {
     window.removeEventListener('keydown', this.onKeyDown);
     window.removeEventListener('keyup', this.onKeyUp);
     window.removeEventListener('blur', this.onBlur);
+    window.removeEventListener('resize', this.onResize);
     this.joy.remove();
   }
 
@@ -82,7 +87,7 @@ export class InputController {
     this.keys.clear();
     this.shoveKey = false;
     this.keyX = this.keyZ = 0;
-    this.joy.classList.remove('on');
+    this.hideJoy();
   }
 
   private onContext = (e: Event): void => e.preventDefault();
@@ -103,6 +108,7 @@ export class InputController {
     this.drag.magnitude = 0;
     this.joy.style.setProperty('--r', `${this.radius}px`);
     this.place(0, 0);
+    this.joy.classList.remove('idle');
     this.joy.classList.add('on');
   };
 
@@ -140,6 +146,8 @@ export class InputController {
     this.drag.intentZ = 0;
     this.drag.magnitude = 0;
     this.joy.classList.remove('on');
+    if (this.enabled) this.showParked();
+    else this.hideJoy();
   };
 
   private place(dx: number, dy: number): void {
@@ -180,6 +188,7 @@ export class InputController {
     if (this.pointerId !== null) return;
     if (!this.enabled) {
       this.drag.intentX = this.drag.intentZ = this.drag.magnitude = 0;
+      this.hideJoy();
       return;
     }
     const has = (a: string, b: string) => this.keys.has(a) || this.keys.has(b);
@@ -197,5 +206,38 @@ export class InputController {
     this.drag.intentX = this.keyX;
     this.drag.intentZ = this.keyZ;
     this.drag.magnitude = m < 0.02 ? 0 : m;
+    this.showParked();
+  }
+
+  private onResize = (): void => {
+    this.readSafe();
+    if (this.enabled && this.pointerId === null) this.showParked();
+  };
+
+  /** Home-indicator / notch. env() on a custom property does not resolve via getPropertyValue. */
+  private readSafe(): void {
+    const probe = document.createElement('div');
+    probe.style.cssText = 'position:absolute;visibility:hidden;padding-left:env(safe-area-inset-left);padding-bottom:env(safe-area-inset-bottom)';
+    this.joy.appendChild(probe);
+    const cs = getComputedStyle(probe);
+    this.safeLeft = parseFloat(cs.paddingLeft) || 0;
+    this.safeBottom = parseFloat(cs.paddingBottom) || 0;
+    probe.remove();
+  }
+
+  /** Lower-left park, clear of the home indicator and the bottom-right shove cluster. */
+  private showParked(): void {
+    this.radius = Math.max(44, Math.min(80, Math.min(window.innerWidth, window.innerHeight) * 0.14));
+    this.joy.style.setProperty('--r', `${this.radius}px`);
+    this.baseX = this.radius + 28 + this.safeLeft;
+    this.baseY = window.innerHeight - this.radius - 36 - this.safeBottom;
+    const r = this.radius;
+    this.place(this.drag.intentX * r, -this.drag.intentZ * r);
+    this.joy.classList.remove('on');
+    this.joy.classList.add('idle');
+  }
+
+  private hideJoy(): void {
+    this.joy.classList.remove('on', 'idle');
   }
 }

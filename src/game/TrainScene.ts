@@ -161,10 +161,15 @@ export class TrainScene {
   private fovExtra = 0;
   private baseFov = 55;
   private tmp = new THREE.Vector3();
+  /** Scratch for groundAxes only. follow() reuses tmp, so this must stay separate. */
+  private groundFwd = new THREE.Vector3();
   private time = 0;
 
   private mat = {
     wall: new THREE.MeshLambertMaterial({ color: 0xf1f3f5 }),
+    // Camera sits on +X for the whole level, so this slab is the one between the lens and the player.
+    // Own material: M.wall is shared with the door wall and the gangways, which stay opaque.
+    farWall: new THREE.MeshLambertMaterial({ color: 0xf1f3f5, transparent: true, opacity: 0.5, depthWrite: false }),
     wallGrey: new THREE.MeshLambertMaterial({ color: 0xd5dae0 }),
     red: new THREE.MeshLambertMaterial({ color: HCR_RED }),
     steel: new THREE.MeshPhongMaterial({ color: HCR_SILVER, specular: 0x9aa3ad, shininess: 70 }),
@@ -684,11 +689,11 @@ export class TrainScene {
     aisle.position.set(0.15, 0.004, midZ);
     this.scene.add(aisle);
 
-    b.box(M.wall, 0.12, 2.4, len, C.halfWidth + 0.06, 1.1, midZ);
+    b.box(M.farWall, 0.12, 2.4, len, C.halfWidth + 0.06, 1.1, midZ);
     b.box(M.red, 0.03, 0.07, len, C.halfWidth - 0.02, 0.98, midZ);
     b.box(M.light, 0.16, 0.06, len - 0.2, C.halfWidth - 0.04, 2.33, midZ);
     for (const cz of [-2.6, 0, 2.6]) {
-      b.box(M.window, 0.02, 0.72, 1.4, C.halfWidth - 0.02, 1.48, cz);
+      b.box(M.glass, 0.02, 0.72, 1.4, C.halfWidth - 0.02, 1.48, cz);
       b.box(M.wallGrey, 0.03, 0.06, 1.48, C.halfWidth - 0.03, 1.87, cz);
       b.box(M.wallGrey, 0.03, 0.06, 1.48, C.halfWidth - 0.03, 1.09, cz);
     }
@@ -1017,6 +1022,22 @@ export class TrainScene {
 
   setFovExtra(a: number): void {
     this.fovExtra = a;
+  }
+
+  /**
+   * Ground basis of the live camera. Screen-up moves along (fx, fz); screen-right along (rx, rz).
+   * right = (−fz, fx): a camera on +Z looking −Z (fwd 0,0,−1) has right (+1, 0).
+   * This rig sits on +X looking −X, so fwd ≈ (−1, 0) and right ≈ (0, −1):
+   * screen-up walks toward the −X doors, screen-right walks along the car (−Z).
+   */
+  groundAxes(): { fx: number; fz: number; rx: number; rz: number } {
+    this.camera.getWorldDirection(this.groundFwd);
+    this.groundFwd.y = 0;
+    if (this.groundFwd.lengthSq() < 1e-8) this.groundFwd.set(-1, 0, 0);
+    else this.groundFwd.normalize();
+    const fx = this.groundFwd.x;
+    const fz = this.groundFwd.z;
+    return { fx, fz, rx: -fz, rz: fx };
   }
 
   /** Critically-damped follow: from +X looking at the left door wall (−X). */

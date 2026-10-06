@@ -956,8 +956,15 @@ button {
   opacity: 0;
   transition: opacity 0.12s ease;
 }
+.joy.idle,
 .joy.on {
   opacity: 1;
+}
+.joy.idle::before,
+.joy.on::before {
+  border: 3px solid rgba(255, 255, 255, 0.92);
+  background: radial-gradient(circle, rgba(12, 18, 28, 0.28), rgba(12, 18, 28, 0.55));
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.4);
 }
 .joy::before {
   content: '';

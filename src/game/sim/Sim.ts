@@ -204,14 +204,14 @@ export class Sim {
 
   /**
    * If the player is pressed against / pushing into a closed door bay, return its Z.
-   * Used for toast + red-light flash feedback.
+   * `worldX` is stick world +X (negative = toward the −X doors), not the raw screen axis.
    */
-  closedBayPush(intentX: number, mag: number): number | null {
+  closedBayPush(worldX: number, mag: number): number | null {
     const wall = doorWallX();
     const b = this.player.body;
     const C = TUNING.car;
     const nearWall = b.x <= wall + TUNING.player.radius + 0.4;
-    const shovingIn = mag > 0.18 && intentX < -0.2;
+    const shovingIn = mag > 0.18 && worldX < -0.2;
     if (!nearWall) return null;
     if (!shovingIn && !(this.player.pushing && b.pressure > 0.01)) return null;
     const open = new Set(this.openBays);
