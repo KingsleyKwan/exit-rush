@@ -1,3 +1,17 @@
+# Grok Build kickoff prompt
+
+> **Updated for v0.8.1:** the single paste-in prompt is now **[`docs/HANDOFF.md`](./HANDOFF.md)**.
+> On your MacBook: clone/pull the repo, run Grok Build in the repo root, then paste:
+>
+> ```text
+> Read docs/HANDOFF.md end-to-end and execute it in priority order (sections 1→6).
+> Do not push unless I explicitly say so. Review screenshots before calling anything done.
+> ```
+>
+> The Phase 1 Capacitor prompt below is **archived** (still useful detail) but do **not** start from it alone — HANDOFF includes Gear L, IAP, submission, and current architecture.
+
+---
+
 # Grok Build kickoff prompt: iOS App Store, Phase 1
 
 > **俾 Kingsley 嘅用法（廣東話）：**

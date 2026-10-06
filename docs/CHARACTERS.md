@@ -41,8 +41,8 @@ Legend: 🤖 = box agent can do it · 🛠️ = Kingsley's local Grok Build (Cap
 
 | Rule | Value | Notes |
 |---|---|---|
-| Level unlocks | **Shared** across characters | Buying a character never forces a replay of 100 levels |
-| SP / coins source | Derived from the shared `cleared` list | A new character starts with the progress you already have (retro grant) |
+| Level unlocks | **Separate per character** (D12, v0.8.1) | A newly selected character starts at L1 |
+| SP / coins source | Derived from **that character's** first clears | Mage/Tech SP/coins never borrow Hero clears |
 | Per-character "cleared with" marks | Cosmetic badge per level (主角 / 魔 / 機 icons on the level card) | Optional completionist goal, no power reward |
 | Skill/gear changes | Apply on next run (same as today) | Changed from the pause overlay or level-select |
 | Ultimate cooldown | 10 s for all three (🎛️) | Same as the Hero today (`TUNING.ult.cooldown`) |
@@ -476,7 +476,7 @@ export const CHARACTERS: Record<CharacterId, CharacterDef>;
 - `TreeDef` generalises `SkillTree.ts`: `{ branches: [{id, colour, fill: FillCoeffs}], nodes: SkillNodeDef[], ults: UltDef[] }`. The Hero's existing data becomes `HERO_TREE` **without changing ids** (`str_t1` …), so saves and tests stay valid.
 - `modsFor(char: CharacterDef, save: SaveData): PlayerMods` is a pure function, replacing direct `modifiersFromSkills()` calls. `PlayerMods = SkillModifiers & { mass0, manaMax, manaRegen, spellPower, cdr, abilities: AbilitySlot[], passives: PassiveFlags }`. For the Hero it must return values **bit-identical** to today's `modifiersFromSkills()` (golden test).
 
-### 7.2 Save format · 存檔 (recommendation: shared level progress, separate character progression)
+### 7.2 Save format · 存檔 (v0.8.1: **separate** level progress per character)
 
 Keep `version: 1` and the key `exit-rush-v1`. **Add** fields with defaults in `defaultSave()` + `normalizeSave()` (AGENTS.md save rules):
 
@@ -499,12 +499,11 @@ trialsPlayed: Record<CharacterId, number>;
 
 The Hero's `skills` / `loadouts` / `activeLoadout` stay **untouched** (no rename, no migration risk).
 
-**Why shared level progress + separate points/coins:**
-1. A buyer at L45 can play the Mage right away with 44 SP. Forcing a replay of 44 levels would feel like a paywall on their own progress.
-2. The SP/coin totals derive from the same `cleared` list, so the power budget is identical across characters by construction (Pillar 2).
+**Why separate level progress (D12, decided v0.8.1):**
+1. Each character is its own journey — switching to Mage starts at L1 with Mage-only SP.
+2. Existing saves: all pre-0.8.1 clears belong to Hero; Mage spell spend is kept only if backed by Mage clears (else refund + one-time notice).
 3. Separate allocations mean switching characters never wipes a build. Free respec already exists per character.
-4. Derived (not stored) totals make migrations and future retunes safe (same pattern as `reconcileSlot`).
-5. "Cleared with" marks still give completionists a reason to replay with each character, without gating anything.
+4. "Cleared with" marks stay cosmetic for completionists.
 
 Native: the save moves to Capacitor Preferences per APP_STORE.md §B11. Purchases are **not** stored only in the save: StoreKit/RevenueCat is re-queried on launch and on Restore. The cache allows offline play, and a refund/revoke re-locks the character but keeps its progress data.
 
@@ -714,6 +713,7 @@ Branching: work on feature branches with PRs (`feat/v0.8-characters-*`), never d
 | D9 | Tech name | Keep **「裝備L」 / Gear L** as is |
 | D10 | Mage EN name | **Bad Girl** (an English name, not a romanisation of 凱婷) |
 | D11 | Tech item tier labels | **平 / 中價 / 名貴** (EN: **Cheap / Mid / Luxury**). Replaces earlier 細/中/傳說 (S/M/LG). Code still uses numeric tiers 1/2/3; player-facing copy uses the new labels |
+| D12 | Level progress | **Separate per character** (replaces shared progress). Unlocks, best clears, boss cutscenes, and SP/coins derive from that character's own first clears |
 
 **Assumed per recommendation unless Kingsley objects:**
 
