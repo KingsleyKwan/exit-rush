@@ -131,3 +131,7 @@ Bot clear rates (`COUNTERS=0 RUNS=60`, earned loadout; v0.6.2 → v0.6.3). The b
 L100 (`RUNS=120`): pts20 3% → 3%, ult-str 6% → 12%, ult-spd 47% → 51% (same 200 seeds: 51% on v0.6.2 vs 53%), ult-sta 8% → 11%. L27–30 were already under band in v0.6.2 and stay there; this release doesn't make them harder.
 
 First pass (zone r 1.6 m, weight 4, boarders allowed) dropped L26 to 2%: about 10 loudmouths blanketed a car only ~4 m wide, and boarding loudmouths parked their zone on the door. Fixed with rider-only loudmouths, ~3 per intro car, r 1.3 m, a steep falloff (8% at the rim) and no stacking. Intro L26 then guarantees ≥2 loudmouths (normal riders >1.6 m from the start are swapped in), which cost ~20 pts of clear rate at 17 s, so the L26 timer went 17 → 19 s (earned 38% → 68%).
+
+
+## v0.8 characters
+Run `CHARS=hero,mage RUNS=40 npm run test:sim` for parity. Target: each band within ±10 pp of the hero (`docs/CHARACTERS.md` §1). Mage uses the same SP economy; Gear L coins/grid land in a later pass.

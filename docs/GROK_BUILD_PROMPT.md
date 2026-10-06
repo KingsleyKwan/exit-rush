@@ -100,3 +100,16 @@ REPORT BACK WITH:
 | Native / App Store | **Not started.** No Capacitor, no `ios/` (and `.gitignore` currently ignores `ios/`). No Apple Developer account yet (owner) |
 | Monetisation | None. Plan in `docs/APP_STORE.md` §E (recommend v1 without ads) |
 | Known issues | Bot balance in band for L6–99; L100 ult-str 26 % (band 30–50 %). Not yet human-playtested past L30. **iPhone performance not yet profiled in WKWebView**: DPR 3 devices render at pixelRatio 2 on high, PCF 1024² shadows. `haptics.ts` is a no-op on iOS (needs the native plugin). `scripts/capture-*.mjs` hard-code `/workspace/...` paths and need Playwright, which isn't a dependency |
+
+
+---
+
+## v0.8.0 — Characters / IAP hooks (for local Grok Build)
+
+- Build flag: `VITE_PLATFORM=ios` (Capacitor). Default `web` unlocks all characters with no IAP UI.
+- Fail-closed: `IS_STORE_BUILD` is true on any native shell even if a web bundle loads.
+- Hook points (stubs today — replace with RevenueCat / StoreKit 2):
+  - `src/game/entitlements.ts` → `buy()`, `restore()`, `products()` (localized prices)
+  - Product ids: `exitrush.char.mage`, `exitrush.char.tech`, `exitrush.pack.chars`, `exitrush.noads`
+  - Character select Buy / Restore buttons only render when `entitlements().showStoreUi` (iOS)
+- Do **not** ship the unlocked web demo path inside the App Store binary.
