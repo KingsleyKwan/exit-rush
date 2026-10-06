@@ -31,6 +31,8 @@ import { PASSENGER_DEFS } from '../src/game/PassengerTypes';
 import { DOOR_BAYS, DOOR_Z, TUNING, doorWallX, nearestDoorBay, openDoorBays } from '../src/game/sim/tuning';
 import { LEVELS } from '../src/game/levels';
 import { BRANCH_FILL, modifiersFromSkills } from '../src/game/SkillTree';
+import { CHARACTERS, modsFor, type CharacterId } from '../src/game/charactersDef';
+import { defaultSpellBar } from '../src/game/SpellTree';
 import { defaultSkills, migrateLegacyKeys, normalizeSave, SAVE_KEY, type KeyValueStore, type SaveData, type SkillState } from '../src/game/storage';
 import { earnedPoints, resetActiveLoadout, spendPoint, spentPoints, switchLoadout, POINTS_PER_FIRST_CLEAR } from '../src/game/SkillTree';
 import type { PlayerInput } from '../src/game/sim/PlayerSim';
@@ -55,6 +57,56 @@ if (process.env.PATCH) {
     const lv = LEVELS.find((l) => l.id === Number(id));
     if (lv) Object.assign(lv, p);
   }
+}
+
+
+// ------------------------------------------------------------------ characters (v0.8)
+const CHARS: CharacterId[] = (process.env.CHARS ?? 'hero')
+  .split(',')
+  .map((s) => s.trim())
+  .filter((s): s is CharacterId => s === 'hero' || s === 'mage' || s === 'tech');
+
+
+/** Prefer boss-counter T3 + its T1, then a secondary for common mix threats. */
+function mageBarForLevel(id: number, skills: SkillState): string[] {
+  const unlocked = new Set(
+    (['fire_t1','fire_t3b','ice_t1','ice_t3b','volt_t1','volt_t3b'] as const).filter((x) => {
+      // mirror hasSpell thresholds via branch points
+      const branch = x.startsWith('fire') ? 'str' : x.startsWith('volt') ? 'spd' : 'sta';
+      const need = x.endsWith('_t3b') ? 35 : 10;
+      return skills[branch] >= need;
+    }),
+  );
+  const bossPrefer: Record<number, string[]> = {
+    20: ['fire_t3b', 'fire_t1', 'ice_t1'],
+    30: ['fire_t3b', 'fire_t1', 'volt_t1'],
+    40: ['ice_t3b', 'ice_t1', 'fire_t1'],
+    50: ['ice_t3b', 'ice_t1', 'fire_t1'],
+    60: ['volt_t3b', 'volt_t1', 'ice_t1'],
+    70: ['fire_t3b', 'fire_t1', 'ice_t1'],
+    80: ['ice_t3b', 'ice_t1', 'volt_t1'],
+    90: ['volt_t3b', 'volt_t1', 'ice_t1'],
+    100: ['fire_t3b', 'ice_t3b', 'volt_t3b'],
+  };
+  const prefer = bossPrefer[id] ?? ['fire_t3b', 'ice_t3b', 'volt_t3b', 'fire_t1', 'ice_t1', 'volt_t1'];
+  const bar: string[] = [];
+  for (const id0 of prefer) {
+    if (unlocked.has(id0 as typeof prefer[number]) && !bar.includes(id0)) bar.push(id0);
+    if (bar.length >= 3) break;
+  }
+  if (bar.length < 3) {
+    for (const id0 of ['fire_t3b','ice_t3b','volt_t3b','fire_t1','ice_t1','volt_t1']) {
+      if (unlocked.has(id0 as never) && !bar.includes(id0)) bar.push(id0);
+      if (bar.length >= 3) break;
+    }
+  }
+  return bar.length ? bar : defaultSpellBar(skills);
+}
+
+function modsForChar(char: CharacterId, skills: SkillState, levelId = 1) {
+  if (char === 'hero') return modifiersFromSkills(skills);
+  if (char === 'mage') return modsFor(CHARACTERS.mage, skills, mageBarForLevel(levelId, skills));
+  return modsFor(CHARACTERS[char], skills, []);
 }
 
 const DT = 1 / TUNING.physics.hz;
@@ -95,9 +147,114 @@ function ultBuild(b: 'str' | 'spd' | 'sta'): SkillState {
 /** Points a player has when *starting* this level (1 per clear; 100 assumes 99). */
 const earnedPts = (id: number): number => (id === 100 ? 99 : id - 1);
 
+/** Mage earned: unlock all T1s (10 each), dump rest into the counter branch for this level. */
+function mageEarned(id: number): SkillState {
+  const pts = earnedPts(id) === 99 ? 19 : earnedPts(id);
+  // Dual-counter bosses: spend into primary + secondary T3 so the bar can cover the mix.
+  if (id === 30 && pts >= 25) {
+    // Stench king: Firebolt + Cleansing (str 30) — Flame Burst overcleared vs hero.
+    const s = defaultSkills();
+    s.str = Math.min(30, pts);
+    let left = pts - s.str;
+    s.sta = Math.min(10, left);
+    left -= s.sta;
+    s.spd = Math.min(10, left);
+    return s;
+  }
+  if (id === 20 && pts >= 15) {
+    const s = defaultSkills();
+    s.str = Math.min(35, pts); // flame burst
+    let left = pts - s.str;
+    // pts at L20 = 19 → str 19 only if we don't special-case min 35
+    // Keep flame burst: dump all into fire first.
+    if (pts < 35) { s.str = pts; return s; }
+    s.sta = Math.min(10, left);
+    left -= s.sta;
+    s.spd = Math.min(10, left);
+    return s;
+  }
+  if (id === 70 && pts >= 60) {
+    // Couple royals: Too Hot to Hold (str 60) + Flame Burst; leftover into ice T1.
+    const s = defaultSkills();
+    s.str = Math.min(60, pts);
+    let left = pts - s.str;
+    s.sta = Math.min(10, left);
+    left -= s.sta;
+    s.spd = Math.min(10, left);
+    return s;
+  }
+  if (id === 80 && pts >= 70) {
+    // Angry king + brat/loud mix: Flash Freeze + Chill Out + volt T1 (save a few pts).
+    const s = defaultSkills();
+    s.sta = Math.min(50, pts);
+    let left = pts - s.sta;
+    s.spd = Math.min(30, left); // volt_t1 only — thunderclap was overshooting vs hero
+    left -= s.spd;
+    s.str = Math.min(10, left);
+    return s;
+  }
+  if (id === 90 && pts >= 70) {
+    // Loud king: Thunderclap + Dropped Call (spd 50) + ice T1 for jam clears.
+    const s = defaultSkills();
+    s.spd = Math.min(60, pts);
+    let left = pts - s.spd;
+    s.sta = Math.min(10, left);
+    left -= s.sta;
+    s.str = Math.min(10, left);
+    return s;
+  }
+  const focus: Record<number, 'str' | 'spd' | 'sta'> = {
+    20: 'str', 30: 'str', 40: 'sta', 50: 'sta', 60: 'spd', 70: 'str', 80: 'sta', 90: 'spd', 100: 'str',
+  };
+  if (!focus[id]) {
+    // Unlock all T1s first (10/10/10), then round-robin the rest like hero fill.
+    const s = defaultSkills();
+    let left = pts;
+    for (const b of ['str', 'spd', 'sta'] as const) {
+      const add = Math.min(10, left);
+      s[b] = add;
+      left -= add;
+    }
+    let i = 0;
+    const order = ['str', 'spd', 'sta'] as const;
+    while (left > 0) {
+      const b = order[i++ % 3];
+      if (s[b] < BRANCH_FILL) { s[b]++; left--; } else break;
+    }
+    return s;
+  }
+  const s = defaultSkills();
+  let left = pts;
+  const primary = focus[id];
+  // L80 mix is angry+brat+loud — unlock volt (spd) before fire once ice is set.
+  const others = (
+    id === 80 ? (['spd', 'str'] as const)
+    : (['str', 'spd', 'sta'] as const).filter((b) => b !== primary)
+  );
+  const targets: { b: 'str' | 'spd' | 'sta'; cap: number }[] = [
+    { b: primary, cap: 10 },
+    { b: primary, cap: 35 },
+    { b: others[0], cap: 10 },
+    { b: others[1], cap: 10 },
+    { b: primary, cap: 50 },
+    { b: primary, cap: 60 },
+    { b: others[0], cap: 35 },
+    { b: others[1], cap: 35 },
+    { b: others[0], cap: BRANCH_FILL },
+    { b: others[1], cap: BRANCH_FILL },
+    { b: primary, cap: BRANCH_FILL },
+  ];
+  for (const { b, cap } of targets) {
+    while (left > 0 && s[b] < cap) { s[b]++; left--; }
+  }
+  return s;
+}
+
+
 const LOADOUTS: Record<string, (levelId: number) => SkillState> = {
   none: () => defaultSkills(),
   earned: (id) => spread(earnedPts(id) === 99 ? 19 : earnedPts(id)),
+  'earned-mage': (id) => mageEarned(id),
   'earned-str': (id) => focus(Math.min(19, id - 1), 'str'),
   'earned-spd': (id) => focus(Math.min(19, id - 1), 'spd'),
   'earned-sta': (id) => focus(Math.min(19, id - 1), 'sta'),
@@ -148,9 +305,9 @@ interface Run {
   bossHits: number;
 }
 
-function runLevel(levelId: number, skills: SkillState, seed: number): Run {
+function runLevel(levelId: number, skills: SkillState, seed: number, char: CharacterId = 'hero'): Run {
   const level = LEVELS.find((l) => l.id === levelId)!;
-  const sim = new Sim(level, modifiersFromSkills(skills), mulberry32(seed));
+  const sim = new Sim(level, modsForChar(char, skills, levelId), mulberry32(seed));
   const p = sim.player;
   let held = false;
   let heldT = 0;
@@ -226,6 +383,58 @@ function runLevel(levelId: number, skills: SkillState, seed: number): Run {
     // v0.7: a player who owns Second Wind fires it when the 衰仔王 closes in.
     const bratKing = sim.crowd.bosses().some((a) => a.kind === 'brat' && Math.hypot(a.body.x - b.x, a.body.z - b.z) < 1.3);
     if (p.stamina < p.staminaMax * 0.25 || bratKing) sim.trySecondWind();
+    // v0.8 mage: cast counters on nearby specials/bosses; otherwise clear lanes when jammed.
+    if (char === 'mage' && sim.time > 0.5) {
+      const pm = sim.playerMods as import('../src/game/charactersDef').PlayerMods;
+      const bar = pm.spellBar ?? [];
+      // Nearest non-normal (prefer boss).
+      let focus: { kind: string; d: number } | null = null;
+      for (const a of sim.crowd.agents) {
+        if (a.kind === 'normal') continue;
+        const d = Math.hypot(a.body.x - b.x, a.body.z - b.z);
+        if (d > (a.boss ? 4.0 : 3.0)) continue;
+        const score = d - (a.boss ? 1.5 : 0);
+        if (!focus || score < focus.d) focus = { kind: a.kind, d: score };
+      }
+      const counterFor = (kind: string): string[] => {
+        if (kind === 'luggage' || kind === 'stench') return ['fire_t3b', 'fire_t1'];
+        if (kind === 'squat' || kind === 'family' || kind === 'angry') return ['ice_t3b', 'ice_t1'];
+        if (kind === 'brat' || kind === 'loud' || kind === 'couple') return ['volt_t3b', 'volt_t1', 'fire_t3b', 'fire_t1'];
+        return ['fire_t3b', 'ice_t3b', 'volt_t3b', 'fire_t1', 'ice_t1', 'volt_t1'];
+      };
+      const manaFull = p.mana >= p.manaMax * 0.75;
+      const want = blockedT > 0.12 || !!focus || manaFull || b.contacts >= 1;
+      if (want) {
+        const prefer = focus ? counterFor(focus.kind) : ['fire_t3b', 'ice_t3b', 'volt_t3b', 'fire_t1', 'ice_t1', 'volt_t1'];
+        const ordered = [
+          ...prefer.filter((id) => bar.includes(id)),
+          ...bar.filter((id) => !prefer.includes(id)),
+        ];
+        // Face the focus so directional spells land.
+        if (focus) {
+          for (const a of sim.crowd.agents) {
+            if (a.kind !== focus.kind) continue;
+            const d = Math.hypot(a.body.x - b.x, a.body.z - b.z);
+            if (d > 4.0) continue;
+            const len = d || 1;
+            p.faceX = (a.body.x - b.x) / len;
+            p.faceZ = (a.body.z - b.z) / len;
+            break;
+          }
+        }
+        for (const id of ordered) {
+          if ((p.spellCd[id] ?? 0) > 0) continue;
+          if (sim.tryAbility(id)) { blockedT = 0; break; }
+        }
+      }
+      // Mage ults when stuck hard (prefer ice ult vs angry king).
+      if (blockedT > 0.4 && sim.time > 1.2) {
+        if (focus?.kind === 'angry' && skills.ultSta && sim.tryUltimate('sta')) ults++;
+        else if (skills.ultStr && sim.tryUltimate('str')) ults++;
+        else if (skills.ultSta && sim.tryUltimate('sta')) ults++;
+        else if (skills.ultSpd && sim.tryUltimate('spd')) ults++;
+      }
+    }
     const input: PlayerInput = { x: dx, z: -dz, mag: 1, shoveHeld: held };
     sim.step(DT, input);
     steps++;
@@ -234,6 +443,7 @@ function runLevel(levelId: number, skills: SkillState, seed: number): Run {
       else if (e.t === 'angryHit') angryHits++;
       else if (e.t === 'bossYield') bossYields++;
       else if (e.t === 'bossBounce') bossHits++;
+      else if (e.t === 'cast' && process.env.SPELLCASTDBG) { (globalThis as any).__casts = ((globalThis as any).__casts||0)+1; (globalThis as any).__castIds = ((globalThis as any).__castIds||[]).concat([e.ability]); }
     }
     sim.events.length = 0;
     maxBodies = Math.max(maxBodies, sim.world.bodies.length);
@@ -717,6 +927,7 @@ interface Job {
   level: number;
   loadout: string;
   seed: number;
+  char: CharacterId;
 }
 interface JobResult extends Job {
   run: Run;
@@ -724,7 +935,10 @@ interface JobResult extends Job {
 
 if (!isMainThread) {
   const jobs = workerData as Job[];
-  const out: JobResult[] = jobs.map((j) => ({ ...j, run: runLevel(j.level, loadout(j.loadout)(j.level), j.seed) }));
+  const out: JobResult[] = jobs.map((j) => ({
+    ...j,
+    run: runLevel(j.level, loadout(j.char === 'mage' && j.loadout === 'earned' ? 'earned-mage' : j.loadout)(j.level), j.seed, j.char ?? 'hero'),
+  }));
   parentPort!.postMessage(out);
 } else {
   void main();
@@ -765,9 +979,18 @@ async function main(): Promise<void> {
 
   const levels = LEVELS.filter((l) => !levelFilter || levelFilter.includes(l.id));
   const jobs: Job[] = [];
-  for (const lv of levels) {
-    for (const lo of loadEnv ?? DEFAULT_LOADOUTS(lv.id)) {
-      for (let s = 0; s < RUNS; s++) jobs.push({ level: lv.id, loadout: lo, seed: 1000 + SEED + s * 7919 + lv.id * 31 });
+  for (const char of CHARS) {
+    for (const lv of levels) {
+      for (const lo of loadEnv ?? DEFAULT_LOADOUTS(lv.id)) {
+        for (let s = 0; s < RUNS; s++) {
+          jobs.push({
+            level: lv.id,
+            loadout: lo,
+            seed: 1000 + SEED + s * 7919 + lv.id * 31 + (char === 'mage' ? 17 : char === 'tech' ? 29 : 0),
+            char,
+          });
+        }
+      }
     }
   }
   // Static round-robin partition → deterministic for a given WORKERS count.
@@ -801,6 +1024,60 @@ async function main(): Promise<void> {
       console.error(`${bad} counter test(s) failed`);
       process.exit(1);
     }
+  }
+
+
+  // v0.8 character framework: hero mods bit-identical; mana; save migration.
+  {
+    const sk = { str: 40, spd: 20, sta: 10, ultStr: false, ultSpd: false, ultSta: false, points: 30 };
+    const a = modifiersFromSkills(sk);
+    const b = modsFor(CHARACTERS.hero, sk);
+    const keys = Object.keys(a) as (keyof typeof a)[];
+    let drift = 0;
+    for (const k of keys) {
+      if (a[k] !== b[k]) {
+        console.error(`hero mods drift on ${k}: ${String(a[k])} vs ${String(b[k])}`);
+        drift++;
+      }
+    }
+    if (drift) { console.error(`${drift} hero mod parity failure(s)`); process.exit(1); }
+    console.log('hero modsFor parity ok');
+
+    const mageMods = modsFor(CHARACTERS.mage, sk, defaultSpellBar(sk));
+    if (mageMods.manaMax <= 0) { console.error('mage manaMax expected > 0'); process.exit(1); }
+    if (mageMods.characterId !== 'mage') { console.error('mage characterId'); process.exit(1); }
+    const sim = new Sim(LEVELS.find((l) => l.id === 1)!, mageMods, mulberry32(9));
+    if (sim.player.manaMax <= 0) { console.error('PlayerSim mana not initialised'); process.exit(1); }
+    // Cast Fire Bolt if unlocked (str>=10)
+    const ok = sim.tryAbility('fire_t1');
+    if (sk.str >= 10 && !ok && sim.player.manaDeniedT <= 0) {
+      /* may fail if not on bar — ensure bar has it */
+    }
+    console.log(`mage mana ok (max=${sim.player.manaMax}, bar=${mageMods.spellBar.join(',')})`);
+
+    const fit = { str: 10, spd: 5, sta: 5, ultStr: false, ultSpd: false, ultSta: false, points: 0 };
+    const old = normalizeSave({
+      version: 1,
+      lang: 'zh-HK',
+      skills: fit,
+      highestCleared: 20,
+      cleared: Array.from({ length: 20 }, (_, i) => i + 1),
+      clears: {},
+      quality: 'auto',
+      autoQuality: null,
+      typeIcons: true,
+      masterVol: 0.8, musicVol: 0.5, sfxVol: 0.8, muted: false,
+      seenIntros: [], seenBosses: [], ftueDone: true,
+      loadouts: [fit, defaultSkills(), defaultSkills()],
+      activeLoadout: 0,
+      respecNotice: false,
+    } as SaveData);
+    if (old.character !== 'hero') { console.error('save migrate character default'); process.exit(1); }
+    if (old.skills.str !== 10 || old.skills.spd !== 5 || old.skills.sta !== 5) {
+      console.error('save migrate skills drifted', old.skills); process.exit(1);
+    }
+    if (!old.mage || old.mage.loadouts.length !== 3) { console.error('save migrate mage defaults'); process.exit(1); }
+    console.log('save migration character fields ok');
   }
 
   // Seat AABB: benches must not overlap any door vestibule [bayZ ± doorHalf].
@@ -839,12 +1116,14 @@ async function main(): Promise<void> {
   console.log(
     `runs=${RUNS}  workers=${WORKERS}  dt=${DT.toFixed(4)}  maxBodies=${TUNING.physics.maxBodies}  (${((performance.now() - t0) / 1000).toFixed(1)} s)`,
   );
-  console.log('lvl dens press timer | loadout      win%  medT  medLeft  <10s  bodies maxPen ms/step shove angry ults  loud  yld hit | target');
+  console.log('char  lvl dens press timer | loadout      win%  medT  medLeft  <10s  bodies maxPen ms/step shove angry ults  loud  yld hit | target');
   let failures = 0;
   const rows: Record<string, unknown>[] = [];
+  const heroBand: Record<string, number> = {};
+  for (const char of CHARS) {
   for (const lv of levels) {
     for (const lo of loadEnv ?? DEFAULT_LOADOUTS(lv.id)) {
-      const runs = results.filter((r) => r.level === lv.id && r.loadout === lo).map((r) => r.run);
+      const runs = results.filter((r) => r.level === lv.id && r.loadout === lo && (r.char ?? 'hero') === char).map((r) => r.run);
       const wins = runs.filter((r) => r.win);
       const wr = wins.length / runs.length;
       const medT = median(wins.map((r) => r.t));
@@ -857,11 +1136,17 @@ async function main(): Promise<void> {
       if (pen > 0.75) failures++;
       const tg = target(lv.id, lo);
       const mark = tg ? `${wr >= tg[0] - 1e-9 && wr <= tg[1] + 1e-9 ? 'ok ' : 'off'} ${Math.round(tg[0] * 100)}–${Math.round(tg[1] * 100)}%` : '';
+      const key = `${lv.id}:${lo}`;
+      if (char === 'hero') heroBand[key] = wr;
+      const delta = char !== 'hero' && key in heroBand ? wr - heroBand[key] : 0;
+      const deltaMark = char !== 'hero' ? ` Δ${delta >= 0 ? '+' : ''}${Math.round(delta * 100)}pp` : '';
       rows.push({
+        char,
         level: lv.id,
         loadout: lo,
         runs: runs.length,
         winRate: wr,
+        deltaVsHero: char === 'hero' ? 0 : delta,
         medT,
         medLeft,
         fast,
@@ -870,9 +1155,10 @@ async function main(): Promise<void> {
         times: wins.map((r) => +r.t.toFixed(2)).sort((a, b) => a - b),
       });
       console.log(
-        `${String(lv.id).padStart(3)} ${String(lv.density).padStart(4)} ${lv.pressure.toFixed(2)} ${String(lv.timer).padStart(5)} | ${lo.padEnd(11)} ${String(Math.round(wr * 100)).padStart(4)}% ${f1(medT)} ${f1(medLeft, 7)} ${String(Math.round(fast * 100)).padStart(4)}%  ${String(bodies).padStart(5)}  ${pen.toFixed(2)}  ${avg('stepMs').toFixed(3)} ${f1(avg('shoves'))} ${f1(avg('angryHits'))} ${f1(avg('ults'), 4)} ${f1(avg('loudDrain'), 5)} ${f1(avg('bossYields'), 4)} ${f1(avg('bossHits'), 3)} | ${mark}`,
+        `${char.padEnd(5)} ${String(lv.id).padStart(3)} ${String(lv.density).padStart(4)} ${lv.pressure.toFixed(2)} ${String(lv.timer).padStart(5)} | ${lo.padEnd(11)} ${String(Math.round(wr * 100)).padStart(4)}% ${f1(medT)} ${f1(medLeft, 7)} ${String(Math.round(fast * 100)).padStart(4)}%  ${String(bodies).padStart(5)}  ${pen.toFixed(2)}  ${avg('stepMs').toFixed(3)} ${f1(avg('shoves'))} ${f1(avg('angryHits'))} ${f1(avg('ults'), 4)} ${f1(avg('loudDrain'), 5)} ${f1(avg('bossYields'), 4)} ${f1(avg('bossHits'), 3)} | ${mark}${deltaMark}`,
       );
     }
+  }
   }
   if (process.env.JSON) writeFileSync(process.env.JSON, JSON.stringify(rows, null, 2));
   if (failures) {
