@@ -8,6 +8,38 @@ import { startNativeShell, syncKeepAwake } from './native/shell';
 
 void loadGameFonts();
 
+/** Browser zoom (double-tap, trackpad pinch, Ctrl/Cmd +/-) clips the fixed UI. */
+function lockPageZoom(): void {
+  const block = (e: Event) => e.preventDefault();
+  for (const type of ['gesturestart', 'gesturechange', 'gestureend']) {
+    document.addEventListener(type, block, { passive: false });
+  }
+  window.addEventListener(
+    'wheel',
+    (e) => {
+      if (e.ctrlKey) e.preventDefault();
+    },
+    { passive: false },
+  );
+  window.addEventListener('keydown', (e) => {
+    if (!(e.ctrlKey || e.metaKey)) return;
+    if (e.key === '+' || e.key === '-' || e.key === '=' || e.key === '_' || e.key === '0') e.preventDefault();
+  });
+  let lastTap = 0;
+  document.addEventListener(
+    'touchend',
+    (e) => {
+      const now = Date.now();
+      if (now - lastTap < 300) e.preventDefault();
+      lastTap = now;
+    },
+    { passive: false },
+  );
+  document.addEventListener('dblclick', block);
+}
+
+lockPageZoom();
+
 const canvas = document.getElementById('game-canvas') as HTMLCanvasElement;
 const uiRoot = document.getElementById('ui-root') as HTMLElement;
 

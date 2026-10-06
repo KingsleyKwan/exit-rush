@@ -153,6 +153,13 @@
 .b-str .cst-node.on .cst-dot { background: linear-gradient(180deg, #ff8a3d, #d84315); color: #fff; --ico-ink: #7a2a08; }
 .b-spd .cst-node.on .cst-dot { background: linear-gradient(180deg, #4fd2f0, #0288d1); color: #fff; }
 .b-sta .cst-node.on .cst-dot { background: linear-gradient(180deg, #66bb6a, #2e7d32); color: #fff; --ico-ink: #1b5e20; }
+/* Mage: ice is the stamina arm, thunder is the speed arm. Hero colours stay above. */
+.constellation.mage .b-spd.cst-arm { border-color: rgba(251, 192, 45, 0.7); background: rgba(251, 192, 45, 0.12); }
+.constellation.mage .b-sta.cst-arm { border-color: rgba(30, 136, 229, 0.6); background: rgba(30, 136, 229, 0.12); }
+.constellation.mage .b-spd .cst-arm-line { background: linear-gradient(to bottom, #fbc02d, transparent); }
+.constellation.mage .b-sta .cst-arm-line { background: linear-gradient(to bottom, #42a5f5, transparent); }
+.constellation.mage .b-spd .cst-node.on .cst-dot { background: linear-gradient(180deg, #ffee58, #fbc02d); color: #1a1200; --ico-ink: #5d4037; }
+.constellation.mage .b-sta .cst-node.on .cst-dot { background: linear-gradient(180deg, #42a5f5, #1565c0); color: #fff; --ico-ink: #0d47a1; }
 /* v0.6.2 Tier 3 counter badge: passenger-type icon on the node's corner */
 .cst-dot { position: relative; }
 .cst-ctr {

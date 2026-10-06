@@ -40,12 +40,14 @@ body {
   position: relative;
   width: 100%;
   height: 100%;
+  touch-action: none;
 }
 
 #game-canvas {
   display: block;
   width: 100%;
   height: 100%;
+  touch-action: none;
 }
 
 #ui-root,
@@ -1830,9 +1832,8 @@ button {
   background: linear-gradient(180deg, #ffe082, #ff8f00);
   color: #3e2723;
 }
-.constellation.mage .arm-str { --arm: #e53935; }
-.constellation.mage .arm-spd { --arm: #fbc02d; }
-.constellation.mage .arm-sta { --arm: #1e88e5; }
+.constellation.mage .b-spd .skill-ico { background: linear-gradient(180deg, #ffee58, #fbc02d); color: #1a1200; --ico-ink: #5d4037; }
+.constellation.mage .b-sta .skill-ico { background: linear-gradient(180deg, #42a5f5, #1565c0); color: #fff; --ico-ink: #0d47a1; }
 /* Tip chip: top-left under meters — never overlaps action buttons on the right. */
 .tip-chip {
   left: max(10px, env(safe-area-inset-left));
