@@ -52,7 +52,7 @@ Continuous SPD fill also feeds **gapSense** (aim assist / crowd yield / drag cut
 | 30 | `sta_t2b` | Passive | Start with extra **non-regen buffer** |
 | 40 | `sta_t3a` | Passive · counters **Stench** | **忍臭 Hold Breath** — stench aura slow fully ignored |
 | 50 | `sta_t3b` | Active (HUD, 12 s cd) · counters **Brat** | **回魂 Second Wind** — +45 stamina, clears winded; knocks brats within 1.6 m away and dazes them (no darting) for 3 s |
-| 60 | `sta_t3c` | Passive · counters **Family** | **好脾氣 Unbothered** — pushing against family members costs no stamina and they add no crowd drag |
+| 60 | `sta_t3c` | Passive · counters **Family**, **Loudmouth** | **好脾氣 Unbothered** — pushing against family members costs no stamina and they add no crowd drag; 大聲公 noise-zone drain ×0.3 (−70%, v0.6.3) |
 | +10 | Ult | **鐵馬企穩** Iron Stance | Burst regen + heavy mass + light crowd calm (**replaces** 人潮預測 Crowd Sense path highlight) |
 
 ## Tier 3 = special-passenger counters (v0.6.2, approved)

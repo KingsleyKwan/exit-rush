@@ -57,3 +57,20 @@ L8 introduces **踎低 / squat** (hard shove, lateral weave). Bot win-rate on L8
 - Level densities +1 in most bands; L1–5 stay teachable (~6–7).
 - Boarding: higher `boardRate*` / `boardQueue*` / `boardBudget*`; `maxBodies` 96.
 - Benches: margin 0.06, fill 96% of between-bay segment (sim + TrainScene matched).
+
+## v0.6.3 — 大聲公 Loudmouth
+
+Bot clear rates (`COUNTERS=0 RUNS=60`, earned loadout; v0.6.2 → v0.6.3). The bot walks straight through noise zones, so it's a pessimistic read; players can route round them.
+
+| Lv | v0.6.2 | v0.6.3 | Note |
+|---:|------:|------:|------|
+| 25 | 60% | 58% | no loudmouth (noise only) |
+| 26 | 40% | **68%** | now the loudmouth intro (was Mix exam C), timer 19 s; target 55–75% |
+| 27 | 17% | 20% | + loudmouth weight 1 |
+| 28 | 28% | 32% | unchanged level |
+| 29 | 28% | 28% | + loudmouth 0.8 |
+| 30 | 12% | 13% | + loudmouth 0.8 |
+
+L100 (`RUNS=120`): pts20 3% → 3%, ult-str 6% → 12%, ult-spd 47% → 51% (same 200 seeds: 51% on v0.6.2 vs 53%), ult-sta 8% → 11%. L27–30 were already under band in v0.6.2 and stay there; this release doesn't make them harder.
+
+First pass (zone r 1.6 m, weight 4, boarders allowed) dropped L26 to 2%: about 10 loudmouths blanketed a car only ~4 m wide, and boarding loudmouths parked their zone on the door. Fixed with rider-only loudmouths, ~3 per intro car, r 1.3 m, a steep falloff (8% at the rim) and no stacking. Intro L26 then guarantees ≥2 loudmouths (normal riders >1.6 m from the start are swapped in), which cost ~20 pts of clear rate at 17 s, so the L26 timer went 17 → 19 s (earned 38% → 68%).

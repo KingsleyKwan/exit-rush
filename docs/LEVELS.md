@@ -1,4 +1,4 @@
-# Levels — stations & difficulty (v0.6.1)
+# Levels — stations & difficulty (v0.6.3)
 
 Difficulty is a composite of **density** (0–10), **pressure** (boarding), **special mix**, and **timer seconds**. v0.6 retunes for **~10–15 s** exits with a **complexity staircase**: L1–5 normals only; one special introduced every three levels from L6; mixes on L24–30; L100 finale.
 
@@ -26,8 +26,12 @@ Station names are **parody display names** (香城鐵路 fiction). Real→parody
 | 19–20 | Maan Gwok / Dun East | 萬國 / 頓東 | 14–15 | 7 | 0.5–0.55 | Reinforce couple |
 | 21 ★ | Yuen Kwok | 元國 | 15 | 6 | 0.5 | **Intro angry** |
 | 22–23 | Long Ping Flat / Sheung Yuen | 塱平 / 上圓 | 14–15 | 7 | 0.55–0.6 | Reinforce angry |
-| 24–30 | Mix exams → act boss | (reused stations) | 15–18 | 7–9 | 0.6–0.9 | Combinations |
-| **100** | **Dun Sha Mouth** | **頓沙嘴** | **24** | **10** | **1.5** | All types · fireworks |
+| 24–25 | Bastion Hill / Gu Ching | 堡壘山 / 古城 | 16–17 | 7–9 | 0.46–0.71 | Mix exams A / B |
+| 26 ★ | Koi Stream | 鯉魚涌 | 19 | 8 | 0.58 | **Intro loudmouth / 大聲公** (「講電話車廂」, ~3 loudmouths, ≥2 guaranteed away from the start spot) |
+| 27 | North Spot | 北點 | 17 | 8 | 0.66 | Boarding wall — all types + loudmouth (tip) |
+| 28 | Causeway Bay Village | 銅鑼灣村 | 20 | 7 | 0.41 | Suitcase maze |
+| 29–30 | Tin Wong / Wan Neoi | 天王 / 灣女 | 17–18 | 10 | 0.91–0.96 | Pressure spike / act boss (+ loudmouth) |
+| **100** | **Dun Sha Mouth** | **頓沙嘴** | **24** | **10** | **1.6** | All types (incl. loudmouth) · fireworks |
 
 ★ = intro card before timer. Full copy: design plan in repo review docs / `src/game/intros.ts`.
 
@@ -48,8 +52,9 @@ First clear of each playable level awards **3** skill points. Replays award **0*
 | 15 | brat |
 | 18 | couple |
 | 21 | angry |
+| **26** | **loudmouth / 大聲公** (v0.6.3) |
 
-L24 tip reinforces squat in a mix exam.
+L24 tip reinforces squat in a mix exam; L27 tip reinforces loudmouth. Loudmouths are always riders (already on board, mid-call) — never boarders, so a noise zone never parks on the exit itself. Old L26 (“Mix exam C”, angry + couple) became the loudmouth intro.
 
 ## Open door bays (v0.6.1)
 

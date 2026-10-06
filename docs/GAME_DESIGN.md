@@ -1,4 +1,4 @@
-<!-- v0.6.2: constellation skill tree (STA replaces WIS); 踎低 squat; longer between-bay benches; denser car/platform -->
+<!-- v0.6.3: 大聲公 loudmouth noise zone; v0.6.2: constellation skill tree (STA replaces WIS); 踎低 squat; longer between-bay benches; denser car/platform -->
 <!-- v0.5.1: benches between door bays only (no seats in doorways) -->
 <!-- v0.5.0: short levels, intro cards, FTUE, L100 gated behind L30 -->
 <!-- v0.4.1: side-wall sliding doors; car ends = gangway -->
@@ -57,6 +57,7 @@ Colour-coded low-poly (box body + capsule/sphere head). Behaviours differ:
 | `angry` | Angry man | 暴躁男 | Red | Periodic shove impulse on player |
 | `luggage` | Luggage | 拉行李喼 | Brown + dark case | High mass; slows push heavily |
 | `squat` | Squatter | 踎低客 | Indigo crouched | Hard to shove over; lateral weave |
+| `loud` | Loudmouth | 大聲公 | Orange, phone to ear | Noise ring drains stamina while you're inside (rider only) |
 
 Future: tourist with map, influencer filming, elderly with cane, etc.
 
@@ -75,7 +76,7 @@ See **[`SKILL_TREE.md`](SKILL_TREE.md)** for the full v0.6 constellation node ma
 |--------|-------------------|------------------------------|
 | STR | Push, front shove, charged shove, T3: Split (couple) / Ground Pound (luggage) / Stand Firm (angry) | **鐵牛撞門** — shockwave charge |
 | SPD | Speed, clear-lane, blocked-drag cut, T3: Hurdle (luggage) / Leap (squat, kids) / Thread (couple) | **閃身落車** — burst dash |
-| STA | Pool / regen / buffer, T3: Hold Breath (stench) / Second Wind (brat) / Unbothered (family) | **鐵馬企穩** — burst regen + iron stance |
+| STA | Pool / regen / buffer, T3: Hold Breath (stench) / Second Wind (brat) / Unbothered (family, loudmouth) | **鐵馬企穩** — burst regen + iron stance |
 
 Spending persisted in `localStorage`. Ultimates 10 s cooldown each.
 
@@ -107,6 +108,7 @@ All gameplay physics runs in a **pure-TypeScript sim** (`src/game/sim/`, no thre
 | couple | Two bodies on a **damped spring** ("holding hands" link reddens under tension) — push between them and they pull back together. |
 | angry | Heavy (1.6), strong drive. When you're close: 0.32 s wind-up (swell + red glow + grunt) → **knockback impulse** + short stun, barges neighbours. Shoving him makes him retaliate fast. 1 s i-frames after a hit. |
 | squat | Heavy, high damping, `hardToShove` (shove ×0.35); lateral weave drag near them.
+| loud | Normal-ish body (1.15, slow walker); **rider only** (never boards). Noise zone r 1.3 m: player stamina drain = 40/s × (0.08 + 0.92 × (1 − d/r)), zones don't stack past one centre's worth; regen ×0.5 inside. STA 60 Unbothered ×0.3. Orange floor ring + sound-wave rings + 「喂！！」 bubble; HUD stamina pulse + 「好嘈！」 chip. |
 | stench | Aura slows you (green vignette, scaled by WIS `auraResist`) and **repels other passengers** — an obvious gap you pay for in speed. |
 
 ### Ultimates
@@ -155,7 +157,7 @@ Everything lives in **`src/game/sim/tuning.ts`** (`TUNING`), grouped as `physics
 
 ## Setting (fiction)
 
-**香城鐵路 / Hong City Rail (HCR)** — parody of Hong Kong metro culture. Station/line names are playful fiction (`docs/STATIONS.md`). Not affiliated with MTR Corporation or any real railway. No real-operator logos or audio.
+**香城鐵路 / Hong City Rail (HCR)** — parody of Hong Kong metro culture. Station/line names are playful fiction (`docs/STATIONS.md`). Not affiliated with the real Hong Kong railway operator or any real railway. No real-operator logos or audio.
 
 ## Bilingual
 
@@ -203,7 +205,7 @@ All cues are **original Web Audio synthesis** — never ripped or embedded offic
 
 - Vite + TypeScript + Three.js
 - `src/game/sim/` = pure gameplay sim (fixed step, headless-testable); `src/game/*.ts` views read it
-- Persist: `localStorage` key `hk-mtr-exit-rush-v1` (never throws — in-memory fallback + toast; new fields default safely for old saves: `clears`, `quality`, `autoQuality`, `typeIcons`, `masterVol`, `musicVol`, `sfxVol`, `muted`)
+- Persist: `localStorage` key `exit-rush-v1` (v0.6.3 rename; pre-rename keys are migrated on first load and deleted; never throws — in-memory fallback + toast; new fields default safely for old saves: `clears`, `quality`, `autoQuality`, `typeIcons`, `masterVol`, `musicVol`, `sfxVol`, `muted`)
 - Graphics quality (v0.2.2): Auto / Low / High — see `src/game/quality.ts`. Low = no shadow map, no antialias, pixel ratio 1; Auto = device hints + FPS probe (cached)
 - Lifecycle (v0.2.2): `visibilitychange` / `pagehide` / `blur` auto-pause the run; AudioContext suspended while hidden
 - Future: Capacitor shell; no secrets in repo
