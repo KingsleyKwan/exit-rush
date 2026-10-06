@@ -71,6 +71,9 @@ export interface Dict {
   cancel: string;
   editSkills: string;
   respecNotice: string;
+  progressSplitNotice: string;
+  charCleared: string;
+  charProgressOf: string;
   loadoutNext: string;
   spLeft: string;
   quality: string;
@@ -228,6 +231,7 @@ export const en: Dict = {
   cancel: 'Cancel',
   editSkills: 'Edit skills',
   respecNotice: 'Skill points recalculated — please re-allocate',
+  progressSplitNotice: 'Each character now has its own level progress. Mage spell points were reset to match Mage clears.',
   loadoutNext: 'Applies from your next run',
   spLeft: '{n} pts left',
   quality: 'Graphics',
@@ -301,7 +305,9 @@ export const en: Dict = {
   charBuy: 'Buy',
   charTry: 'Try',
   charRestore: 'Restore Purchases',
-  charNote: 'Shared level progress. Web demo: all characters unlocked.',
+  charNote: 'Each character has its own level progress. Web demo: all characters unlocked.',
+  charCleared: 'Cleared',
+  charProgressOf: 'Progress for',
   charIapStub: 'IAP hooks land in the iOS build (Grok Build).',
   charTryStub: 'Trial car (L6 / L20) comes with the iOS build.',
   manaEmpty: 'Not enough mana!',
