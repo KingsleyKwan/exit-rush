@@ -1187,9 +1187,9 @@ button {
 .skill-use.ult-spd:not(.dim) { background: linear-gradient(180deg, #4fd2f0, #0288d1); }
 .skill-use.ult-wis:not(.dim),
 .skill-use.ult-sta:not(.dim),
-.skill-use.act-dash:not(.dim),
+.skill-use.act-leap:not(.dim),
 .skill-use.act-wind:not(.dim) { background: linear-gradient(180deg, #66bb6a, #2e7d32); --ico-ink: #1b5e20; }
-.skill-use.act-dash:not(.dim) { background: linear-gradient(180deg, #4fd2f0, #0288d1); }
+.skill-use.act-leap:not(.dim) { background: linear-gradient(180deg, #4fd2f0, #0288d1); --ico-ink: #0b3a5a; }
 .shove-btn .ico { width: 46px; height: 46px; --ico-ink: var(--mtr-red-dark); }
 .shove-btn { box-shadow: 0 6px 0 #5e0e18, 0 10px 22px rgba(0, 0, 0, 0.45), 0 0 0 calc(var(--charge) * 10px) rgba(255, 179, 0, 0.55); }
 .shove-btn.charging .ico { --ico-ink: #8a3d00; }
