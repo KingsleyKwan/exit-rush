@@ -48,8 +48,12 @@ export function screenBar(title: string, iconName: string, right = ''): string {
     </div>`;
 }
 
-export const pointsChip = (game: Game): string =>
-  `<span class="chip points-chip" title="${t().skillPoints}" aria-label="${t().skillPoints}: ${game.save.skills.points}">${icon('star', 'sm')}<b>${game.save.skills.points}</b></span>`;
+export const pointsChip = (game: Game): string => {
+  const pts = game.save.character === 'mage'
+    ? (game.save.mage.loadouts[game.save.mage.active]?.points ?? 0)
+    : game.save.skills.points;
+  return `<span class="chip points-chip" title="${t().skillPoints}" aria-label="${t().skillPoints}: ${pts}">${icon('star', 'sm')}<b>${pts}</b></span>`;
+};
 
 export const QUALITY_CYCLE: QualitySetting[] = ['auto', 'low', 'high'];
 
@@ -77,13 +81,20 @@ export function nextLevel(game: Game): LevelDef {
  */
 export function loadoutStrip(game: Game, opts: { edit?: boolean; reset?: boolean; cls?: string } = {}): string {
   const dict = t();
-  const slots = game.save.loadouts
+  const isMage = game.save.character === 'mage';
+  const loadouts = isMage ? game.save.mage.loadouts : game.save.loadouts;
+  const active = isMage ? game.save.mage.active : game.save.activeLoadout;
+  const live = isMage ? loadouts[active] : game.save.skills;
+  const slots = loadouts
     .map((s, i) => {
-      const on = i === game.save.activeLoadout;
-      const sk = on ? game.save.skills : s;
+      const on = i === active;
+      const sk = on ? (live ?? s) : s;
       const name = dict.loadoutN.replace('{n}', String(i + 1));
       const u = (sk.ultStr ? 1 : 0) + (sk.ultSpd ? 1 : 0) + (sk.ultSta ? 1 : 0);
-      return `<button type="button" class="lo-slot ${on ? 'on' : ''}" data-slot="${i}" aria-pressed="${on}" aria-label="${name}: ${dict.strength} ${sk.str}, ${dict.speed} ${sk.spd}, ${dict.staminaBranch} ${sk.sta}">
+      const l1 = isMage ? dict.fire : dict.strength;
+      const l2 = isMage ? dict.volt : dict.speed;
+      const l3 = isMage ? dict.ice : dict.staminaBranch;
+      return `<button type="button" class="lo-slot ${on ? 'on' : ''}" data-slot="${i}" aria-pressed="${on}" aria-label="${name}: ${l1} ${sk.str}, ${l2} ${sk.spd}, ${l3} ${sk.sta}">
         <b>${name}</b><small>${sk.str}·${sk.spd}·${sk.sta}${u ? `<i class="lo-ult">${'★'.repeat(u)}</i>` : ''}</small>
       </button>`;
     })

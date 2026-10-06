@@ -3,9 +3,37 @@ import type { Game } from '../game/Game';
 import { INTROS, type IntroKind } from '../game/intros';
 import { playableLevels } from '../game/levels';
 import { POINTS_PER_FIRST_CLEAR, MAX_POINTS_PER_LEVEL, modifiersFromSkills } from '../game/SkillTree';
+import { spellById } from '../game/SpellTree';
 import { linesFor, lineColor } from '../game/lines';
 import { icon, langIcon } from './icons';
 import { el, portrait, iconBtn, langBtn, qualityLabel, stationName, loadoutStrip, wireLoadoutStrip } from './uiShared';
+
+
+function mageActions(game: Game, dict: ReturnType<typeof t>): string {
+  const s = game.runSkills;
+  // One slot per element (highest-tier unlocked), then a single gold-ring ult.
+  const raw = game.runMods.spellBar ?? [];
+  const byBranch = new Map<string, string>();
+  for (const id of raw) {
+    const n = spellById(id);
+    if (!n) continue;
+    const prev = byBranch.get(n.branch);
+    if (!prev || (spellById(prev)?.at ?? 0) < n.at) byBranch.set(n.branch, id);
+  }
+  const bar = ['fire', 'ice', 'volt'].map((b) => byBranch.get(b)).filter((x): x is string => !!x).slice(0, 3);
+  const spellBtn = (id: string) => {
+    const n = spellById(id);
+    if (!n) return '';
+    const ico = n.branch === 'fire' ? 'fire' : n.branch === 'ice' ? 'ice' : 'volt';
+    const title = `${n.nameZh} / ${n.nameEn}`;
+    return `<button type="button" class="skill-use act-spell el-${n.branch}" data-spell="${id}" title="${title}" aria-label="${title}">${icon(ico)}</button>`;
+  };
+  const ults: string[] = [];
+  if (s.ultStr) ults.push(`<button type="button" class="skill-use ult-str ult-mage" data-ult="str" title="${dict.fire}" aria-label="${dict.fire}">${icon('fire')}</button>`);
+  if (s.ultSpd) ults.push(`<button type="button" class="skill-use ult-spd ult-mage" data-ult="spd" title="${dict.volt}" aria-label="${dict.volt}">${icon('volt')}</button>`);
+  if (s.ultSta) ults.push(`<button type="button" class="skill-use ult-sta ult-mage" data-ult="sta" title="${dict.ice}" aria-label="${dict.ice}">${icon('ice')}</button>`);
+  return [...bar.map(spellBtn), ...ults.slice(0, 1)].join('');
+}
 
 export function renderPlayHud(game: Game): HTMLElement {
   const dict = t();
@@ -49,6 +77,10 @@ export function renderPlayHud(game: Game): HTMLElement {
               <span class="meter-icon" title="${dict.stamina}">${icon('stamina')}</span>
               <div class="meter-bar stamina"><i id="m-stam"></i></div>
             </div>
+            ${game.save.character === 'mage' ? `<div class="meter mana-meter">
+              <span class="meter-icon" title="${dict.mana}">${icon('mana')}</span>
+              <div class="meter-bar mana"><i id="m-mana"></i></div>
+            </div>` : ''}
             <div class="meter timer" id="m-timer">
               <span class="meter-icon" title="${dict.time}">${icon('timer')}</span>
               <span class="timer-val" id="m-time"></span>
@@ -56,18 +88,20 @@ export function renderPlayHud(game: Game): HTMLElement {
           </div>
         </div>
         ${doorBanner}
+        ${game.activeTip ? `<div class="tip-chip tip-under-meters" id="tip-chip">${icon(`kind_${game.activeTip}`, 'xs')}<span>${dict.tipChip}: ${getLang() === 'en' ? (INTROS[game.activeTip as IntroKind]?.tipEn ?? '') : (INTROS[game.activeTip as IntroKind]?.tipZh ?? '')}</span></div>` : ''}
       </div>
-      ${game.activeTip ? `<div class="tip-chip" id="tip-chip">${icon(`kind_${game.activeTip}`, 'xs')}<span>${dict.tipChip}: ${getLang() === 'en' ? (INTROS[game.activeTip as IntroKind]?.tipEn ?? '') : (INTROS[game.activeTip as IntroKind]?.tipZh ?? '')}</span></div>` : ''}
       <div class="drag-hint ${game.showFtueGhost ? 'ftue-ghost' : ''}" aria-hidden="true">
         ${game.showFtueGhost ? `<span class="ghost-hand"></span><span class="ghost-label">${dict.hintDrag}</span>` : icon('drag')}
       </div>
       <div class="hud-actions">
         <div class="ult-col">
+          ${game.save.character === 'mage' ? mageActions(game, dict) : `
           ${ult('str', dict.ultStr, s.ultStr)}
           ${ult('spd', dict.ultSpd, s.ultSpd)}
           ${ult('sta', dict.ultSta, s.ultSta)}
           ${mods.hasLeap ? act('leap', `${dict.skillNodeActive}: ${dict.skLeap}`, true, 'kind_squat') : ''}
           ${mods.hasSecondWind ? act('wind', `${dict.skillNodeActive}: ${dict.skSecondWind}`, true, 'sta') : ''}
+          `}
         </div>
         <button type="button" class="shove-btn" id="btn-shove" title="${dict.shove}" aria-label="${dict.shove}">${icon('shove')}</button>
       </div>
@@ -87,6 +121,13 @@ export function renderPlayHud(game: Game): HTMLElement {
       const id = (b as HTMLElement).dataset.actSkill;
       if (id === 'leap') game.tryLeap();
       if (id === 'wind') game.trySecondWind();
+    });
+  });
+  hud.querySelectorAll('[data-spell]').forEach((b) => {
+    b.addEventListener('pointerdown', (e) => {
+      e.preventDefault();
+      const id = (b as HTMLElement).dataset.spell;
+      if (id) game.tryAbility(id);
     });
   });
   hud.querySelector('#btn-pause')?.addEventListener('click', () => {
@@ -128,6 +169,20 @@ export function updatePlayHud(root: HTMLElement, game: Game): void {
   if (st) st.style.width = `${stam}%`;
   root.querySelector('.stam-meter')?.classList.toggle('winded', game.isWinded());
   root.querySelector('.stam-meter')?.classList.toggle('low', stam < 25);
+  const mn = q('#m-mana');
+  if (mn) {
+    const mf = Math.round(game.manaFrac() * 100);
+    mn.style.width = `${mf}%`;
+    root.querySelector('.mana-meter')?.classList.toggle('low', mf < 25);
+    root.querySelector('.mana-meter')?.classList.toggle('denied', (game.sim?.player.manaDeniedT ?? 0) > 0);
+  }
+  // Spell CD rings
+  root.querySelectorAll<HTMLElement>('[data-spell]').forEach((b) => {
+    const id = b.dataset.spell!;
+    const cd = game.sim?.player.spellCd[id] ?? 0;
+    b.classList.toggle('cooling', cd > 0);
+    b.style.setProperty('--cd', String(Math.min(1, cd / 8)));
+  });
   // 大聲公 noise zone: pulse the stamina bar + show the loudmouth chip.
   const noisy = game.noiseDrain() > 0;
   root.querySelector('.stam-meter')?.classList.toggle('noisy', noisy);

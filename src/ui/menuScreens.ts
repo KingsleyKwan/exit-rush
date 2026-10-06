@@ -10,6 +10,7 @@ import {
   el, portrait, screenBar, pointsChip, stationName, stationAlt, nextLevel,
   PORTRAITS, PortraitKind, asset, langBtn, iconBtn, qualityLabel, loadoutStrip, wireLoadoutStrip,
 } from './uiShared';
+import { CHARACTERS } from '../game/charactersDef';
 
 /** v0.7: long Latin station names (e.g. "Down-to-Earth Town") step down a size instead of ellipsizing. */
 function fitCls(name: string): string {
@@ -32,6 +33,7 @@ export function renderMenu(game: Game): HTMLElement {
       <div class="top-bar">
         ${langBtn()}
         <div class="bar-right">
+          ${iconBtn('chars', 'characters', dict.chars)}
           ${iconBtn('legend', 'legend', dict.legendTitle)}
           ${iconBtn('skills', 'skills', dict.skills)}
         </div>
@@ -75,7 +77,7 @@ export function renderLevels(game: Game): HTMLElement {
   const levels = playableLevels();
   const page = el(`
     <div class="sub-screen" data-ui="1">
-      ${screenBar(dict.levelsTitle, 'levels', pointsChip(game))}
+      ${screenBar(dict.levelsTitle, 'levels', `<button type="button" class="char-chip" data-act="characters">${icon('chars', 'xs')}<span>${game.save.character === 'mage' ? (getLang()==='en'?CHARACTERS.mage.nameEn:CHARACTERS.mage.nameZh) : dict.youOffice}</span></button>` + pointsChip(game))}
       <div class="sub-body lv-body">
         <div class="lv-sticky">
           ${loadoutStrip(game, { edit: true, cls: 'pre-level' })}

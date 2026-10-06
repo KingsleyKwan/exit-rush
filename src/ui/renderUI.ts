@@ -1,7 +1,7 @@
 import { t, toggleLang, getLang } from '../i18n';
 import type { Game } from '../game/Game';
 import { INTROS } from '../game/intros';
-import { BOSSES } from '../game/bosses';
+import { BOSSES, countersFor } from '../game/bosses';
 import { icon } from './icons';
 import { renderSkills } from './constellationSkills';
 import {
@@ -13,13 +13,14 @@ import {
   QUALITY_CYCLE,
 } from './uiShared';
 import { renderMenu, renderLevels, renderLegend } from './menuScreens';
+import { renderCharacters } from './characterSelect';
 import { renderPlayHud, updatePlayHud, renderPause, renderEnd } from './playScreens';
 
 let lastKey = '';
 
 /** Key that forces a full rebuild when it changes; otherwise the play HUD is patched in place. */
 function uiKey(game: Game): string {
-  return `${game.screen}|${getLang()}|${game.level?.id ?? ''}|${game.skillsReturn}|${game.pendingIntro ?? ''}|${game.showFtueGhost ? 1 : 0}|${game.doorBannerT > 0 ? 1 : 0}`;
+  return `${game.screen}|${getLang()}|${game.level?.id ?? ''}|${game.skillsReturn}|${game.pendingIntro ?? ''}|${game.showFtueGhost ? 1 : 0}|${game.doorBannerT > 0 ? 1 : 0}|${game.save.character}`;
 }
 
 function rerender(game: Game): void {
@@ -48,6 +49,7 @@ function wireCommon(scope: ParentNode, game: Game): void {
   });
   on('levels', () => game.openScreen('levels'));
   on('legend', () => game.openScreen('legend'));
+  on('characters', () => game.openCharacters());
   on('menu-back', () => game.openScreen('menu'));
   on('home', () => game.goMenu());
   on('quality', () => {
@@ -81,6 +83,8 @@ export function renderUI(root: HTMLElement, game: Game): void {
     wrap.appendChild(renderLevels(game));
   } else if (game.screen === 'legend') {
     wrap.appendChild(renderLegend(game));
+  } else if (game.screen === 'characters') {
+    wrap.appendChild(renderCharacters(game));
   } else if (game.screen === 'boss') {
     wrap.appendChild(renderBossCut(game));
   } else if (game.screen === 'intro') {
@@ -169,7 +173,8 @@ function renderBossCut(game: Game): HTMLElement {
   const zh = all ? dict.bossAllZh : b.zh;
   const enName = all ? dict.bossAllEn : b.en;
   const tagline = all ? dict.bossAllTagline : en ? b.taglineEn : b.taglineZh;
-  const counter = all ? '' : en ? b.counterEn : b.counterZh;
+  const ctr = all ? null : countersFor(kinds[0] ?? 'luggage', game.save.character);
+  const counter = ctr ? (en ? ctr.en : ctr.zh) : '';
   const dur = cut?.dur ?? 2.6;
   const crowns = all ? `<div class="boss-crowns">${kinds.map((k) => `<span style="--acc:${BOSSES[k].accent}">${icon('crown', 'xs')}</span>`).join('')}</div>` : '';
   const node = el(`

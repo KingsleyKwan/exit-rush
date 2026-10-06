@@ -1,3 +1,4 @@
+import { SPELL_NODES, SPELL_ULT_DEFS, defaultSpellBar } from '../game/SpellTree';
 import { t, getLang, fmt } from '../i18n';
 import type { Game } from '../game/Game';
 import { icon } from './icons';
@@ -35,24 +36,48 @@ function screenBar(title: string, iconName: string, right = ''): string {
     </div>`;
 }
 
-const pointsChip = (game: Game): string =>
-  `<span class="chip points-chip" title="${t().skillPoints}" aria-label="${t().skillPoints}: ${game.save.skills.points}">${icon('star', 'sm')}<b>${game.save.skills.points}</b></span>`;
+const pointsChip = (game: Game): string => {
+  const pts = game.save.character === 'mage'
+    ? (game.save.mage.loadouts[game.save.mage.active]?.points ?? 0)
+    : game.save.skills.points;
+  return `<span class="chip points-chip" title="${t().skillPoints}" aria-label="${t().skillPoints}: ${pts}">${icon('star', 'sm')}<b>${pts}</b></span>`;
+};
 
 export function renderSkills(game: Game, rerender: (game: Game) => void): HTMLElement {
   const dict = t();
-  const s = game.save.skills;
+  const isMage = game.save.character === 'mage';
+  const s = isMage
+    ? (game.save.mage.loadouts[game.save.mage.active] ?? game.save.mage.loadouts[0])
+    : game.save.skills;
   const overRun = game.skillsOverRun;
-  const branchLabel = (b: Branch) => (b === 'str' ? dict.strength : b === 'spd' ? dict.speed : dict.staminaBranch);
-  const branchIco = (b: Branch) => (b === 'sta' ? 'sta' : b);
+  const branchLabel = (b: Branch) => {
+    if (isMage) return b === 'str' ? dict.fire : b === 'spd' ? dict.volt : dict.ice;
+    return b === 'str' ? dict.strength : b === 'spd' ? dict.speed : dict.staminaBranch;
+  };
+  const branchIco = (b: Branch) => {
+    if (isMage) return b === 'str' ? 'fire' : b === 'spd' ? 'volt' : 'ice';
+    return b === 'sta' ? 'sta' : b;
+  };
+  const nodeList = (branch: Branch) => {
+    if (isMage) {
+      const el = branch === 'str' ? 'fire' : branch === 'spd' ? 'volt' : 'ice';
+      return SPELL_NODES.filter((n) => n.branch === el).map((n) => ({
+        id: n.id, branch, tier: n.tier, at: n.at, kind: n.kind, counters: n.counters,
+        nameEn: n.nameEn, nameZh: n.nameZh, tipEn: n.tipEn, tipZh: n.tipZh,
+      }));
+    }
+    return nodesFor(branch);
+  };
+  const ultDefs = isMage ? SPELL_ULT_DEFS : ULT_DEFS;
 
   /** Portrait constellation arm: vertical stack, bilingual major labels always on. */
   const arm = (branch: Branch) => {
     const filled = s[branch];
-    const nodes = nodesFor(branch);
+    const nodes = nodeList(branch);
     const ult = ultUnlocked(s, branch);
     const can = canSpend(s, branch);
     const ultNext = filled >= BRANCH_FILL && !ult;
-    const ultDef = ULT_DEFS[branch];
+    const ultDef = ultDefs[branch];
     const nodeHtml = nodes
       .map((n, i) => {
         const on = nodeUnlocked(s, n);
@@ -101,13 +126,13 @@ export function renderSkills(game: Game, rerender: (game: Game) => void): HTMLEl
 
   const panel = el(`
     <div class="${overRun ? 'panel skills-panel' : 'sub-screen skills-screen'}" data-ui="1">
-      ${overRun ? `<h2 class="panel-title">${icon('skills', 'sm')}${dict.skills}</h2>` : screenBar(dict.skills, 'skills', pointsChip(game))}
+      ${overRun ? `<h2 class="panel-title">${icon('skills', 'sm')}${dict.skills}</h2>` : screenBar(isMage ? dict.spells : dict.skills, 'skills', pointsChip(game))}
       <div class="${overRun ? 'skills-body' : 'sub-body skills-body'}">
         ${overRun ? `<p class="points">${pointsChip(game)}</p>` : ''}
         <p class="howto skill-howto">${fmt(dict.skillHowto, { fill: BRANCH_FILL, ult: ULTIMATE_COST })}</p>
         ${loadoutStrip(game, { reset: true, cls: 'in-tree' })}
         ${overRun ? `<p class="howto">${dict.skillsApplyNext}</p>` : ''}
-        <div class="constellation" role="group" aria-label="${dict.skills}">
+        <div class="constellation ${game.save.character === 'mage' ? 'mage' : 'hero'}" role="group" aria-label="${dict.skills}">
           <div class="cst-core" title="${dict.skillPoints}">${icon('skills')}<b>${s.points}</b></div>
           <div class="cst-detail" id="cst-detail" aria-live="polite">
             <div class="cst-detail-names"><b class="cst-detail-en"></b><span class="cst-detail-zh"></span></div>
@@ -128,7 +153,16 @@ export function renderSkills(game: Game, rerender: (game: Game) => void): HTMLEl
   panel.querySelectorAll('[data-spend]').forEach((btn) => {
     btn.addEventListener('click', () => {
       const branch = (btn as HTMLElement).dataset.spend as Branch;
-      game.save.skills = spendPoint(game.save.skills, branch);
+      if (isMage) {
+        const slot = spendPoint(s, branch);
+        game.save.mage.loadouts[game.save.mage.active] = slot;
+        // Keep bar in sync with unlocked actives.
+        const bar = game.save.mage.spellBars[game.save.mage.active] ?? [];
+        const unlocked = defaultSpellBar(slot);
+        game.save.mage.spellBars[game.save.mage.active] = bar.length ? bar.filter((id) => unlocked.includes(id) || SPELL_NODES.some((n) => n.id === id && slot[n.skillBranch] >= n.at)).concat(unlocked.filter((id) => !bar.includes(id))).slice(0, 3) : unlocked;
+      } else {
+        game.save.skills = spendPoint(game.save.skills, branch);
+      }
       game.persist();
       game.audio.ui();
       rerender(game);
