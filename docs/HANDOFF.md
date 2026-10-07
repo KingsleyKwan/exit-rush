@@ -88,7 +88,7 @@ Mage Δ vs hero should stay within **±10 pp** on sampled levels.
 |-------|-------|-------|
 | Coins | Derive from **tech** `progress.tech.cleared` + replay ledger (see CHARACTERS §5.6) — do **not** share Hero clears | Mirror SP pattern in `storage.ts` |
 | Shop UI | New `src/ui/techShop.ts` (or similar) | 平 / 中價 / 名貴 tiers; prices in CHARACTERS |
-| Polyomino backpack | New grid model + UI | 2×2 → 4×4 expansions; rotate pieces; consumables **occupy cells** |
+| Polyomino backpack | New grid model + UI | 2×2, then one expansion to 2×3 (6 cells). No bigger bag. Rotate pieces; consumables **occupy cells** |
 | 3 loadouts | `save.tech.sets[0..2]` already stubbed | `TechProgress` in `storage.ts` |
 | Items / effects | `src/game/sim/` hooks + `modsFor` tech branch | Must not alter hero `modsFor` bit-identity |
 | Character select | Unlock Tech when entitled | `entitlements().canPlay('tech')` |
@@ -104,7 +104,7 @@ CHARS=hero,mage,tech LEVEL=1,10,20,40,60,70,80,100 LOADOUTS=earned RUNS=40 npm r
 Capture: character select (Gear L playable), shop, backpack editor, one in-run Tech HUD shot — READ before done.
 
 ### Balance bot
-Extend `scripts/simTest.ts` loadouts: `tech:earned`, `tech:kit:…`, `tech:grid4` (see CHARACTERS §8). Shop policy: greedy + expand grid when coins allow.
+Extend `scripts/simTest.ts` loadouts: `tech:earned`, `tech:kit:…`, `tech:grid4` (see CHARACTERS §8). Shop policy: greedy + expand once, to 2×3, when coins allow.
 
 ---
 

@@ -208,6 +208,8 @@ export interface Dict {
   ownedTier: string;
   /** Standing workshop rule: one of each worn slot, and upgrades grow. */
   oneEach: string;
+  /** The backpack never grows into a kit that covers every stage. */
+  bagLimit: string;
   /** {n} = cells this piece covers. */
   placeSize: string;
   /** {slot} = shoes / gloves / head / core. */
@@ -429,6 +431,7 @@ export const en: Dict = {
   noRoom: 'No space',
   ownedTier: 'Owned',
   oneEach: 'Shoes, gloves, head and core: one each. Upgrades take more cells.',
+  bagLimit: 'The bag stops at 6 cells. Pack for this stage. One kit will not cover every car.',
   placeSize: 'Covers {n} cells. Tap a cell to drop it.',
   whyBody: 'Already wearing {slot}. Only one.',
   whyOnce: 'Already in the bag.',

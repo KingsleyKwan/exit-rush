@@ -201,6 +201,7 @@ export const zhHK: Dict = {
   noRoom: '冇位',
   ownedTier: '已有',
   oneEach: '鞋、手套、頭同核心，每樣只可以戴一件。升級會佔多啲格。',
+  bagLimit: '背囊最多 6 格。呢關要帶咩自己揀，一套裝唔會通殺。',
   placeSize: '呢件佔 {n} 格。撳一格放下。',
   whyBody: '已經戴住{slot}，只可以一件。',
   whyOnce: '呢件已經喺背囊。',

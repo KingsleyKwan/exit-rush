@@ -24,6 +24,7 @@ export interface MageProgress {
 /** v0.8 Tech kit stub (full grid/shop lands in a later pass). */
 export interface TechProgress {
   items: Record<string, 0 | 1 | 2 | 3>;
+  /** 0 = 2×2, 1 = 2×3. Saves may still say 2–4; reconcileTech clamps those. */
   gridTier: 0 | 1 | 2 | 3 | 4;
   sets: { placements: { id: string; tier: 1 | 2 | 3; x: number; y: number; rot: 0 | 1 | 2 | 3 }[] }[];
   activeSet: number;

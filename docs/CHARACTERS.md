@@ -14,11 +14,11 @@ Legend: 🤖 = box agent can do it · 🛠️ = Kingsley's local Grok Build (Cap
 | | 主角「上班族」 Office Worker (FREE 免費) | 魔法師「凱婷」 Bad Girl (PAID 付費) | 高科技人「裝備L」 Gear L (PAID 付費) |
 |---|---|---|---|
 | Fantasy | Commuter who pushes through | Umbrella-wand witch who casts her way out | Gadget geek with a backpack full of toys |
-| Progression | 力量 / 速度 / 體力 constellation (existing) | 火 / 冰 / 雷 spellbook constellation (same 10…60 + ult shape) | No tree. Coins 💰 → shop 🛒 → items in 平/中價/名貴 (Cheap/Mid/Luxury) tiers placed in a **backpack grid 背囊格** (2×2 → 4×4) |
+| Progression | 力量 / 速度 / 體力 constellation (existing) | 火 / 冰 / 雷 spellbook constellation (same 10…60 + ult shape) | No tree. Coins 💰 → shop 🛒 → items in 平/中價/名貴 (Cheap/Mid/Luxury) tiers placed in a **backpack grid 背囊格** (2×2, one expansion to 2×3) |
 | Resource | Stamina 體力 | Stamina 體力 + **Mana 魔力** (separate bar) | Stamina 體力 + item cooldowns + ≤ 3 consumables (in grid) |
 | Points / coins | 1 SP per first clear (100) | 1 SP per first clear (100, same shared clear list) | Coins per clear, bounded replay coins, ⚡ fast-exit bonus |
 | Respec | Free, 3 loadouts | Free, 3 loadouts | 100 % item sell-back, 3 grid layouts (套裝); grid expansions permanent |
-| Power cap | 100 SP (70 per branch + ult) | 100 SP | **Grid cells** (16 max) + body rule (1 shoes / gloves / head / core) |
+| Power cap | 100 SP (70 per branch + ult) | 100 SP | **Grid cells** (6 max) + body rule (1 shoes / gloves / head / core) |
 | Counters all 8 specials + 8 bosses | ✅ | ✅ | ✅ |
 | Price ✅ decided | Free | US$2.99 ≈ HK$23 | US$2.99 ≈ HK$23 (pack of both US$4.99 ≈ HK$38) |
 | Web / Pages demo | Unlocked | **Unlocked** (no IAP, no ads) | **Unlocked** (no IAP, no ads) |
@@ -28,7 +28,7 @@ Legend: 🤖 = box agent can do it · 🛠️ = Kingsley's local Grok Build (Cap
 ## 1. Pillars · 設計原則
 
 1. **Different, not stronger · 唔同玩法，唔係課金變強.** A paid character changes *how* you solve a car, not *whether* you can. Every level, L100 included, must stay beatable with the free Hero. No paid character has an exclusive level, exclusive skip, extra timer or revive.
-2. **Same power budget · 同一個力量上限.** Each character's endgame power is pegged to the Hero's 100 SP (one full branch + ultimate + ~30 pts). The Mage uses the same point economy. The Tech's power is capped by **backpack grid space (max 4×4)**, not by how many coins you hoard.
+2. **Same power budget · 同一個力量上限.** Each character's endgame power is pegged to the Hero's 100 SP (one full branch + ultimate + ~30 pts). The Mage uses the same point economy. The Tech's power is capped by **backpack grid space (max 2×3, 6 cells)**, not by how many coins you hoard. One packed set is a stage kit. The other two sets are how you cover a different car.
 3. **Clear-rate parity · 過關率相近 (measurable).** Balance-bot target: for every level band, each character's `earned` win rate is within **±10 pp** of the Hero's. At L100, each character's best build is within ±10 pp of the Hero's best ult build (Hero target band 30–55 %, see `docs/BALANCE.md`). 🎛️
 4. **Every special has an answer in every kit · 每種乘客都有剋星.** All 8 special passengers and all 8 bosses have at least one counter per character (table in §4).
 5. **No real-money currency · 金幣唔賣錢.** Tech coins are **earned in play only**. They are never sold for real money, never granted by IAP, and never granted by ads. No loot boxes, no randomised paid items.
@@ -197,7 +197,7 @@ Hero entries match `SkillTree.ts` / `bosses.ts`. Level = earliest the counter ca
 | Retro grant 補發 | On first Tech run: Σ first-clear coins for levels already cleared (no ⚡) | Once |
 | IAP / ads | **Never.** No coin packs, no coin doubling ads | — |
 
-Totals (approx.): first clears ≈ **6,760**; ⚡ max ≈ **3,380**; replay max ≈ **6,760** → **lifetime cap ≈ 16,900 coins**. Grinding is bounded by design. Even unlimited time can't buy power past the 4×4 grid cap. The cumulative earn curve per level is in §5.4.3.
+Totals (approx.): first clears ≈ **6,760**; ⚡ max ≈ **3,380**; replay max ≈ **6,760** → **lifetime cap ≈ 16,900 coins**. Grinding is bounded by design. Even unlimited time can't buy power past the 6-cell bag. Extra coins buy different kits for the three sets, not a bigger bag. The cumulative earn curve per level is in §5.4.3.
 
 Coins are **derived, not stored**: `balance = earned(cleared, ledger) − Σ itemSpend − gridSpend − consumableSpend`. If a price is retuned, the save reconciles. If it's over-spent, items are refunded with a one-time 「金幣已重新計算」 notice, like the v0.7 SP respec notice.
 
@@ -231,12 +231,12 @@ Shape legend (`#` = cell):
 | `I2` | domino 1×2 | 2 | `##` | any |
 | `I3` | line 3 | 3 | `###` | 2×3+ (vertical) |
 | `L3` | L-tromino | 3 | `#.` / `##` | any ≥ 2×2 |
-| `I4` | line 4 | 4 | `####` | **only 3×4 (vertical) or 4×4** |
+| `I4` | line 4 | 4 | `####` | **does not fit 2×3** (wear 中價 `I2`) |
 | `L4` | L-tetromino | 4 | `#.` / `#.` / `##` | 2×3+ |
 | `T4` | T-tetromino | 4 | `###` / `.#.` | 3×3+ (or 2×3 rotated) |
 | `S4` / `Z4` | S / Z tetromino | 4 | `.##` / `##.` · `##.` / `.##` | 2×3+ |
 | `U5` | U-pentomino | 5 | `#.#` / `###` | 2×3+ |
-| `X5` | plus | 5 | `.#.` / `###` / `.#.` | 3×3+ (leaves 4 corner holes) |
+| `X5` | plus | 5 | `.#.` / `###` / `.#.` | **does not fit 2×3** (wear 中價 `L4`) |
 
 Tier footprints by family:
 
@@ -252,98 +252,91 @@ Effect scaling (rule of thumb): **平 ≈ 40 %, 中價 ≈ 70 %, 名貴 = 100 %*
 
 **Implementation note:**
 - Each shape is a **cell mask** defined as string rows (`['###', '.#.']`). At load it's converted to a list of `(dx, dy)` offsets, and its **4 rotations** (90° steps: `(x, y) → (h−1−y, x)`) are precomputed, normalised to the top-left and de-duplicated (`O1`/`X5` have 1, `I*`/`S4`/`Z4` have 2, the rest 4).
-- The grid is at most 4×4, so occupancy fits a **16-bit bitmask** with fixed stride 4 (`bit = y·4 + x`). A placed rotation is `maskBits << (y·4 + x)`.
+- The bag stops at 2×3. Occupancy still uses a stride-4 bitmask (`bit = y·4 + x`) and rejects `x ≥ 4` or `y ≥ 4`, so do not widen the bag without rewriting that mask. A placed rotation is `maskBits << (y·4 + x)`.
 - **Collision check:** the piece is in bounds iff `x + w ≤ cols && y + h ≤ rows` (using the rotated bounding box), and free iff `(occupied & pieceBits) === 0`. Placement is `occupied |= pieceBits`.
 - The same functions drive drag preview (green/red), auto-pack (deterministic backtracking: largest/most irregular first, then fixed rotation order) and save validation. They're pure TS in `src/game/techKit.ts`.
 
 #### 5.4.3 Expansion tiers · 背囊擴充
 
-| Tier | Grid | Cells | Price 🎛️ | Cumulative | Target reached by (first clears + ~25 % ⚡, no replays) |
+**Decided (7 Oct 2026):** the bag stops at **6 cells**. A 4×4 held a cheap counter for every passenger, so one set cleared every stage. There is no third size.
+
+| Tier | Grid | Cells | Price 🎛️ | Cumulative | When |
 |---|---|---|---|---|---|
 | 0 | 2×2 | 4 | free | 0 | start |
 | 1 | 2×3 | 6 | 150 | 150 | ≈ L11 (≈190 coins earned) |
-| 2 | 3×3 | 9 | 450 | 600 | ≈ L31 (≈1,040 earned → ~440 left for items) |
-| 3 | 3×4 | 12 | 1,200 | 1,800 | ≈ L51–61 (≈2,440–3,350 earned) |
-| 4 | 4×4 | 16 | 2,400 | 4,200 | ≈ L81–91 (≈5,580–6,890 earned) |
 
-Earn curve used (from §5.3, cumulative coins **before** level Y, first clears only / +25 % ⚡ / +50 % ⚡): L11 155/193/232 · L21 440/550/660 · L31 835/1,043/1,252 · L41 1,340/1,675/2,010 · L51 1,955/2,443/2,932 · L61 2,680/3,350/4,020 · L71 3,515/4,393/5,272 · L81 4,460/5,575/6,690 · L91 5,515/6,893/8,272 · L100 6,460/8,075/9,690. Bounded replays (§5.3) can pull each target ~10–20 levels earlier, but never past the 4×4 cap.
+Old saves that bought 3×3 / 3×4 / 4×4 (the removed 450 / 1,200 / 2,400 steps) shrink to 2×3 on load. Those coins come back, because the balance is earned minus what the current price table charges. Pieces that no longer fit leave the grid and stay owned. `gridTier` in the save may still read 2–4 until that load.
 
-At L100 a typical player has ≈ 8,000 coins: 4,200 for the 4×4 grid plus ≈ 3,800 for items. That's enough for a core plus mostly 中價-tier items and one or two irregular 名貴 pieces, but not 名貴-everything. So strength vs space vs coins are all real choices.
+A cheap universal kit is about 9 cells: one shoe, one glove, one head, all five gadgets, and one drink. Six cells cannot hold it. A 中價 piece is 2 cells. A 名貴 piece that fits (`L4`, `T4`, `S4`, `Z4`, `U5`, `I3`, `L3`) takes 3–5, so it is most of the bag. `I4` (Hover Skates 名貴) and `X5` (core 名貴) do not fit at all; wear the 中價 shape, which you already own.
 
 #### 5.4.4 Sample layouts · 擺位例子
 
-Grid sizes are written **cols × rows** (portrait-friendly: 3×4 = 3 wide, 4 tall).
+Grid sizes are **cols × rows**.
 
 **2×2 start (L6, luggage intro):** 4 cells, all 平.
 ```
 ┌──────┬──────┐
-│ S3·平 │ G1·平 │   磁浮滑板鞋 平 (suitcase pass) · 液壓手套 平
+│ S3·平 │ G2·平 │   磁浮滑板鞋 · 震波拳套
 ├──────┼──────┤
 │ K1   │ K1   │   能量飲品 ×2
 └──────┴──────┘
 ```
 
-**3×3 (a player past L60 who bought 名貴 tiers instead of expanding, replaying 臭狐王 Stink Fox King for ⚡; 名貴 tiers need L60 cleared):** Gas Mask **名貴 = T4** takes the top row plus the centre. Only an `O1` and two dominoes fit around it, and no room is left for consumables.
+**2×3 luggage / stench set.** Full. No room for spring boots, headphones, the tablet, or the drone.
 ```
-┌──────┬──────┬──────┐
-│ H1·名貴│ H1·名貴│ H1·名貴│   防毒面罩 名貴 (T4) — stench slow −100 %
-├──────┼──────┼──────┤
-│ G2·平 │ H1·名貴│ D5·中價 │   震波拳套 平 (O1) · 手提風扇 中價 (I2, vertical)
-├──────┼──────┼──────┤
-│ S1·中價 │ S1·中價 │ D5·中價 │   跑鞋 中價 (I2)
-└──────┴──────┴──────┘
+┌──────┬──────┐
+│ S3·平 │ G2·平 │   行李箱
+├──────┼──────┤
+│ H1·平 │ D5·平 │   臭味
+├──────┼──────┤
+│ K1   │ K3   │   飲品 · 香口膠
+└──────┴──────┘
 ```
-Alternative for the same grid (and what a player around L31–59 actually has): Gas Mask **中價** (`I2`) frees 2 cells for Mint Gum + Energy Drink. That's weaker vs the king, but gives 2 emergency buttons. This is the intended trade-off.
 
-**3×4 (≈ L61+, replaying 衰仔王 Brat King for ⚡ or heading to L70):** Decoy Drone **名貴 = Z4** interlocks with small pieces.
+**Set 2, a different car (squat, noise, family, brats).** Same 6 cells. This is why the three sets exist.
 ```
-┌──────┬──────┬──────┐
-│ D3·名貴│ D3·名貴│ K1   │   誘餌無人機 名貴 (Z4) · 能量飲品
-├──────┼──────┼──────┤
-│ G3·平 │ D3·名貴│ D3·名貴│   整蠱震震手套 平 (O1)
-├──────┼──────┼──────┤
-│ S2·中價 │ S2·中價 │ H2·平 │   彈簧鞋 中價 (I2) · 降噪耳機 平 (O1)
-├──────┼──────┼──────┤
-│ D1·中價 │ D1·中價 │ K1   │   充電寶 中價 (I2) · 能量飲品
-└──────┴──────┴──────┘
+┌──────┬──────┐
+│ S2·平 │ H2·平 │   彈簧鞋 · 降噪耳機
+├──────┼──────┤
+│ D4·平 │ D3·平 │   平板 · 無人機
+├──────┼──────┤
+│ D1·平 │ K1   │   充電寶 · 飲品
+└──────┴──────┘
 ```
-12/12 cells, 2 actives (drone, boots), body rule OK (1 shoes, 1 gloves, 1 head).
 
-**4×4 (L100, all eight kings):** a plus-shaped core leaves 4 corner holes, and the `L4` headphones hug the edge.
+**One upgrade eats the bag.** Gas Mask 名貴 is a `T4` (4 cells, rotated into 2×3). Two cells remain.
 ```
-┌──────┬──────┬──────┬──────┐
-│ K1   │ C1·名貴│ H2·名貴│ H2·名貴│   機械臂 名貴 (X5 plus) · 降噪耳機 名貴 (L4)
-├──────┼──────┼──────┼──────┤
-│ C1·名貴│ C1·名貴│ C1·名貴│ H2·名貴│
-├──────┼──────┼──────┼──────┤
-│ G3·平 │ C1·名貴│ D3·中價 │ H2·名貴│   整蠱震震手套 平 · 誘餌無人機 中價 (I2)
-├──────┼──────┼──────┼──────┤
-│ S2·中價 │ S2·中價 │ D3·中價 │ K3   │   彈簧鞋 中價 · 薄荷香口膠 (stench patch) · 能量飲品 (top-left)
-└──────┴──────┴──────┴──────┘
+┌──────┬──────┐
+│ H1·名貴│ H1·名貴│
+├──────┼──────┤
+│ H1·名貴│ K3   │
+├──────┼──────┤
+│ H1·名貴│ K1   │
+└──────┴──────┘
 ```
 
 #### 5.4.5 Balance implications · 平衡
 
-- **The grid is the Tech's power budget.** It replaces the fixed-slot cap as the parity anchor against the Hero's 100 SP. 16 cells ≈ one "full branch + ult + extras", provided 名貴-tier effects match the Hero's T3 nodes and cores match his ults.
-- **Early game:** a 2×2 grid with 平 tiers ≈ 40 % counters. Tech counters exist from the intro level (earlier than the Hero's 40-pt nodes) but are weak and space-starved. Bot parity checks L6–30 for the ±10 pp band (§1). If early Tech runs too strong, raise the 2×3 price or cut 平 to 30 %.
-- **Bosses:** weak-point drain ×2.5 applies at **any tier**. Disable durations scale with tier (and are halved on bosses), so boss levels reward a 中價/名貴 counter. The level card shows ✦ recommended counter + tier, and gear sets let you keep a "boss set".
-- **L100:** the body rule (1 head: gas mask **or** headphones; 1 shoes: skates **or** boots; 1 gloves) plus 16 cells guarantee a choice. Consumables (Mint Gum) are the cheap patch for a missing counter.
-- **Sell-back stays 100 %, expansions don't.** So the irreversible decision is "how much capacity", and item choices stay flexible like the Hero's free respec.
-- **Irregular = strong:** 名貴-tier pieces (4–5 cells, odd shapes) cost an extra ~1 cell of "packing tax" in small grids. An `I4` doesn't fit a 3×3 at all, so the Hover Skates 名貴 only become usable at 3×4. Owning a 名貴 tier lets you **downsize** to 中價/平 for free when space is tight, so a bigger shape is never a trap. The bot measures the real packed power (auto-pack), not raw cells.
+- **The grid is the Tech's power budget.** Six cells is one stage, not every stage. The three sets are the way to keep a second answer. Do not grow the bag to put those answers back in one grid.
+- **Early game:** a 2×2 grid with 平 tiers ≈ 40 % counters. Tech counters exist from the intro level (earlier than the Hero's 40-pt nodes) but are weak and space-starved. Bot parity checks L6–30 for the ±10 pp band (§1). If early Tech runs too strong, raise the 2×3 price or cut 平 to 30 %. Do not retune just because a later band was already off.
+- **Bosses:** weak-point drain ×2.5 applies at **any tier**. Disable durations scale with tier (and are halved on bosses), so a boss set wants the counter that fits, not every counter. The level card shows ✦ recommended counter + tier.
+- **L100:** one head, one pair of shoes, one pair of gloves, and 6 cells. A core 中價 is an `L4` and leaves 2 cells. A core 名貴 (`X5`) does not fit.
+- **Sell-back stays 100 %.** The one expansion is not refunded by the sell button. Shrinking a pre-cap save is the exception: the removed expansion prices are no longer in `gridSpend`, so those coins return.
+- **Irregular = strong, when it fits:** a 名貴 piece that fits costs most of the 6 cells. `I4` and `X5` never fit. Owning that tier still lets you wear 中價 or 平 for free. The 名貴 effect itself stays in the tray. The bot measures the real packed power (auto-pack), not raw cells.
 - **Consumables in the grid (✅ decided):** every emergency drink competes with a permanent item for a cell. There is no separate pocket.
-- **Grind:** replay coins are bounded (§5.3), so the 4×4 grid is reached a bit sooner, never bigger.
+- **Grind:** replay coins are bounded (§5.3). They buy more items to swap between sets. They do not buy a seventh cell.
 
 #### 5.4.6 UI: drag-to-place on phone · 擺位介面
 
-- **Workshop › Equip tab:** grid on top (cells ≥ 60 px; 4×4 = 240 px wide on a 390 pt screen), with the **tray** below as a horizontal-scroll strip filtered by tabs 👟🧤🪖🔧⚙️🎒. Locked expansion cells are shown dashed with 🔒 + price, and tapping them opens 「擴充背囊」.
+- **Workshop › Equip tab:** the live grid on top (2 columns, 2 then 3 rows), with the **tray** below. One 「擴充背囊」 button buys 2×3 for 150, then disappears. A standing note says the bag stops at 6 cells.
 - **Drag** an item from the tray. The ghost footprint is green when it fits and red with a reason chip when it doesn't (「冇位」 / 「已有鞋」 / 「主動道具上限」). Snap on release with a haptic tick.
 - **Rotate:** ⟳ button while dragging/selected, or two-finger twist / double-tap.
 - **Tier switch:** tap a placed item → 平/中價/名貴 pills (owned tiers only). The footprint previews before you confirm.
 - **Tap-to-place alternative** (accessibility, no drag needed): tap an item, then tap a target cell.
 - **Remove:** drag back to the tray, or tap → 「除低」.
-- **自動排 Auto-pack:** packs the chosen items if they fit (deterministic backtracking, ≤ 10 items × 16 cells, instant). Also used by 「推介套裝」.
-- **Sets 套裝 1/2/3:** each set saves its own placements. A set badge on the level-select chip shows which one is active.
-- Capacity readout: 「12/16 格」, plus the coin balance top-right.
+- **自動排 Auto-pack:** packs what fits in the current bag (largest footprints first, then a fixed rotation order). Also used by 「推介套裝」. Pieces that do not fit stay in the tray.
+- **Sets 套裝 1/2/3:** each set saves its own placements. Swapping sets is how one character covers more than one kind of car.
+- Capacity readout: 「4/6 格」, plus the coin balance top-right.
 
 #### 5.4.7 Loadouts per grid · 套裝
 
@@ -357,7 +350,7 @@ Prices are per tier: **平 / +中價 / +名貴 (total)**. Footprint per §5.4.2.
 |---|---|---|---|---|---|---|---|---|
 | S1 | 👟 | **跑鞋** Sprint Sneakers | Passive | Speed ×1.10 / 1.20 / 1.30; 名貴 + faster when unobstructed | `O1` / `I2` / `I3` | 100 / 200 / 350 (650) | — | — |
 | S2 | 👟 | **彈簧鞋** Spring Boots | Active | Hop over squatters + kids; CD 9 / 7.5 / 6 s | `O1` / `I2` / `Z4` | 150 / 250 / 450 (850) | 8 / 40 / 60 | Squat, Family kids |
-| S3 | 👟 | **磁浮滑板鞋** Hover Skates | Passive | Pass suitcases; pace ×0.6 / 0.7 / 0.8; 名貴 also the boss case (名貴 = `I4`: needs a 3×4+ grid) | `O1` / `I2` / `I4` | 150 / 250 / 450 (850) | 6 / 40 / 60 | Luggage |
+| S3 | 👟 | **磁浮滑板鞋** Hover Skates | Passive | Pass suitcases; pace ×0.6 / 0.7 / 0.8; 名貴 also the boss case (名貴 = `I4`, which does not fit the 6-cell bag — wear 中價) | `O1` / `I2` / `I4` | 150 / 250 / 450 (850) | 6 / 40 / 60 | Luggage |
 | G1 | 🧤 | **液壓手套** Hydraulic Gloves | Passive | Push ×1.12 / 1.25 / 1.40; 名貴 squat shove ×2 | `O1` / `I2` / `L3` | 100 / 200 / 350 (650) | — | (Squat at LG) |
 | G2 | 🧤 | **震波拳套** Shock Gauntlets | Passive (shove) | Full-charge shove shockwave r 1.2 / 1.4 / 1.6, luggage ×2.0 / 2.3 / 2.6 | `O1` / `I2` / `T4` | 150 / 250 / 450 (850) | 6 / 40 / 60 | Luggage |
 | G3 | 🧤 | **整蠱震震手套** Joy Buzzer Gloves | Passive (shove) | Shove hit on a couple → they let go for 2.5 / 3.5 / 4.5 s | `O1` / `I2` / `L4` | 150 / 250 / 450 (850) | 18 / 40 / 60 | Couple |
@@ -380,7 +373,7 @@ Shape codes per §5.4.2. Buying a tier needs the previous one (平 → 中價 �
 
 **Consumable rules · 消耗品規則:** coins only, never IAP. They occupy grid cells (1×1, **max 3 per run**). Stock cap 9 each. Using one consumes it, and so does a lost run (it was used). Unused packed units stay in stock. Not usable in trial runs. Not sold back.
 
-**Power check:** an "all-名貴" wish list needs far more than 16 cells (6 items × 3–5 cells + a 5-cell plus core ≈ 27, and the shapes don't tile), so even a maxed 4×4 Tech has to choose, like the Hero's 100 SP vs 70 per branch. Coins at L100 (≈ 8,000 with some ⚡) cover the 4,200 of grid + ≈ 3,800 of items. 100 % item sell-back means extra (bounded) replay coins buy *convenience*, not power.
+**Power check:** six cheap cells cannot hold one of each worn slot plus every gadget. A 名貴 piece that fits takes most of those six. Coins at L100 buy alternate sets, not a bigger bag. 100 % item sell-back means extra (bounded) replay coins buy a different kit, not a seventh cell.
 
 ### 5.6 Recommended kit · 推介套裝
 
@@ -407,7 +400,7 @@ General rules: icon-first, EN + 粵 (zh-HK default, colloquial). Every string go
 |---|---|---|
 | Hero | 🌟 技能 Skills | Existing constellation (`constellationSkills.ts`) |
 | Mage | 📖 魔法 Spells | **Same constellation component**, re-themed: fire red / ice cyan / lightning yellow arms on a hex "magic circle" background, same node positions. Plus a **spell bar strip** (3 slots, drag a learned active onto it) and a 「推介」 button |
-| Tech | 🛒 裝備 Gear | **Workshop 工作室**: tabs **裝備 Equip (backpack grid + tray, §5.4.6) / 商店 Shop / 套裝 Sets 1-2-3**; the paper-doll preview shows equipped looks; coin balance + 「12/16 格」 top-right; each item card shows icon, 平/中價/名貴 pills with footprints, effect, counters chip, price, 買/升級/賣 |
+| Tech | 🛒 裝備 Gear | **Workshop 工作室**: tabs **裝備 Equip (backpack grid + tray, §5.4.6) / 商店 Shop / 套裝 Sets 1-2-3**; coin balance + 「4/6 格」 top-right; each item card shows icon, 平/中價/名貴 pills with footprints, effect, counters chip, price, 買/升級/賣. Expand stops after 2×3 |
 
 The constellation code is parameterised by a `TreeDef` (branches, colours, node list, ult list), so the Mage costs almost no new UI code.
 
@@ -435,7 +428,7 @@ Tech:  [stamina bar]   💰 run preview +36    [act1][act2][act3] [CORE] [SHOVE]
 
 ### 6.5 Try before buy · 試玩
 
-- **試玩車廂 Trial Car:** each paid character can play **L6 (luggage intro)** and **L20 (Suitcase King)** with a **preset build** (Mage: Fire 50 + Ice 10 + Volt 10, 3 spells; Tech: preset 3×3 grid with Hover Skates 中價, Shock Gauntlets 中價, Gas Mask 平, Drone 平, Tablet 平, 2 Energy Drinks), unlimited times, offline. Preset because a fresh 0-SP Mage has no spells and would demo badly. 🎛️
+- **試玩車廂 Trial Car:** each paid character can play **L6 (luggage intro)** and **L20 (Suitcase King)** with a **preset build** (Mage: Fire 50 + Ice 10 + Volt 10, 3 spells; Tech: the same 2×3 bag, all 平 — Hover Skates, Shock Gauntlets, Gas Mask, Drone, Tablet, 1 Energy Drink), unlimited times, offline. Preset because a fresh 0-SP Mage has no spells and would demo badly. The trial level list is unchanged. 🎛️
 - Trial runs give **no SP, coins, clears or badges**, and don't touch the save beyond a `trialsPlayed` counter. The end card shows **Buy / Back**, no nag loop (at most 1 auto-shown offer per session). L20 needs to be unlocked first; otherwise only L6 is offered.
 - Trial exists in the **iOS build only**. On the web demo everything is already unlocked.
 - This is an in-game trial, not Apple's tier-0 "XX-day Trial" IAP (see §8.3). No time limit, so there's nothing to disclose about expiry.
@@ -486,7 +479,7 @@ entitlementCache: { mage: boolean; tech: boolean; noAds: boolean; at: number }; 
 mage: { loadouts: TreeState[]; active: number; spellBars: string[][] };          // 3 slots, like hero loadouts
 tech: {
   items: Record<ItemId, 0 | 1 | 2 | 3>;       // highest owned tier: 0 none, 1 平, 2 中價, 3 名貴
-  gridTier: 0 | 1 | 2 | 3 | 4;                // 2×2, 2×3, 3×3, 3×4, 4×4 (cols×rows from TUNING.economy.grid)
+  gridTier: 0 | 1 | 2 | 3 | 4;                // live bag is 0 = 2×2, 1 = 2×3. 2–4 are old saves; reconcile clamps them
   sets: GearSet[];  activeSet: number;        // 3 sets
   // GearSet = { placements: { id: ItemId | ConsumableId; tier: 1|2|3; x: number; y: number; rot: 0|1|2|3 }[] }
   stock: Record<ConsumableId, number>;
@@ -572,7 +565,7 @@ export const entitlements = IS_STORE_BUILD ? await loadStoreEntitlements() : web
 ### 7.6 Balance bot support (`scripts/simTest.ts`)
 
 - New env `CHARS=hero,mage,tech` (default `hero`, so today's output is unchanged).
-- Loadout names gain a character prefix: `mage:earned`, `mage:b:60/30/10+fire`, `mage:ult-ice`, `tech:earned` (coins = first clears + 50 % ⚡ assumed, greedy shop policy from §5.6), `tech:kit:S3@3,G2@3,H1@2,D3@3,D4@2,C2@1` (validated against the grid), `tech:grid4` (best 16-cell kit), `tech:max`. The shop policy also decides expansions (buy the next grid tier when coins ≥ price + 150 reserve) and uses auto-pack.
+- Loadout names gain a character prefix: `mage:earned`, `mage:b:60/30/10+fire`, `mage:ult-ice`, `tech:earned` (coins = first clears + 50 % ⚡ assumed, greedy shop policy from §5.6), `tech:kit:S3@3,G2@3,H1@2,D3@3,D4@2,C2@1` (validated against the 6-cell bag; shapes that do not fit are left unpacked), `tech:grid4` (name kept; it is the 6-cell bag, not 16), `tech:max`. The shop policy expands at most once (2×2 → 2×3, when coins ≥ 150 + a 150 reserve) and uses auto-pack.
 - Bot ability policy (generic, data-driven): fire a counter ability when a matching special or boss is in the 60° forward cone within range and the resource is ready. Fire the general ability (Fire Bolt / Zap / Turbo Fan) when blocked (speed < 0.3 m/s for 0.5 s). Ult same as the Hero today. Consumables when stamina < 30 % or a matching special is near.
 - Report: the per-level table adds **Δ vs hero** columns and flags |Δ| > 10 pp in red. Targets are reported, not enforced, as today.
 - Counter micro-scenarios: one scripted scenario per new counter node/item (with vs without), like the existing Hurdle/Leap/Split checks.
@@ -720,7 +713,7 @@ Branching: work on feature branches with PRs (`feat/v0.8-characters-*`), never d
 | # | Topic | Assumption |
 |---|---|---|
 | A1 | Tech progression | Coins only (no SP); core/ult unlocks at L70 |
-| A2 | Grid prices | 2×2 free → 2×3 150 → 3×3 450 → 3×4 1,200 → 4×4 2,400 (4×4 at ≈ L85) |
+| A2 | Grid prices | 2×2 free → 2×3 for 150. That is the last expansion (7 Oct 2026). The old 3×3 / 3×4 / 4×4 prices are gone |
 | A3 | Expansions | Permanent and non-refundable; items keep 100 % sell-back |
 | A4 | Rewarded ads | No "double SP" ad; no ad ever grants SP or coins (revive / +3 s only) |
 | A5 | Family Sharing | Turn on for character IAPs (**irreversible: get Kingsley's explicit OK before toggling in ASC**) |

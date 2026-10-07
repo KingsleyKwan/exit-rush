@@ -175,7 +175,7 @@ export function renderWorkshop(game: Game, _rerender: (game: Game) => void): HTM
       </div>`
     : '';
 
-  const nextGrid = tech.gridTier < 4 ? GRID_TIERS[tech.gridTier + 1] : null;
+  const nextGrid = tech.gridTier + 1 < GRID_TIERS.length ? GRID_TIERS[tech.gridTier + 1] : null;
   const growLocked = nextGrid != null && coins < nextGrid.price;
   const growBtn = (label: string, extra = '') => nextGrid
     ? `<button type="button" class="primary${growLocked ? ' is-locked' : ''}${extra}" data-act="bag-grow" ${growLocked ? 'aria-disabled="true"' : ''}>${label}</button>`
@@ -218,6 +218,7 @@ export function renderWorkshop(game: Game, _rerender: (game: Game) => void): HTM
   const body = tab === 'equip'
     ? `<p class="place-hint${hintWarn ? ' warn' : ''}">${hint}</p>
        <p class="sfx-note">${dict.oneEach}</p>
+       <p class="sfx-note">${dict.bagLimit}</p>
        <div class="bag-grid" style="--cols:${grid.cols}">${cells.join('')}</div>
        ${selTools}
        <div class="tray">${tray || `<p class="sfx-note">${dict.tabShop}</p>`}</div>
@@ -227,7 +228,7 @@ export function renderWorkshop(game: Game, _rerender: (game: Game) => void): HTM
          ${growBtn(`${dict.expandBag} · ${nextGrid?.price ?? ''}`)}
        </div>`
     : tab === 'shop'
-      ? `<div class="shop-list"><p class="sfx-note">${dict.coinShop}</p>${shopCards}
+      ? `<div class="shop-list"><p class="sfx-note">${dict.coinShop}</p><p class="sfx-note">${dict.bagLimit}</p>${shopCards}
           ${growBtn(`${dict.expandBag} · ${nextGrid?.cols ?? ''}×${nextGrid?.rows ?? ''} · ${nextGrid?.price ?? ''}`, ' bag-grow')}
         </div>`
       : `<div class="set-row">${sets}</div><p class="sfx-note">${dict.placeHint}</p>`;

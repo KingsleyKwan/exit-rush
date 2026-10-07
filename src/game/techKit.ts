@@ -46,13 +46,19 @@ export const SHAPES: Record<ShapeCode, string[]> = {
   X5: ['.#.', '###', '.#.'],
 };
 
+/**
+ * Backpack stops at 2×3 (6 cells). A 4×4 held a cheap counter for every
+ * passenger, so one kit cleared every stage. 6 cells is one stage's kit:
+ * a few tools, or one big upgrade, not both.
+ */
 export const GRID_TIERS: { cols: number; rows: number; price: number }[] = [
   { cols: 2, rows: 2, price: 0 },
   { cols: 2, rows: 3, price: 150 },
-  { cols: 3, rows: 3, price: 450 },
-  { cols: 3, rows: 4, price: 1200 },
-  { cols: 4, rows: 4, price: 2400 },
 ];
+
+export function gridMaxTier(): number {
+  return GRID_TIERS.length - 1;
+}
 
 export interface ItemDef {
   id: ItemId;
@@ -103,7 +109,7 @@ export function isItemId(id: string): id is ItemId {
 }
 
 export function gridOf(tier: number): { cols: number; rows: number } {
-  const t = Math.max(0, Math.min(4, tier | 0));
+  const t = Math.max(0, Math.min(gridMaxTier(), tier | 0));
   return GRID_TIERS[t];
 }
 
@@ -212,7 +218,8 @@ export function itemSpend(items: TechProgress['items']): number {
 
 export function gridSpend(gridTier: number): number {
   let n = 0;
-  for (let i = 1; i <= Math.max(0, Math.min(4, gridTier)); i++) n += GRID_TIERS[i].price;
+  const cap = Math.max(0, Math.min(gridMaxTier(), gridTier | 0));
+  for (let i = 1; i <= cap; i++) n += GRID_TIERS[i].price;
   return n;
 }
 
@@ -223,9 +230,45 @@ export function coinBalance(save: Pick<SaveData, 'tech' | 'progress' | 'characte
   return earned - spent;
 }
 
+/** Shrink a saved 3×3–4×4 bag down to the cap and drop pieces that no longer fit. */
+function clampBag(save: SaveData): boolean {
+  let changed = false;
+  const cap = gridMaxTier() as 0 | 1 | 2 | 3 | 4;
+  if (save.tech.gridTier > cap) {
+    save.tech.gridTier = cap;
+    changed = true;
+    save.tech.coinNotice = true;
+  }
+  for (const set of save.tech.sets) {
+    const kept: Placement[] = [];
+    for (const raw of set.placements) {
+      if (!isItemId(raw.id)) {
+        changed = true;
+        continue;
+      }
+      const p: Placement = {
+        id: raw.id,
+        tier: (raw.tier === 2 || raw.tier === 3 ? raw.tier : 1) as Tier,
+        x: raw.x | 0,
+        y: raw.y | 0,
+        rot: (raw.rot & 3) as Rot,
+      };
+      if (!placeCheck(kept, save.tech.gridTier, save.tech.items, save.tech.stock, p).ok) {
+        changed = true;
+        continue;
+      }
+      kept.push(p);
+    }
+    if (kept.length !== set.placements.length) changed = true;
+    set.placements = kept;
+  }
+  return changed;
+}
+
 /** Refund owned gear (not the grid, not used consumables) when a retune over-spends. */
 export function reconcileTech(save: SaveData): boolean {
-  if (coinBalance(save) >= 0) return false;
+  const shrunk = clampBag(save);
+  if (coinBalance(save) >= 0) return shrunk;
   save.tech.items = {};
   for (const set of save.tech.sets) set.placements = set.placements.filter((p) => itemDef(p.id)?.slot === 'consumable');
   save.tech.coinNotice = true;
@@ -598,7 +641,7 @@ export function sellItem(save: SaveData, id: ItemId): boolean {
 }
 
 export function expandGrid(save: SaveData): boolean {
-  if (save.tech.gridTier >= 4) return false;
+  if (save.tech.gridTier >= gridMaxTier()) return false;
   const price = GRID_TIERS[save.tech.gridTier + 1].price;
   if (coinBalance(save) < price) return false;
   save.tech.gridTier = (save.tech.gridTier + 1) as 0 | 1 | 2 | 3 | 4;
@@ -693,7 +736,7 @@ export function recommendKit(cleared: readonly number[], levelId: number, fastFr
   };
   const saveAs = fakeSave as unknown as SaveData;
   const tryExpand = () => {
-    if (tech.gridTier >= 4) return false;
+    if (tech.gridTier >= gridMaxTier()) return false;
     const price = GRID_TIERS[tech.gridTier + 1].price;
     // Buy power before a bigger bag, unless the current grid is already tight.
     const free = gridOf(tech.gridTier).cols * gridOf(tech.gridTier).rows;
@@ -798,26 +841,25 @@ function wishFor(levelId: number): ItemId[] {
   return boss[pick];
 }
 
-/** Preset 3×3 trial kit (iOS try-before-buy). Not written to the save. */
+/** Preset trial kit (iOS try-before-buy). Same 6-cell cap as a real bag. Not saved. */
 export function trialTech(): TechProgress {
   const tech: TechProgress = {
-    items: { S3: 2, G2: 2, H1: 1, D3: 1, D4: 1 },
-    gridTier: 2,
-    sets: [{ placements: [], }, { placements: [] }, { placements: [] }],
+    items: { S3: 1, G2: 1, H1: 1, D3: 1, D4: 1 },
+    gridTier: 1,
+    sets: [{ placements: [] }, { placements: [] }, { placements: [] }],
     activeSet: 0,
-    stock: { K1: 2 },
+    stock: { K1: 1 },
     ledger: {},
     consumableSpend: 0,
     retroGranted: true,
     coinNotice: false,
   };
   tech.sets[0].placements = [
-    { id: 'S3', tier: 2, x: 0, y: 0, rot: 0 },
-    { id: 'G2', tier: 2, x: 0, y: 1, rot: 0 },
-    { id: 'H1', tier: 1, x: 2, y: 0, rot: 0 },
-    { id: 'D3', tier: 1, x: 2, y: 1, rot: 0 },
-    { id: 'D4', tier: 1, x: 2, y: 2, rot: 0 },
-    { id: 'K1', tier: 1, x: 0, y: 2, rot: 0 },
+    { id: 'S3', tier: 1, x: 0, y: 0, rot: 0 },
+    { id: 'G2', tier: 1, x: 1, y: 0, rot: 0 },
+    { id: 'H1', tier: 1, x: 0, y: 1, rot: 0 },
+    { id: 'D3', tier: 1, x: 1, y: 1, rot: 0 },
+    { id: 'D4', tier: 1, x: 0, y: 2, rot: 0 },
     { id: 'K1', tier: 1, x: 1, y: 2, rot: 0 },
   ];
   return tech;
@@ -917,7 +959,7 @@ export function kitForBot(loadout: string, levelId: number): TechProgress {
 
 function syntheticKit(everything: boolean): TechProgress {
   const tech = emptyTech();
-  tech.gridTier = 4;
+  tech.gridTier = gridMaxTier() as 0 | 1 | 2 | 3 | 4;
   const focus = ['C2', 'S3', 'S1', 'H1', 'H2', 'D2', 'G3', 'D5', 'D1', 'G1', 'D4', 'S2'];
   for (const it of ITEMS) {
     if (it.slot === 'consumable') continue;
@@ -932,7 +974,7 @@ function syntheticKit(everything: boolean): TechProgress {
 
 function specKit(spec: string): TechProgress {
   const tech = emptyTech();
-  tech.gridTier = 4;
+  tech.gridTier = gridMaxTier() as 0 | 1 | 2 | 3 | 4;
   for (const part of spec.split(/[,+]/)) {
     const m = /^([A-Z]\d)@([123])$/.exec(part.trim());
     if (!m || !isItemId(m[1])) continue;
@@ -1020,6 +1062,39 @@ export function techKitSelfTest(): string[] {
   eq('grid not free', coinBalance(save) === gridBefore - 150);
   sellItem(save, 'S1');
   eq('expand sticks', save.tech.gridTier === 1);
+  eq('bag stops at 6', expandGrid(save) === false && gridOf(save.tech.gridTier).cols * gridOf(save.tech.gridTier).rows === 6);
+  eq('old 4x4 spends like the cap', gridSpend(4) === 150, String(gridSpend(4)));
+  const stuffed = emptyTech();
+  stuffed.gridTier = 4;
+  for (const id of ['S1', 'G1', 'H1', 'D1', 'D2', 'D3', 'D4', 'D5'] as ItemId[]) stuffed.items[id] = 1;
+  stuffed.stock = { K1: 1 };
+  stuffed.sets[0].placements = autoPack(stuffed);
+  const stuffedIds = new Set(stuffed.sets[0].placements.map((p) => p.id));
+  eq('one bag cannot hold every tool', stuffedIds.size < 9, String(stuffedIds.size));
+  // Levels 1–12 only earn 198. A 4×4 save that still owns two cheap tools needs
+  // the refund (grid spend is now 150, not 4,200) to stay solvent. Levels 1–20 earn 440.
+  const richCleared = Array.from({ length: 20 }, (_, i) => i + 1);
+  const capped = {
+    tech: emptyTech(),
+    progress: {
+      hero: { cleared: [], clears: {}, highestCleared: 0, seenBosses: [] },
+      mage: { cleared: [], clears: {}, highestCleared: 0, seenBosses: [] },
+      tech: { cleared: richCleared, clears: {}, highestCleared: 20, seenBosses: [] },
+    },
+    character: 'tech' as const,
+  } as unknown as SaveData;
+  capped.tech.gridTier = 4 as 0 | 1 | 2 | 3 | 4;
+  capped.tech.items = { S1: 1, G1: 1 };
+  capped.tech.sets[0].placements = [
+    { id: 'G1', tier: 1, x: 0, y: 0, rot: 0 },
+    { id: 'S1', tier: 1, x: 3, y: 3, rot: 0 },
+  ];
+  eq('shrink old bag', reconcileTech(capped) && capped.tech.gridTier === 1, String(capped.tech.gridTier));
+  eq('shrink drops the piece outside the bag', capped.tech.sets[0].placements.length === 1 && capped.tech.sets[0].placements[0].id === 'G1');
+  eq('shrink keeps gear the player can afford', capped.tech.items.S1 === 1 && capped.tech.items.G1 === 1 && coinBalance(capped) > 0, String(coinBalance(capped)));
+  const trial = trialTech();
+  const trialKit = resolveKit(trial);
+  eq('trial uses the same cap', trial.gridTier === 1 && trialKit.placements.length === 6, String(trialKit.placements.length));
   const packedTech = syntheticKit(false);
   const packed = packedTech.sets[0].placements;
   let bits = 0;
