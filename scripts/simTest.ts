@@ -1239,10 +1239,19 @@ async function main(): Promise<void> {
         const lv = LEVELS.find((l) => l.id === id)!;
         const sim = new Sim(lv, modifiersFromSkills(defaultSkills()), mulberry32(seed));
         const seated = sim.crowd.agents.filter((a) => a.seated);
-        const doors = sim.crowd.agents.filter((a) => a.posted && !a.seated && a.kind === 'normal');
+        const doors = sim.crowd.agents.filter((a) => a.posted && !a.seated && a.mode === 'rider' && !a.boss && a.body.x < -1.2);
         const bad: string[] = [];
         if (seated.length < 6) bad.push(`seated=${seated.length}`);
         if (doors.length < 4) bad.push(`door-side=${doors.length}`);
+        const glassSpecial = doors.some((a) => a.kind !== 'normal' && a.kind !== 'loud' && a.kind !== 'stench');
+        if ((id === 24 || id === 33) && !glassSpecial) bad.push('no special at the glass');
+        for (const bay of sim.openBays) {
+          const sealed = sim.crowd.agents.some((a) => {
+            const bodies = a.caseBody ? [a.body, a.caseBody] : [a.body];
+            return bodies.some((b) => Math.hypot(b.x + 1.52, b.z - bay) < b.r + 0.12);
+          });
+          if (sealed) bad.push(`door gap sealed ${bay}`);
+        }
         const laneBlocked = (x: number, z: number) => seated.some((a) => Math.hypot(a.body.x - x, a.body.z - z) < a.body.r + 0.05);
         if (!laneBlocked(0.98, 1.3) && !laneBlocked(0.98, 0.96) && !laneBlocked(0.98, 1.64)) bad.push('far seat lane open');
         if (!laneBlocked(-0.98, 1.3) && !laneBlocked(-0.98, 0.96) && !laneBlocked(-0.98, 1.64)) bad.push('door seat lane open');

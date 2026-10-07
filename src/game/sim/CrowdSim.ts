@@ -135,6 +135,12 @@ export interface CrowdCtx {
   onPlayerShoved: (dx: number, dz: number, power: number, heavy?: boolean) => void;
 }
 
+/**
+ * Specials that can lean on the door glass without parking a noise ring or a
+ * stench cloud on the opening. Loudmouths and stench stay on the short way.
+ */
+const GLASS_KINDS = new Set<PassengerKind>(['squat', 'angry', 'brat', 'luggage', 'couple', 'family']);
+
 function pickKind(mix: LevelDef['mix'], rng: Rng): PassengerKind {
   const entries = Object.entries(mix) as [PassengerKind, number][];
   const total = entries.reduce((s, [, w]) => s + w, 0);
@@ -336,7 +342,7 @@ export class CrowdSim {
     return out;
   }
 
-/** From L20 the car is no longer an empty diagonal: seats, door glass, and the short way are taken. */
+  /** From L20 the car is no longer an empty diagonal: seats, door glass, and the short way are taken. */
   private shapedCar(level: LevelDef): boolean {
     return level.id >= 20 && level.id < 100;
   }
@@ -344,15 +350,168 @@ export class CrowdSim {
   /**
    * Both sides of every door, inside the vestibule, backs toward the glass
    * beside the bench. The middle of the opening stays a sideways squeeze.
+   * Open doors come first — that is the squeeze the player actually uses.
    */
-  private doorSideHomes(): { x: number; z: number; yaw: number }[] {
+  private doorSideHomes(openBays: readonly number[]): { x: number; z: number; yaw: number }[] {
     const x = -1.52;
     const yaw = Math.PI / 2;
+    const open = new Set(openBays);
+    const bays = [...TUNING.car.doorBays].sort((a, b) => {
+      const ao = open.has(a) ? 0 : 1;
+      const bo = open.has(b) ? 0 : 1;
+      if (ao !== bo) return ao - bo;
+      return b - a;
+    });
     const out: { x: number; z: number; yaw: number }[] = [];
-    for (const bay of TUNING.car.doorBays) {
-      out.push({ x, z: bay - 0.5, yaw }, { x, z: bay + 0.5, yaw });
+    for (const bay of bays) {
+      out.push({ x, z: bay + 0.5, yaw }, { x, z: bay - 0.5, yaw });
     }
     return out;
+  }
+
+  /** Nearest door bay to a glass spot (the opening whose middle must stay clear). */
+  private bayOf(z: number): number {
+    let bay: number = TUNING.car.doorBays[0];
+    let best = Infinity;
+    for (const z0 of TUNING.car.doorBays) {
+      const d = Math.abs(z - z0);
+      if (d < best) {
+        best = d;
+        bay = z0;
+      }
+    }
+    return bay;
+  }
+
+  /** True if this circle covers the middle of a door opening. */
+  private coversGap(x: number, z: number, r: number, bay: number): boolean {
+    return Math.hypot(x + 1.52, z - bay) < r + 0.18;
+  }
+
+  /** A spawned group (or its suitcase) is standing in an open doorway. */
+  private groupCoversGap(made: readonly Agent[], openBays: readonly number[]): boolean {
+    for (const a of made) {
+      const bodies = a.caseBody ? [a.body, a.caseBody] : [a.body];
+      for (const b of bodies) {
+        for (const bay of openBays) {
+          if (Math.hypot(b.x + 1.52, b.z - bay) < b.r + 0.12) return true;
+        }
+      }
+    }
+    return false;
+  }
+
+  /**
+   * Suitcase in the aisle, not across the opening. The link rest is shorter
+   * than the two radii, so a case at rest distance overlaps its owner and the
+   * spawn fallback steps +Z — straight into the door when the owner is on the
+   * lower side of the glass.
+   */
+  private aisleCase(homeX: number, homeZ: number): { x: number; z: number } | null {
+    const r = PASSENGER_DEFS.luggage.radius;
+    const L = TUNING.types.luggage;
+    const x = homeX + r + L.caseRadius + 0.02;
+    const z = homeZ;
+    if (!this.canFit(x, z, L.caseRadius) || this.coversGap(x, z, L.caseRadius, this.bayOf(z))) return null;
+    return { x, z };
+  }
+
+  /** Parent against the glass, both kids in the aisle. The wall side has no room for a child. */
+  private familyRow(home: { x: number; z: number }): { x: number; z: number; kid: boolean }[] | null {
+    const bay = this.bayOf(home.z);
+    // +Z side only: a child stepping toward −Z would stand in the opening.
+    if (!(home.z > bay)) return null;
+    const r = PASSENGER_DEFS.family.radius;
+    const kidR = r * 0.78;
+    const x1 = home.x + r + kidR + 0.04;
+    const x2 = x1 + kidR * 2 + 0.04;
+    const spots = [
+      { x: home.x, z: home.z, kid: false },
+      { x: x1, z: home.z, kid: true },
+      { x: x2, z: home.z, kid: true },
+    ];
+    for (const s of spots) {
+      const rr = s.kid ? kidR : r;
+      if (!this.canFit(s.x, s.z, rr) || this.coversGap(s.x, s.z, rr, bay)) return null;
+    }
+    return spots;
+  }
+
+  /** True if this special can take the spot without standing in the door gap. */
+  private glassFits(kind: PassengerKind, home: { x: number; z: number }): boolean {
+    const bay = this.bayOf(home.z);
+    if (kind === 'family') return this.familyRow(home) !== null;
+    if (kind === 'couple') {
+      const r = PASSENGER_DEFS.couple.radius;
+      const x2 = home.x + TUNING.types.couple.rest;
+      return this.canFit(home.x, home.z, r) && this.canFit(x2, home.z, r) && !this.coversGap(home.x, home.z, r, bay) && !this.coversGap(x2, home.z, r, bay);
+    }
+    if (kind === 'luggage') {
+      const r = PASSENGER_DEFS.luggage.radius;
+      return this.canFit(home.x, home.z, r) && !this.coversGap(home.x, home.z, r, bay) && this.aisleCase(home.x, home.z) !== null;
+    }
+    const r = PASSENGER_DEFS[kind].radius;
+    return this.canFit(home.x, home.z, r) && !this.coversGap(home.x, home.z, r, bay);
+  }
+
+  private attachCase(owner: Agent, cx: number, cz: number): void {
+    const L = TUNING.types.luggage;
+    const g = ++groupSeq + 10000;
+    const cb = createBody({
+      x: cx,
+      z: cz,
+      r: L.caseRadius,
+      mass: L.caseMass,
+      damping: L.caseDamping,
+      restitution: 0.02,
+      maxSpeed: 5,
+      group: g,
+    });
+    cb.passTag = PASS_LUGGAGE;
+    owner.body.group = g;
+    this.world.add(cb);
+    owner.caseBody = cb;
+  }
+
+  /** Plant one special against the glass. Caller has already checked glassFits. */
+  private plantGlass(kind: PassengerKind, home: { x: number; z: number; yaw: number }): number {
+    const stamp = (a: Agent) => {
+      a.posted = true;
+      a.seatYaw = home.yaw;
+    };
+    if (kind === 'luggage') {
+      const spot = this.aisleCase(home.x, home.z);
+      if (!spot) return 0;
+      const owner = this.makeAgent('luggage', home.x, home.z, 'rider');
+      this.attachCase(owner, spot.x, spot.z);
+      stamp(owner);
+      return 1;
+    }
+    if (kind === 'family') {
+      const spots = this.familyRow(home);
+      if (!spots) return 0;
+      const cid = ++this.clusterSeq;
+      for (const s of spots) {
+        const a = this.makeAgent('family', s.x, s.z, 'rider', s.kid);
+        a.clusterId = cid;
+        stamp(a);
+      }
+      return spots.length;
+    }
+    if (kind === 'couple') {
+      const r = PASSENGER_DEFS.couple.radius;
+      const x2 = home.x + TUNING.types.couple.rest;
+      const a = this.makeAgent('couple', home.x, home.z, 'rider');
+      const b = this.makeAgent('couple', x2, home.z, 'rider');
+      a.partner = b;
+      b.partner = a;
+      stamp(a);
+      stamp(b);
+      return 2;
+    }
+    const a = this.makeAgent(kind, home.x, home.z, 'rider');
+    stamp(a);
+    return 1;
   }
 
   /**
@@ -502,7 +661,6 @@ export class CrowdSim {
         a.seatYaw = home.yaw;
         people++;
       };
-      for (const home of this.doorSideHomes()) post(home, false);
       for (const home of this.benchSeatHomes()) post(home, true);
     }
     const takeHazard = (kind: 'loud' | 'stench'): [number, number] | null => {
@@ -526,9 +684,42 @@ export class CrowdSim {
       if (posted) for (const a of made) a.posted = true;
       people += made.length;
     };
+    const glass: PassengerKind[] = [];
+    const later: PassengerKind[] = [];
+    for (const kind of queued) {
+      if (shaped && GLASS_KINDS.has(kind)) glass.push(kind);
+      else later.push(kind);
+    }
+    if (shaped) {
+      // Specials lean on the door glass. Empty sides stay ordinary commuters
+      // so every door still has someone on both sides.
+      for (const home of this.doorSideHomes(openBays)) {
+        if (people >= n) break;
+        const idx = glass.findIndex((kind) => this.glassFits(kind, home));
+        if (idx >= 0) {
+          const [kind] = glass.splice(idx, 1);
+          if (kind) {
+            const made = this.plantGlass(kind, home);
+            if (made > 0) {
+              people += made;
+              continue;
+            }
+            glass.unshift(kind);
+          }
+        }
+        const nIdx = later.indexOf('normal');
+        if (nIdx >= 0) later.splice(nIdx, 1);
+        if (people >= n || !this.canFit(home.x, home.z, rNormal)) continue;
+        const a = this.makeAgent('normal', home.x, home.z, 'rider');
+        a.posted = true;
+        a.seatYaw = home.yaw;
+        people++;
+      }
+      later.push(...glass);
+    }
     const rest: PassengerKind[] = [];
     // Hazards first, while the short-way spots are still empty.
-    for (const kind of queued) {
+    for (const kind of later) {
       if (people >= n) break;
       // Loudmouths always take a short-way spot or they are not spawned — a random
       // one lands on the quiet aisle. Stench does the same once the car is shaped;
@@ -547,7 +738,17 @@ export class CrowdSim {
       for (let t = 0; t < 6; t++) {
         const [x, z] = this.randomCarSpot(openBays);
         if (Math.hypot(x - avoidX, z - avoidZ) < 0.75) continue;
-        placeRider(kind, x, z, 0.45);
+        // Leave the middle of each open door as a squeeze. Glass riders already own the sides.
+        const inGap = shaped && openBays.some((bay) => Math.hypot(x + 1.52, z - bay) < 0.85);
+        if (inGap) continue;
+        const made = this.spawnGroup(kind, x, z, 'rider', 0.45);
+        if (made.length === 0) continue;
+        // A lead can clear the gap while a child or suitcase does not.
+        if (shaped && this.groupCoversGap(made, openBays)) {
+          for (const a of made) this.removeAgent(a);
+          continue;
+        }
+        people += made.length;
         break;
       }
     }
@@ -839,27 +1040,40 @@ export class CrowdSim {
   }
 
   private spawnBoarderUnit(level: LevelDef, openBays: readonly number[]): number {
-    let kind = pickKind(level.mix, this.rng);
-    // 大聲公 are riders already mid-call; boarders streaming through the door would park the
-    // noise zone on the exit itself (unavoidable), so they board as plain commuters.
-    if (kind === 'loud') kind = 'normal';
-    const wall = doorWallX();
-    const bay = openBays[Math.floor(this.rng() * openBays.length)] ?? 0;
-    // Platform side (−X), lined up on a door bay.
-    const x = wall - 0.55 - this.rng() * 1.6;
-    const z = bay + (this.rng() - 0.5) * 1.1;
-    const made = this.spawnGroup(kind, x, z, 'boarder', 0.6);
-    if (made.length === 0) return 0;
-    // Goal deep toward the far (+X) side of the car.
-    const gx = 0.4 + this.rng() * 1.2;
-    const gz = bay + (this.rng() - 0.5) * 2.4;
-    const doorZAim = bay + (this.rng() - 0.5) * 0.5;
-    for (const a of made) {
-      a.goalX = clamp(gx + (a.body.x - made[0].body.x), -TUNING.car.halfWidth + 0.4, TUNING.car.halfWidth - 0.35);
-      a.goalZ = clamp(gz + (a.body.z - made[0].body.z), CAR_Z_MIN + 0.4, CAR_Z_MAX - 0.4);
-      a.doorX = doorZAim; // reuse field: Z aim through the doorway
+    const shaped = this.shapedCar(level);
+    for (let attempt = 0; attempt < 4; attempt++) {
+      let kind = pickKind(level.mix, this.rng);
+      // 大聲公 are riders already mid-call; boarders streaming through the door would park the
+      // noise zone on the exit itself (unavoidable), so they board as plain commuters.
+      if (kind === 'loud') kind = 'normal';
+      // Same for stench once the car is shaped: a cloud waiting on the platform
+      // sits on the opening, so the squeeze is unavoidable. Before L20 they still board.
+      if (kind === 'stench' && shaped) kind = 'normal';
+      const wall = doorWallX();
+      const bay = openBays[Math.floor(this.rng() * openBays.length)] ?? 0;
+      // Platform side (−X), lined up on a door bay.
+      const x = wall - 0.55 - this.rng() * 1.6;
+      const z = bay + (this.rng() - 0.5) * 1.1;
+      const made = this.spawnGroup(kind, x, z, 'boarder', 0.6);
+      if (made.length === 0) return 0;
+      // A child or suitcase can step off the platform into the opening. They still
+      // walk in during the round; they must not spawn already filling the squeeze.
+      if (shaped && this.groupCoversGap(made, openBays)) {
+        for (const a of made) this.removeAgent(a);
+        continue;
+      }
+      // Goal deep toward the far (+X) side of the car.
+      const gx = 0.4 + this.rng() * 1.2;
+      const gz = bay + (this.rng() - 0.5) * 2.4;
+      const doorZAim = bay + (this.rng() - 0.5) * 0.5;
+      for (const a of made) {
+        a.goalX = clamp(gx + (a.body.x - made[0].body.x), -TUNING.car.halfWidth + 0.4, TUNING.car.halfWidth - 0.35);
+        a.goalZ = clamp(gz + (a.body.z - made[0].body.z), CAR_Z_MIN + 0.4, CAR_Z_MAX - 0.4);
+        a.doorX = doorZAim; // reuse field: Z aim through the doorway
+      }
+      return made.length;
     }
-    return made.length;
+    return 0;
   }
 
   /** Counterflow: boarders stream in from the platform while the doors are open. */
