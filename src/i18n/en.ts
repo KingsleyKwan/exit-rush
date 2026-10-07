@@ -140,6 +140,8 @@ export interface Dict {
   clearBonusN: string;
   levelsTeaserV05: string;
   doorClosedToast: string;
+  /** Spoken once in the last few seconds, while the doors are about to close. */
+  doorMind: string;
   doorBanner: string;
   doorBannerZh: string;
   doorBannerEn: string;
@@ -357,6 +359,7 @@ export const en: Dict = {
   clearBonusN: '+{n} skill point',
   levelsTeaserV05: 'Short exits · learn one special every few levels',
   doorClosedToast: "This door won't open!",
+  doorMind: 'Please mind the door.',
   doorBanner: 'Only {n} doors open',
   doorBannerZh: '只開{n}道門',
   doorBannerEn: 'Only {n} doors open',

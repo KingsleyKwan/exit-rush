@@ -24,6 +24,7 @@ export class GameAudio {
   private ambientGain: GainNode | null = null;
   private ambientWant = 0;
   private warnPair = 0;
+  private voiceHooked = false;
   private logOnce = false;
   applySettings(s: Partial<AudioSettings> | null | undefined): void {
     const d = DEFAULT_AUDIO;
@@ -53,10 +54,10 @@ export class GameAudio {
   setMuted(m: boolean): void {
     this.settings.muted = m;
     this.syncGains();
+    if (m) this.stopVoice();
   }
   toggleMute(): boolean {
-    this.settings.muted = !this.settings.muted;
-    this.syncGains();
+    this.setMuted(!this.settings.muted);
     return this.settings.muted;
   }
   private syncGains(): void {
@@ -91,6 +92,7 @@ export class GameAudio {
       const ctx = this.ensure();
       if (ctx.state !== 'running' && !this.isHidden()) void ctx.resume().catch(() => undefined);
       this.unlocked = true;
+      this.primeVoice();
     } catch {
       this.unlocked = false;
     }
@@ -175,6 +177,61 @@ export class GameAudio {
     src.start(t0, Math.random() * 0.3);
     src.stop(t0 + duration + 0.02);
   }
+  /** Load the voice list once. Speaking later in the run is not a fresh tap. */
+  private primeVoice(): void {
+    try {
+      const synth = window.speechSynthesis;
+      if (!synth) return;
+      synth.getVoices();
+      if (!this.voiceHooked) {
+        this.voiceHooked = true;
+        synth.addEventListener('voiceschanged', () => {
+          synth.getVoices();
+        });
+      }
+    } catch {
+      /* this browser has no speech */
+    }
+  }
+
+  stopVoice(): void {
+    try {
+      window.speechSynthesis?.cancel();
+    } catch {
+      /* ignore */
+    }
+  }
+
+  /**
+   * One spoken door warning. A short chime first, then the line in the player's language.
+   * Original speech only — not a recorded railway announcement.
+   */
+  mindTheDoor(lang: 'en' | 'zh-HK', text: string): void {
+    if (!this.unlocked || this.settings.muted || this.settings.sfx <= 0.01 || !text) return;
+    this.tone(880, 0.1, 'sine', 0.05);
+    this.tone(1174.7, 0.16, 'sine', 0.04, 0.12);
+    this.speak(text, lang === 'en' ? 'en-GB' : 'zh-HK');
+  }
+
+  private speak(text: string, lang: string): void {
+    const synth = window.speechSynthesis;
+    if (!synth) return;
+    try {
+      const u = new SpeechSynthesisUtterance(text);
+      u.lang = lang;
+      u.rate = lang.startsWith('zh') ? 1.02 : 0.98;
+      u.pitch = 1;
+      u.volume = clamp01(this.settings.master * this.settings.sfx);
+      const voice = pickVoice(synth.getVoices(), lang);
+      if (voice) u.voice = voice;
+      synth.cancel();
+      synth.resume();
+      synth.speak(u);
+    } catch {
+      /* speech can be missing in a webview */
+    }
+  }
+
   warnBeep(urgency: number): void {
     const hi = 1480 + urgency * 220;
     const lo = 1180 + urgency * 180;
@@ -399,6 +456,18 @@ export class GameAudio {
     this.noise(0.1, 0.08, 180, 1.2, 0.02, 60);
   }
 }
+function pickVoice(voices: SpeechSynthesisVoice[], lang: string): SpeechSynthesisVoice | undefined {
+  const want = lang.startsWith('zh') ? ['zh-HK', 'yue-HK', 'zh-TW', 'zh-CN'] : ['en-GB', 'en-US', 'en'];
+  for (const tag of want) {
+    const hit = voices.find((v) => v.lang === tag || v.lang.toLowerCase().startsWith(tag.toLowerCase()));
+    if (hit) return hit;
+  }
+  if (lang.startsWith('zh')) {
+    return voices.find((v) => /cantonese|sinji|粵/i.test(v.name));
+  }
+  return voices.find((v) => v.lang.toLowerCase().startsWith('en'));
+}
+
 function clamp01(v: number): number {
   if (!Number.isFinite(v)) return 0;
   return Math.min(1, Math.max(0, v));

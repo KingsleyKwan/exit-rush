@@ -134,6 +134,7 @@ export const zhHK: Dict = {
   levelsTeaserV05: '短關卡 · 每隔幾關學一種特殊乘客',
   artCredit: '概念美術：Grok Image。香城鐵路係虛構，靈感來自香港地鐵，並無隸屬關係。',
   doorClosedToast: '呢道門不開！',
+  doorMind: '請小心車門。',
   doorBanner: '只開{n}道門',
   doorBannerZh: '只開{n}道門',
   doorBannerEn: 'Only {n} doors open',

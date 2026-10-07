@@ -126,6 +126,8 @@ export class Game {
   clock = 0;
   private hudT = 0;
   private beepT = 0;
+  /** Spoken door warning already played this run. */
+  private doorMinded = false;
   private ghostT = 0;
   private stinkT = 0;
   /** 大聲公 chatter-blip timer. */
@@ -527,6 +529,8 @@ export class Game {
     this.resultDelay = -1;
     this.hitStop = 0;
     this.beepT = 0;
+    this.doorMinded = false;
+    this.audio.stopVoice();
     this.input.reset();
     this.shoveBtn = false;
     this.train.setDoorOpenValue(1);
@@ -635,6 +639,7 @@ export class Game {
     this.autoPaused = auto;
     this.input.reset();
     this.shoveBtn = false;
+    this.audio.stopVoice();
     this.hooks.onState();
   }
 
@@ -1332,7 +1337,12 @@ export class Game {
 
     // Door-closing warning: lights + beeps speeding up in the last seconds.
     const W = TUNING.door.warnTime;
-    if (!sim.result && sim.timeLeft < W) {
+    if (!sim.result && sim.timeLeft < W && sim.timeLeft > 0) {
+      if (!this.doorMinded) {
+        this.doorMinded = true;
+        this.audio.mindTheDoor(getLang(), t().doorMind);
+        this.hooks.onToast?.(t().doorMind);
+      }
       const u = 1 - sim.timeLeft / W;
       this.train.setWarning(u);
       this.beepT -= dt;
