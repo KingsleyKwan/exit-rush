@@ -93,9 +93,9 @@ export function renderMenu(game: Game): HTMLElement {
           <div class="wordmark"><b>${dict.title}</b><span>${dict.titleCantonese}</span></div>
         </div>
         <p class="tagline">${dict.tagline}</p>
-        <div class="howto-icons" aria-label="${dict.howTo}">
+        <div class="howto-icons" aria-label="${game.save.character === 'mage' ? dict.howToMage : game.save.character === 'tech' ? dict.howToTech : dict.howTo}">
           <span>${icon('drag')}<small>${dict.hintDrag}</small></span>
-          <span>${icon('shove')}<small>${dict.hintShove}</small></span>
+          <span>${game.save.character === 'mage' ? `${icon('fire')}<small>${dict.hintCast}</small>` : game.save.character === 'tech' ? `${icon('shop')}<small>${dict.hintGear}</small>` : `${icon('shove')}<small>${dict.hintShove}</small>`}</span>
           <span>${icon('door')}<small>${dict.hintExit}</small></span>
         </div>
         ${titleCharPick(game)}

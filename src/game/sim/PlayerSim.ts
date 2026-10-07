@@ -363,17 +363,24 @@ export class PlayerSim {
       this.winded = false;
     }
 
-    // ---- Hold-to-shove: charge while held, burst on release.
+    // Hold-to-shove is the office worker's exit. Mage casts; Gear L uses kit.
     const S = P.shove;
-    if (input.shoveHeld) {
+    const canPush = (this.mods as { characterId?: string }).characterId !== 'mage'
+      && (this.mods as { characterId?: string }).characterId !== 'tech';
+    if (!canPush) {
+      this.shoveCharge = 0;
+      this.shoveWasHeld = false;
+    } else if (input.shoveHeld) {
       this.shoveCharge = Math.min(1, this.shoveCharge + dt / S.chargeTime);
+      this.shoveWasHeld = true;
     } else if (this.shoveWasHeld) {
       this.tryShove(0.45 + 0.55 * this.shoveCharge, world, crowd, emit);
       this.shoveCharge = 0;
+      this.shoveWasHeld = false;
     } else {
       this.shoveCharge = 0;
+      this.shoveWasHeld = false;
     }
-    this.shoveWasHeld = input.shoveHeld;
 
     if (this.path.length) this.path = [];
   }

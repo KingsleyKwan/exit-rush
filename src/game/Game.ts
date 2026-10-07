@@ -1195,7 +1195,8 @@ export class Game {
     const { fx, fz, rx, rz } = this.train.groundAxes();
     const wx = d.intentX * rx + d.intentZ * fx;
     const wz = d.intentX * rz + d.intentZ * fz;
-    return { x: wx, z: -wz, mag: d.magnitude, shoveHeld: this.shoveBtn || this.input.shoveKey };
+    const who = this.trial?.character ?? this.save.character;
+    return { x: wx, z: -wz, mag: d.magnitude, shoveHeld: who === 'hero' && (this.shoveBtn || this.input.shoveKey) };
   }
 
   // -------------------------------------------------------------------- loop

@@ -1129,6 +1129,23 @@ async function main(): Promise<void> {
     }
     console.log(`mage mana ok (max=${sim.player.manaMax}, bar=${mageMods.spellBar.join(',')})`);
 
+    const held = { x: 0, z: 0, mag: 0, shoveHeld: true };
+    const dtShove = 1 / 60;
+    for (const id of ['hero', 'mage', 'tech'] as const) {
+      const run = new Sim(LEVELS.find((l) => l.id === 1)!, modsFor(CHARACTERS[id], defaultSkills()), mulberry32(3));
+      for (let i = 0; i < 30; i++) run.step(dtShove, held);
+      const charge = run.player.shoveCharge;
+      if (id === 'hero' && charge < 0.9) {
+        console.error(`hero should charge a shove, got ${charge.toFixed(2)}`);
+        process.exit(1);
+      }
+      if (id !== 'hero' && charge > 0) {
+        console.error(`${id} must not push, charge=${charge.toFixed(2)}`);
+        process.exit(1);
+      }
+    }
+    console.log('push is hero-only');
+
     const fit = { str: 10, spd: 5, sta: 5, ultStr: false, ultSpd: false, ultSta: false, points: 0 };
     const old = normalizeSave({
       version: 1,

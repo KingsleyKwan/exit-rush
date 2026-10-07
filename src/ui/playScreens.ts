@@ -154,7 +154,7 @@ export function renderPlayHud(game: Game): HTMLElement {
           ${mods.hasSecondWind ? act('wind', `${dict.skillNodeActive}: ${dict.skSecondWind}`, true, 'sta') : ''}
           `}
         </div>
-        <button type="button" class="shove-btn" id="btn-shove" title="${dict.shove}" aria-label="${dict.shove}">${icon('shove')}</button>
+        ${who === 'hero' ? `<button type="button" class="shove-btn" id="btn-shove" title="${dict.shove}" aria-label="${dict.shove}">${icon('shove')}</button>` : ''}
       </div>
     </div>
   `);

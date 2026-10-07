@@ -40,6 +40,8 @@ export interface Dict {
   level: string;
   density: string;
   howTo: string;
+  howToMage: string;
+  howToTech: string;
   language: string;
   clearBonus: string;
   /** Replay clear bonus; {n} = this level's clears, {max} = cap. */
@@ -123,6 +125,8 @@ export interface Dict {
   off: string;
   hintDrag: string;
   hintShove: string;
+  hintCast: string;
+  hintGear: string;
   hintExit: string;
   finale: string;
   cleared: string;
@@ -260,6 +264,8 @@ export const en: Dict = {
   level: 'Level',
   density: 'Crowd',
   howTo: 'Drag anywhere to steer · hold ✊ to shove · get out before the doors close.',
+  howToMage: 'Drag anywhere to steer · cast a spell to clear the way · get out before the doors close.',
+  howToTech: 'Drag anywhere to steer · use your gear to clear the way · get out before the doors close.',
   language: 'Language',
   clearBonus: '+1 skill point',
   replayBonus: '+{n} skill points (replay {n}/{max})',
@@ -337,6 +343,8 @@ export const en: Dict = {
   off: 'Off',
   hintDrag: 'Drag',
   hintShove: 'Hold',
+  hintCast: 'Cast',
+  hintGear: 'Gear',
   hintExit: 'Get off',
   finale: 'Finale',
   cleared: 'Cleared',
