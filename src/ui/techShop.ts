@@ -12,6 +12,7 @@ import {
   buyBlock,
   coinBalance,
   gridOf,
+  gridMaxTier,
   GRID_TIERS,
   isItemId,
   itemDef,
@@ -74,6 +75,51 @@ function shapeHtml(id: ItemId, tier: Tier, dict: ReturnType<typeof t>, count = f
   }
   const n = count ? `<small>${cells.length} ${dict.cells}</small>` : '';
   return `<span class="shape" style="--sw:${w};--sh:${h}" aria-hidden="true">${bits}</span>${n}`;
+}
+
+const fitMemo = new Map<string, boolean>();
+
+/** True when some rotation of this tier fits the biggest bag, empty. */
+function everFits(id: ItemId, tier: Tier): boolean {
+  const key = `${id}${tier}`;
+  const cached = fitMemo.get(key);
+  if (cached != null) return cached;
+  const bag = gridMaxTier();
+  const { cols, rows } = gridOf(bag);
+  let ok = false;
+  for (const rot of [0, 1, 2, 3] as Rot[]) {
+    for (let y = 0; y < rows && !ok; y++) {
+      for (let x = 0; x < cols; x++) {
+        const chk = placeCheck([], bag, { [id]: tier }, { [id]: 1 }, { id, tier, x, y, rot });
+        if (chk.ok) { ok = true; break; }
+      }
+    }
+  }
+  fitMemo.set(key, ok);
+  return ok;
+}
+
+/**
+ * Every tier's footprint at once. `dimAbove` greys tiers the player does not own yet.
+ * `mark` is the tier a tap would place, or the tier the shop is selling next.
+ */
+function tierSizesHtml(id: ItemId, dict: ReturnType<typeof t>, dimAbove = 0, mark = 0): string {
+  const def = itemDef(id);
+  if (!def) return '';
+  const chips = def.shape.map((_, i) => {
+    const tier = (i + 1) as Tier;
+    const n = cellsFor(id, tier, 0).length;
+    const fit = everFits(id, tier);
+    const cls = [
+      'tier-size',
+      mark === tier ? 'on' : '',
+      dimAbove > 0 && tier > dimAbove ? 'locked' : '',
+      fit ? '' : 'nofit',
+    ].filter(Boolean).join(' ');
+    const fitNote = fit ? '' : `<small>${dict.wontFit}</small>`;
+    return `<span class="${cls}">${shapeHtml(id, tier, dict)}<b>${n}</b><small>${tierName(tier, dict)}</small>${fitNote}</span>`;
+  }).join('');
+  return `<span class="tier-sizes">${chips}</span>`;
 }
 
 function nextUncleared(game: Game): number {
@@ -143,8 +189,9 @@ export function renderWorkshop(game: Game, _rerender: (game: Game) => void): HTM
           size = `<em class="cell-n">${shape.length}</em>`;
         }
       }
+      const piece = p && hit != null ? ` p${hit % 6}` : '';
       cells.push(
-        `<button type="button" class="bag-cell${p ? ' filled' : ''}${on}${clash}" data-cell="${x},${y}" aria-label="${label || `${x},${y}`}">${mark}${size}</button>`,
+        `<button type="button" class="bag-cell${p ? ' filled' : ''}${piece}${on}${clash}" data-cell="${x},${y}" aria-label="${label || `${x},${y}`}">${mark}${size}</button>`,
       );
     }
   }
@@ -157,9 +204,9 @@ export function renderWorkshop(game: Game, _rerender: (game: Game) => void): HTM
     const tier = Math.min(3, Math.max(1, owned)) as Tier;
     const on = pick?.id === it.id ? ' on' : '';
     const name = en ? it.nameEn : it.nameZh;
-    const size = isItemId(it.id) ? shapeHtml(it.id, tier, dict, true) : '';
-    const tag = it.slot === 'consumable' ? `×${owned}` : tierName(owned, dict);
-    return `<button type="button" class="tray-item${on}" data-tray="${it.id}" data-tier="${tier}">${gearIcon(it.id, it.slot)}<span>${name}</span><span class="piece-size">${size}<small>${tag}</small></span></button>`;
+    const sizes = isItemId(it.id) ? tierSizesHtml(it.id, dict, tier, tier) : '';
+    const tag = it.slot === 'consumable' ? `<small>×${owned}</small>` : '';
+    return `<button type="button" class="tray-item${on}" data-tray="${it.id}" data-tier="${tier}">${gearIcon(it.id, it.slot)}<span class="name">${name}</span>${sizes}${tag}</button>`;
   }).join('');
 
   const sel = selected >= 0 ? placements[selected] : undefined;
@@ -189,19 +236,14 @@ export function renderWorkshop(game: Game, _rerender: (game: Game) => void): HTM
     const blurb = en ? it.blurbEn : it.blurbZh;
     const have = it.slot === 'consumable' ? (stock > 0 ? `${dict.ownedTier} ×${stock}` : '') : owned > 0 ? `${dict.ownedTier} · ${tierName(owned, dict)}` : '';
     const buyLabel = it.slot === 'consumable' || owned === 0 ? dict.buyItem : dict.upgradeItem;
-    const haveTier = (it.slot === 'consumable' ? (stock > 0 ? 1 : 0) : owned >= 1 ? Math.min(owned, it.shape.length, 3) : 0) as Tier | 0;
-    const buyTier = (next >= 0 ? Math.min(next + 1, it.shape.length, 3) : 0) as Tier | 0;
-    const nowShape = haveTier >= 1 && isItemId(it.id) ? shapeHtml(it.id, haveTier as Tier, dict, true) : '';
-    const nextShape = buyTier >= 1 && buyTier !== haveTier && isItemId(it.id) ? shapeHtml(it.id, buyTier as Tier, dict, true) : '';
-    const sizeRow = nowShape && nextShape
-      ? `${nowShape}<span class="shape-arrow">→</span>${nextShape}`
-      : (nowShape || nextShape);
+    const buyTier = (next >= 0 ? Math.min(next + 1, it.shape.length, 3) : Math.min(owned, it.shape.length, 3)) as Tier | 0;
+    const sizes = isItemId(it.id) ? tierSizesHtml(it.id, dict, 0, buyTier) : '';
     const lockLine = buyLock(buyBlock(game.save, it.id), dict);
     return `<article class="shop-card">
       <header>${gearIcon(it.id, it.slot)}<b>${name}</b></header>
+      <div class="shop-size">${sizes}</div>
       <p>${blurb}</p>
       ${have ? `<p class="shop-meta">${have}</p>` : ''}
-      <div class="shop-size">${sizeRow}</div>
       ${lockLine ? `<p class="shop-lock">${lockLine}</p>` : ''}
       <div class="shop-actions">
         ${next >= 0 ? `<button type="button" class="primary${lockLine ? ' is-locked' : ''}" data-buy="${it.id}" ${lockLine ? 'aria-disabled="true"' : ''}>${buyLabel} · ${price}</button>` : ''}

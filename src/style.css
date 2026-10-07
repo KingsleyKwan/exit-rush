@@ -2062,14 +2062,26 @@ button {
 .ico.it-core { color: #ce93d8; }
 .ico.it-consumable { color: #f48fb1; }
 .bag-cell.filled { border-style: solid; background: rgba(255,176,58,.22); }
-.bag-cell.on { outline: 2px solid #ffb03a; }
+.bag-cell.filled.p0 { background: rgba(255,176,58,.40); border-color: #ffb03a; }
+.bag-cell.filled.p1 { background: rgba(79,195,247,.34); border-color: #4fc3f7; }
+.bag-cell.filled.p2 { background: rgba(129,199,132,.34); border-color: #81c784; }
+.bag-cell.filled.p3 { background: rgba(255,138,101,.34); border-color: #ff8a65; }
+.bag-cell.filled.p4 { background: rgba(206,147,216,.36); border-color: #ce93d8; }
+.bag-cell.filled.p5 { background: rgba(255,213,79,.32); border-color: #ffd54f; }
+.bag-cell.on { outline: 2px solid #fff; outline-offset: 1px; }
 .bag-cell.clash { outline: 2px solid #ff8a65; }
-.tray { display: flex; gap: 8px; overflow-x: auto; padding-bottom: 14px; }
-.tray-item span { white-space: nowrap; }
+.tray {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(148px, 1fr));
+  gap: 8px;
+  padding-bottom: 4px;
+}
+.tray > .sfx-note { grid-column: 1 / -1; }
+.tray-item .name { font-weight: 800; line-height: 1.2; }
 .tray-item, .set-btn {
-  display: flex; flex-direction: column; align-items: flex-start; gap: 2px;
+  display: flex; flex-direction: column; align-items: flex-start; gap: 4px;
   border: 0; border-radius: 12px; background: rgba(255,255,255,.08); color: inherit;
-  padding: 8px 10px; font: inherit; flex: 0 0 auto;
+  padding: 8px 10px; font: inherit; min-width: 0;
 }
 .tray-item small, .set-btn small { opacity: .75; }
 .bag-actions, .bag-tools, .shop-actions, .set-row { display: flex; flex-wrap: wrap; gap: 8px; }
@@ -2082,7 +2094,13 @@ button {
   border-radius: 12px;
   background: rgba(255,255,255,.14);
 }
-.shop-list { display: flex; flex-direction: column; gap: 8px; }
+.shop-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 8px;
+  align-items: start;
+}
+.shop-list > .sfx-note, .shop-list > .primary { grid-column: 1 / -1; }
 .shop-card {
   background: rgba(255,255,255,.06);
   border-radius: 14px;
@@ -2105,15 +2123,15 @@ button {
 .place-hint.warn { color: #ffb74d; opacity: 1; font-weight: 700; }
 .shape {
   display: inline-grid;
-  grid-template-columns: repeat(var(--sw), 8px);
-  grid-template-rows: repeat(var(--sh), 8px);
+  grid-template-columns: repeat(var(--sw), 9px);
+  grid-template-rows: repeat(var(--sh), 9px);
   gap: 2px;
   vertical-align: middle;
 }
 .shape i {
   display: block;
-  width: 8px;
-  height: 8px;
+  width: 9px;
+  height: 9px;
   border-radius: 2px;
   background: rgba(255,255,255,.16);
 }
@@ -2124,6 +2142,17 @@ button {
   gap: 6px;
   font-size: 12px;
 }
-.shop-size { margin: 2px 0 6px; }
+.shop-size { margin: 6px 0; }
 .shape-arrow { opacity: .7; }
 .bag-tools .shape { margin-left: 6px; }
+.tier-sizes { display: flex; flex-wrap: wrap; gap: 8px; width: 100%; }
+.tier-size { display: flex; flex-direction: column; align-items: flex-start; gap: 1px; min-width: 34px; }
+.tier-size b { font-size: 15px; font-variant-numeric: tabular-nums; line-height: 1.1; }
+.tier-size small { font-size: 10px; line-height: 1.15; opacity: .8; }
+.tier-size.locked { opacity: .45; }
+.tier-size.nofit b { color: #ffb74d; }
+.tier-size.on b { color: #ffb03a; }
+.tray-item.on .tier-size b,
+.tray-item.on .tier-size small { color: #1b1408; opacity: 1; }
+.tray-item.on .tier-size.locked { opacity: .5; }
+.tray-item.on .tier-size.nofit b { color: #8a3b12; }

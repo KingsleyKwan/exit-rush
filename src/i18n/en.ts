@@ -205,6 +205,8 @@ export interface Dict {
   charNoteIos: string;
   trialBanner: string;
   noRoom: string;
+  /** A tier's shape cannot be placed in the 6-cell bag. */
+  wontFit: string;
   ownedTier: string;
   /** Standing workshop rule: one of each worn slot, and upgrades grow. */
   oneEach: string;
@@ -429,6 +431,7 @@ export const en: Dict = {
   charNoteIos: 'Each character keeps their own level progress. Mage and Gear L are optional characters.',
   trialBanner: 'Trial · no rewards',
   noRoom: 'No space',
+  wontFit: "Won't fit",
   ownedTier: 'Owned',
   oneEach: 'Shoes, gloves, head and core: one each. Upgrades take more cells.',
   bagLimit: 'The bag stops at 6 cells. Pack for this stage. One kit will not cover every car.',

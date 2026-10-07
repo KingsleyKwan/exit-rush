@@ -199,6 +199,7 @@ export const zhHK: Dict = {
   charNoteIos: '每個角色有自己嘅關卡進度。魔法師同裝備L係額外角色。',
   trialBanner: '試玩中 · 不計獎勵',
   noRoom: '冇位',
+  wontFit: '放唔入',
   ownedTier: '已有',
   oneEach: '鞋、手套、頭同核心，每樣只可以戴一件。升級會佔多啲格。',
   bagLimit: '背囊最多 6 格。呢關要帶咩自己揀，一套裝唔會通殺。',
