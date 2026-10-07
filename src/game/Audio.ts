@@ -25,6 +25,8 @@ export class GameAudio {
   private ambientWant = 0;
   private warnPair = 0;
   private voiceHooked = false;
+  /** Bumped by stopVoice so a late announcement callback cannot fire. */
+  private voiceGen = 0;
   private logOnce = false;
   applySettings(s: Partial<AudioSettings> | null | undefined): void {
     const d = DEFAULT_AUDIO;
@@ -195,11 +197,36 @@ export class GameAudio {
   }
 
   stopVoice(): void {
+    this.voiceGen++;
     try {
       window.speechSynthesis?.cancel();
     } catch {
       /* ignore */
     }
+  }
+
+  /**
+   * Spoken station name while the doors are still shut.
+   * Original speech only — the parody name, not a recorded railway announcement.
+   * `onDone` fires when the line finishes, fails, or cannot play.
+   */
+  stationCall(lang: 'en' | 'zh-HK', text: string, onDone: () => void): void {
+    this.stopVoice();
+    const gen = this.voiceGen;
+    let fired = false;
+    const done = () => {
+      if (fired || gen !== this.voiceGen) return;
+      fired = true;
+      onDone();
+    };
+    if (!this.unlocked || this.settings.muted || this.settings.sfx <= 0.01 || !text || !window.speechSynthesis) {
+      done();
+      return;
+    }
+    this.tone(523.25, 0.12, 'sine', 0.05);
+    this.tone(659.25, 0.16, 'sine', 0.045, 0.14);
+    this.speak(text, lang === 'en' ? 'en-GB' : 'zh-HK', { onend: done, onerror: done });
+    window.setTimeout(done, 9000);
   }
 
   /**
@@ -213,7 +240,7 @@ export class GameAudio {
     this.speak(text, lang === 'en' ? 'en-GB' : 'zh-HK');
   }
 
-  private speak(text: string, lang: string): void {
+  private speak(text: string, lang: string, hooks?: { onend?: () => void; onerror?: () => void }): void {
     const synth = window.speechSynthesis;
     if (!synth) return;
     try {
@@ -224,11 +251,13 @@ export class GameAudio {
       u.volume = clamp01(this.settings.master * this.settings.sfx);
       const voice = pickVoice(synth.getVoices(), lang);
       if (voice) u.voice = voice;
+      if (hooks?.onend) u.onend = hooks.onend;
+      if (hooks?.onerror) u.onerror = () => hooks.onerror?.();
       synth.cancel();
       synth.resume();
       synth.speak(u);
     } catch {
-      /* speech can be missing in a webview */
+      hooks?.onerror?.();
     }
   }
 

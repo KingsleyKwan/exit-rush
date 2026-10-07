@@ -76,6 +76,18 @@ function techActions(game: Game, dict: ReturnType<typeof t>): string {
   return `${drinks ? `<div class="cons-row">${drinks}</div>` : ''}${gadget.join('')}`;
 }
 
+/** Station name while the doors are still shut. The spoken line uses the same words. */
+export function renderArrival(game: Game): HTMLElement {
+  const lv = game.level!;
+  const name = stationName(lv);
+  return el(`
+    <div class="arrival-banner" role="status">
+      <b>${name}</b>
+      <p>${fmt(t().stationCall, { station: name })}</p>
+    </div>
+  `);
+}
+
 export function renderPlayHud(game: Game): HTMLElement {
   const dict = t();
   const lv = game.level!;

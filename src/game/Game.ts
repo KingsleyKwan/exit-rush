@@ -39,13 +39,13 @@ import type { IntroKind } from './intros';
 import type { PassengerKind } from './PassengerTypes';
 import { loadSave, writeSave, type QualityLevel, type QualitySetting, type SaveData, type SkillState } from './storage';
 import { FpsProbe, PROBE_MIN_FPS, pixelRatioFor, resolveQuality } from './quality';
-import { setLang, getLang, t } from '../i18n';
+import { setLang, getLang, t, fmt } from '../i18n';
 import { Sim } from './sim/Sim';
 import { TUNING } from './sim/tuning';
 import type { SimEvent, UltKind } from './sim/events';
 import type { PlayerInput } from './sim/PlayerSim';
 
-export type GameScreen = 'menu' | 'levels' | 'legend' | 'characters' | 'boss' | 'intro' | 'playing' | 'paused' | 'skills' | 'win' | 'lose';
+export type GameScreen = 'menu' | 'levels' | 'legend' | 'characters' | 'boss' | 'intro' | 'arrival' | 'playing' | 'paused' | 'skills' | 'win' | 'lose';
 
 /** v0.7 boss entrance cutscene lengths (s): first time / repeat visits. */
 export const BOSS_CUT_FULL = 2.6;
@@ -128,6 +128,9 @@ export class Game {
   private beepT = 0;
   /** Spoken door warning already played this run. */
   private doorMinded = false;
+  /** Doors-shut station call before the run starts. Null once the doors have opened. */
+  private arrival: { spoken: boolean; hold: number; phase: 'call' | 'open'; open: number } | null = null;
+  private arrivalGen = 0;
   private ghostT = 0;
   private stinkT = 0;
   /** 大聲公 chatter-blip timer. */
@@ -504,8 +507,6 @@ export class Game {
       return;
     }
     this.audio.unlock();
-    this.audio.arrival();
-    this.audio.announce(getLang());
     this.level = level;
     this.setStationFor(level);
     this.train.setOpenBays(openDoorBays(level.id, level.openDoors));
@@ -530,11 +531,11 @@ export class Game {
     this.hitStop = 0;
     this.beepT = 0;
     this.doorMinded = false;
-    this.audio.stopVoice();
     this.input.reset();
     this.shoveBtn = false;
-    this.train.setDoorOpenValue(1);
-    this.audio.doorOpen();
+    sim.doorOpen = 0;
+    this.train.setDoorOpenValue(0);
+    this.train.setWarning(0);
 
     // FTUE ghost on first L1
     this.showFtueGhost = id === 1 && !this.save.ftueDone;
@@ -543,17 +544,59 @@ export class Game {
     const intro = level.introKind;
     if (intro && !this.save.seenIntros.includes(intro)) {
       this.pendingIntro = intro as IntroKind;
-      this.screen = 'intro';
-    } else {
-      this.screen = 'playing';
     }
-    // v0.7: boss levels open on the entrance cutscene (full length the first time only).
+    // Boss entrance waits until the doors have opened, so its clock starts then.
     this.bossCut = null;
-    if (level.boss?.length) {
-      const full = !progressOf(this.save).seenBosses.includes(level.id);
+    this.arrivalGen++;
+    this.arrival = { spoken: false, hold: 0, phase: 'call', open: 0 };
+    this.screen = 'arrival';
+    const station = getLang() === 'en' ? level.stationEn : level.stationZh;
+    const gen = this.arrivalGen;
+    this.audio.stationCall(getLang(), fmt(t().stationCall, { station }), () => {
+      if (gen !== this.arrivalGen || !this.arrival) return;
+      this.arrival.spoken = true;
+    });
+    this.hooks.onState();
+  }
+
+  /**
+   * Doors stay shut while the station name is spoken, then slide open.
+   * The run (boss cut, intro card, or play) starts only after they are open.
+   */
+  private tickArrival(dt: number): void {
+    const a = this.arrival;
+    if (this.screen !== 'arrival' || !a || !this.sim) return;
+    if (document.hidden) return;
+    a.hold += dt;
+    if (a.phase === 'call' && a.spoken && a.hold >= 1.2) {
+      a.phase = 'open';
+      this.audio.doorOpen();
+    }
+    if (a.phase === 'open') {
+      a.open = Math.min(1, a.open + dt / 0.85);
+      this.sim.doorOpen = a.open;
+      if (a.open >= 1) this.beginRun();
+    } else {
+      this.sim.doorOpen = 0;
+    }
+  }
+
+  /** Hand off to the boss cut, the intro card, or play. Doors are already open. */
+  private beginRun(): void {
+    if (!this.level) return;
+    this.arrival = null;
+    if (this.sim) this.sim.doorOpen = 1;
+    this.train.setDoorOpenValue(1);
+    this.bossCut = null;
+    if (this.level.boss?.length) {
+      const full = !progressOf(this.save).seenBosses.includes(this.level.id);
       this.bossCut = { t: 0, start: performance.now(), dur: full ? BOSS_CUT_FULL : BOSS_CUT_SHORT, full, slammed: false };
       this.screen = 'boss';
+    } else {
+      this.screen = this.pendingIntro ? 'intro' : 'playing';
     }
+    this.lastT = performance.now();
+    this.acc = 0;
     this.hooks.onState();
   }
 
@@ -679,8 +722,11 @@ export class Game {
     this.activeTip = null;
     this.showFtueGhost = false;
     this.level = null;
+    this.arrival = null;
+    this.arrivalGen++;
     this.input.reset();
     this.train.setWarning(0);
+    this.audio.stopVoice();
     this.audio.stopAmbience();
     this.makeAmbient();
     this.hooks.onState();
@@ -1222,6 +1268,7 @@ export class Game {
     let alpha = 1;
 
     if (sim) {
+      this.tickArrival(dt);
       const active = this.screen === 'playing' || ((this.screen === 'win' || this.screen === 'lose') && !sim.ambient);
       const runAmbient = sim.ambient && (this.screen === 'skills' || BACKDROP_SCREENS.includes(this.screen));
       if (active || runAmbient) {

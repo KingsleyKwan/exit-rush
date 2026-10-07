@@ -938,14 +938,18 @@ export class TrainScene {
         d.leafPos.position.set(wall - 0.04, 0, d.z + (0.48 + half * this.doorOpen));
         d.psdNeg.position.set(wall - 0.22, 0, d.z - (0.48 + 0.9 * this.doorOpen));
         d.psdPos.position.set(wall - 0.22, 0, d.z + (0.48 + 0.9 * this.doorOpen));
-        d.guide.visible = true;
-        d.guide.position.y = 2.4 + Math.sin(t * 3.6 + d.z) * 0.14;
+        // Still shut (arrival): no exit arrow, and not the red "this door never opens" lamp.
+        const waiting = this.doorOpen < 0.05 && this.warn <= 0;
+        d.guide.visible = !waiting;
+        if (!waiting) d.guide.position.y = 2.4 + Math.sin(t * 3.6 + d.z) * 0.14;
         if (this.guideMat) this.guideMat.opacity = 0.75 + 0.2 * Math.sin(t * 4);
 
         if (this.warn > 0) {
           // Closing: flashing amber on open bays.
           const on = warnFlash;
           this.setBayLight(d, on ? 0xffa000 : 0xffcc44, on ? 2.0 : 0.55, on ? 0xff8800 : 0xffb000);
+        } else if (waiting) {
+          this.setBayLight(d, 0xffcc44, 0.65, 0xc47a00);
         } else {
           // Open & safe: green indicator.
           this.setBayLight(d, 0x22ee66, 0.85 + 0.15 * Math.sin(t * 2.5), 0x1a8f4a);

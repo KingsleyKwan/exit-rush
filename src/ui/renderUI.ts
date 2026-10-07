@@ -15,7 +15,7 @@ import {
 } from './uiShared';
 import { renderMenu, renderLevels, renderLegend } from './menuScreens';
 import { renderCharacters } from './characterSelect';
-import { renderPlayHud, updatePlayHud, renderPause, renderEnd } from './playScreens';
+import { renderPlayHud, updatePlayHud, renderPause, renderEnd, renderArrival } from './playScreens';
 import { entitlements } from '../game/entitlements';
 
 let lastKey = '';
@@ -116,6 +116,8 @@ export function renderUI(root: HTMLElement, game: Game): void {
     } else {
       wrap.appendChild(sheet);
     }
+  } else if (game.screen === 'arrival') {
+    if (game.level) wrap.appendChild(renderArrival(game));
   } else if (game.screen === 'playing' || game.screen === 'paused') {
     wrap.appendChild(renderPlayHud(game));
     if (game.screen === 'paused') wrap.appendChild(renderPause(game));

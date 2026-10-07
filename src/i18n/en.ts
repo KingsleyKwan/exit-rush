@@ -142,6 +142,8 @@ export interface Dict {
   doorClosedToast: string;
   /** Spoken once in the last few seconds, while the doors are about to close. */
   doorMind: string;
+  /** Spoken once before the doors open. `{station}` is the parody name. */
+  stationCall: string;
   doorBanner: string;
   doorBannerZh: string;
   doorBannerEn: string;
@@ -360,6 +362,7 @@ export const en: Dict = {
   levelsTeaserV05: 'Short exits · learn one special every few levels',
   doorClosedToast: "This door won't open!",
   doorMind: 'Please mind the door.',
+  stationCall: 'Passengers, this station is {station}.',
   doorBanner: 'Only {n} doors open',
   doorBannerZh: '只開{n}道門',
   doorBannerEn: 'Only {n} doors open',
