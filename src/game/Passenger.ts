@@ -232,8 +232,20 @@ export class Passenger {
     this.bob += dt * (brat ? 7 + speed * 6 : 4 + speed * 7);
     const moving = Math.min(1, speed * 1.5 + (brat ? 0.6 : 0.15));
     const bobY = Math.abs(Math.sin(this.bob)) * hop * moving;
-    this.mesh.position.set(x, bobY, z);
-    const waddle = Math.sin(this.bob) * (a.isKid ? 0.12 : 0.07) * Math.min(1, speed * 1.2);
+    // Collision stays in the aisle (the bench box rejects a body on the cushion).
+    // Shift the drawing back so the hips land on the pad and the knees stay forward.
+    const seated = a.seated && a.seatYaw !== null;
+    const backX = seated ? (a.seatYaw! > 0 ? -1 : 1) : 0;
+    const seatShift = 0.52;
+    const seatY = seated ? 0.4 - 0.3 * a.scale : bobY;
+    this.mesh.position.set(x + backX * seatShift, seatY, z);
+    if (seated) {
+      const s = a.scale || 1;
+      this.shadowAnchor.position.set((-backX * seatShift) / s, (0.012 - seatY) / s, 0);
+    } else {
+      this.shadowAnchor.position.set(0, 0.012, 0);
+    }
+    const waddle = seated ? 0 : Math.sin(this.bob) * (a.isKid ? 0.12 : 0.07) * Math.min(1, speed * 1.2);
 
     // Face movement, lean into velocity.
     if (this.faceYaw !== null) this.yaw = angleLerp(this.yaw, this.faceYaw, 1 - Math.exp(-10 * dt));

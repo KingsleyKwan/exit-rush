@@ -523,8 +523,11 @@ export type Look =
   | 'seat5'
   | 'stench'
   | 'family'
+  | 'familySit'
   | 'kidGirl'
+  | 'kidGirlSit'
   | 'kidBoy'
+  | 'kidBoySit'
   | 'brat'
   | 'coupleF'
   | 'coupleM'
@@ -557,8 +560,11 @@ const SPECS: Record<Look | 'hero' | 'mage' | 'tech', Spec> = {
   seat5: { skin: 0xe2ad84, hair: DARK_HAIR, style: 'short', shirt: 0x34363d, sleeves: 'short', pants: 0x4a5568, shoes: 0xf2f2f2, phone: true, mouth: 'flat', sit: true },
   stench: { skin: 0xc9a76b, hair: 0x3a302a, style: 'messy', shirt: 0xd9c84a, sleeves: 'none', pants: 0x6b7a3e, shorts: true, shoes: 0x7a5230, belly: true, stubble: true, brows: 'sad', mouth: 'frown', bw: 1.08 },
   family: { skin: 0xf3c9a4, hair: 0x5a3825, style: 'bun', shirt: 0xf3ead8, jacket: 0xe0732d, inner: 0xf3ead8, sleeves: 'long', pants: 0x5a4030, shoes: 0xd56a2a, blush: true },
+  familySit: { skin: 0xf3c9a4, hair: 0x5a3825, style: 'bun', shirt: 0xf3ead8, jacket: 0xe0732d, inner: 0xf3ead8, sleeves: 'long', pants: 0x5a4030, shoes: 0xd56a2a, blush: true, sit: true },
   kidGirl: { skin: 0xf6cfaa, hair: 0x4a2c1d, style: 'pigtails', shirt: 0xf2c94c, dress: 0xd8552f, sleeves: 'short', pants: 0xd8552f, shoes: 0xd8552f, head: 1.18, blush: true, bigEyes: true },
+  kidGirlSit: { skin: 0xf6cfaa, hair: 0x4a2c1d, style: 'pigtails', shirt: 0xf2c94c, dress: 0xd8552f, sleeves: 'short', pants: 0xd8552f, shoes: 0xd8552f, head: 1.18, blush: true, bigEyes: true, sit: true },
   kidBoy: { skin: 0xf6cfaa, hair: 0x4a2c1d, style: 'short', shirt: 0xe8752e, sleeves: 'long', pants: 0x6b4a32, shorts: true, shoes: 0xf08a3c, hood: true, head: 1.18, blush: true, bigEyes: true },
+  kidBoySit: { skin: 0xf6cfaa, hair: 0x4a2c1d, style: 'short', shirt: 0xe8752e, sleeves: 'long', pants: 0x6b4a32, shorts: true, shoes: 0xf08a3c, hood: true, head: 1.18, blush: true, bigEyes: true, sit: true },
   brat: { skin: 0xf6cfaa, hair: 0x3a2a20, style: 'short', cap: 0xf06aa8, shirt: 0xf37ab8, sleeves: 'short', pants: 0x7c4fd0, shorts: true, shoes: 0xf06aa8, mouth: 'tongue', armUp: true, head: 1.12, bigEyes: true },
   coupleF: { skin: 0xf2c5a0, hair: 0x6e1d45, style: 'long', shirt: 0xc8307f, sleeves: 'long', pants: 0x2b2f3a, shoes: 0xc8307f, blush: true },
   coupleM: { skin: 0xeebd96, hair: 0x6e1d45, style: 'short', shirt: 0xc8307f, sleeves: 'short', pants: 0x2d3d63, shoes: 0xc8307f, blush: true },
@@ -574,6 +580,10 @@ const SEATS: Look[] = ['seat0', 'seat1', 'seat2', 'seat3', 'seat4', 'seat5'];
 
 /** Which look an agent wears (deterministic per agent id). */
 export function lookFor(a: Pick<Agent, 'id' | 'kind' | 'isKid' | 'seated'>): Look {
+  if (a.seated && a.kind === 'family') {
+    if (!a.isKid) return 'familySit';
+    return a.id % 2 ? 'kidGirlSit' : 'kidBoySit';
+  }
   if (a.seated) return SEATS[(a.id * 7 + 3) % SEATS.length];
   switch (a.kind) {
     case 'normal':

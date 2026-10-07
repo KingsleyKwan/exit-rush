@@ -515,21 +515,82 @@ export class CrowdSim {
   }
 
   /**
-   * Two people per bench, knees in the aisle just in front of the cushion,
-   * so that lane is not a highway. Facing into the aisle.
+   * Two seats per bench side. Collision sits just in front of the cushion
+   * (a body inside the bench box does not fit). Door-wall benches first.
    */
-  private benchSeatHomes(): { x: number; z: number; yaw: number }[] {
+  private benchPairs(): { x: number; yaw: number; z0: number; z1: number }[] {
     const dh = TUNING.car.doorHalf;
     const bays = [...TUNING.car.doorBays].sort((a, b) => a - b);
-    const out: { x: number; z: number; yaw: number }[] = [];
-    for (let i = 0; i < bays.length - 1; i++) {
-      const cz = (bays[i] + dh + bays[i + 1] - dh) / 2;
-      for (const dz of [-0.34, 0.34]) {
-        out.push({ x: -0.98, z: cz + dz, yaw: Math.PI / 2 });
-        out.push({ x: 0.98, z: cz + dz, yaw: -Math.PI / 2 });
+    const out: { x: number; yaw: number; z0: number; z1: number }[] = [];
+    for (const side of [-1, 1] as const) {
+      for (let i = 0; i < bays.length - 1; i++) {
+        const cz = (bays[i] + dh + bays[i + 1] - dh) / 2;
+        out.push({
+          x: side * 0.98,
+          yaw: side < 0 ? Math.PI / 2 : -Math.PI / 2,
+          z0: cz - 0.34,
+          z1: cz + 0.34,
+        });
       }
     }
     return out;
+  }
+
+  /** A standing spot must not steal a loudmouth or stench home. */
+  private clearOfHazards(x: number, z: number, r: number, openBays: readonly number[], fromZ: number): boolean {
+    for (const kind of ['loud', 'stench'] as const) {
+      const hr = PASSENGER_DEFS[kind].radius;
+      for (const h of this.shortHomes(openBays, fromZ, kind, true)) {
+        if (Math.hypot(x - h.x, z - h.z) < r + hr + 0.08) return false;
+      }
+    }
+    return true;
+  }
+
+  /**
+   * Two children on the bench, parent standing in the aisle in front of them.
+   * Most of the family sits; the one without a seat blocks that lane.
+   */
+  private trySeatFamily(
+    pair: { x: number; yaw: number; z0: number; z1: number },
+    openBays: readonly number[],
+    avoidZ: number,
+  ): Agent[] | null {
+    const r = PASSENGER_DEFS.family.radius;
+    const kidR = r * 0.78;
+    if (!this.canFit(pair.x, pair.z0, kidR) || !this.canFit(pair.x, pair.z1, kidR)) return null;
+    const into = pair.yaw > 0 ? 1 : -1;
+    // Tuck the parent against both children. A side-by-side gap leaves them
+    // standing in the middle of the aisle instead of just in front of the seat.
+    const standZ = (pair.z0 + pair.z1) / 2;
+    const dz = Math.abs(pair.z1 - standZ);
+    const need = kidR + r + 0.02;
+    const dx = Math.sqrt(Math.max(need * need - dz * dz, 0.04 * 0.04));
+    const standX = pair.x + into * dx;
+    if (!this.canFit(standX, standZ, r)) return null;
+    if (!this.clearOfHazards(standX, standZ, r, openBays, avoidZ)) return null;
+    for (const bay of openBays) {
+      if (this.coversGap(standX, standZ, r, bay)) return null;
+    }
+    const cid = ++this.clusterSeq;
+    const made: Agent[] = [];
+    const sit = (x: number, z: number) => {
+      const a = this.makeAgent('family', x, z, 'rider', true);
+      a.clusterId = cid;
+      a.posted = true;
+      a.seated = true;
+      a.seatYaw = pair.yaw;
+      made.push(a);
+    };
+    sit(pair.x, pair.z0);
+    sit(pair.x, pair.z1);
+    const parent = this.makeAgent('family', standX, standZ, 'rider', false);
+    parent.clusterId = cid;
+    parent.posted = true;
+    // Face the bench, toward the children.
+    parent.seatYaw = -pair.yaw;
+    made.push(parent);
+    return made;
   }
 
   /**
@@ -652,17 +713,6 @@ export class CrowdSim {
     let people = 0;
     let guard = 0;
     const rNormal = PASSENGER_DEFS.normal.radius;
-    if (shaped) {
-      const post = (home: { x: number; z: number; yaw: number }, seated: boolean) => {
-        if (people >= n || !this.canFit(home.x, home.z, rNormal)) return;
-        const a = this.makeAgent('normal', home.x, home.z, 'rider');
-        a.posted = true;
-        a.seated = seated;
-        a.seatYaw = home.yaw;
-        people++;
-      };
-      for (const home of this.benchSeatHomes()) post(home, true);
-    }
     const takeHazard = (kind: 'loud' | 'stench'): [number, number] | null => {
       const reach = kind === 'loud' ? TUNING.types.loud.radius : TUNING.types.stench.auraRadius;
       const bodyR = PASSENGER_DEFS[kind].radius;
@@ -678,6 +728,37 @@ export class CrowdSim {
       const kind = pickKind(level.mix, this.rng);
       queued.push(kind);
       planned += kind === 'family' ? 3 : kind === 'couple' ? 2 : 1;
+    }
+    if (shaped) {
+      const pairs = this.benchPairs();
+      const used = new Set<number>();
+      for (let p = 0; p < pairs.length; p++) {
+        const idx = queued.indexOf('family');
+        if (idx < 0) break;
+        const pair = pairs[p];
+        if (!pair) continue;
+        const made = this.trySeatFamily(pair, openBays, avoidZ);
+        if (!made) continue;
+        queued.splice(idx, 1);
+        people += made.length;
+        used.add(p);
+      }
+      for (let p = 0; p < pairs.length; p++) {
+        if (used.has(p)) continue;
+        const pair = pairs[p];
+        if (!pair) continue;
+        for (const z of [pair.z0, pair.z1]) {
+          if (people >= n) break;
+          const ni = queued.indexOf('normal');
+          if (ni < 0 || !this.canFit(pair.x, z, rNormal)) continue;
+          queued.splice(ni, 1);
+          const a = this.makeAgent('normal', pair.x, z, 'rider');
+          a.posted = true;
+          a.seated = true;
+          a.seatYaw = pair.yaw;
+          people++;
+        }
+      }
     }
     const placeRider = (kind: PassengerKind, x: number, z: number, spread: number, posted = false) => {
       const made = this.spawnGroup(kind, x, z, 'rider', spread);

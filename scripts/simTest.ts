@@ -1206,6 +1206,7 @@ async function main(): Promise<void> {
     const seeds = [1, 2, 3, 4, 7, 11];
     let sawTwoDoor = false;
     let sawStench = false;
+    let sawFamilySeat = false;
     const checkLoud = (id: number, quiet: [number, number][], minLoud: number, short: [number, number] | null) => {
       for (const seed of seeds) {
         const lv = LEVELS.find((l) => l.id === id)!;
@@ -1268,6 +1269,32 @@ async function main(): Promise<void> {
         if (sim.crowd.auraSlowAt(sim.player.body.x, sim.player.body.z) > 0) bad.push('spawn stench');
         const stenches = sim.crowd.agents.filter((a) => a.kind === 'stench' && !a.boss && a.mode === 'rider');
         if (stenches.some((a) => a.posted)) sawStench = true;
+        if (id === 24 || id === 33) {
+          const fam = sim.crowd.agents.filter((a) => a.kind === 'family' && !a.boss && a.mode === 'rider');
+          const by = new Map<number, typeof fam>();
+          for (const a of fam) {
+            if (!a.clusterId) continue;
+            const g = by.get(a.clusterId) ?? [];
+            g.push(a);
+            by.set(a.clusterId, g);
+          }
+          let seatedHere = false;
+          for (const g of by.values()) {
+            const kids = g.filter((a) => a.isKid && a.seated);
+            if (!kids.length) continue;
+            seatedHere = true;
+            const parent = g.find((a) => !a.isKid && !a.seated && a.posted && Math.abs(a.body.x) < 0.9);
+            if (kids.length !== 2 || !parent) bad.push(`family split kids=${kids.length}`);
+            else {
+              const z0 = Math.min(kids[0].body.z, kids[1].body.z);
+              const z1 = Math.max(kids[0].body.z, kids[1].body.z);
+              if (parent.body.z < z0 - 0.05 || parent.body.z > z1 + 0.05) bad.push('parent not between the children');
+              if (Math.abs(parent.body.x) >= Math.abs(kids[0].body.x) - 0.05) bad.push('parent not in front of the seat');
+            }
+          }
+          if (seatedHere) sawFamilySeat = true;
+          else if (fam.length) bad.push('family present but none on a seat');
+        }
         for (const a of stenches) {
           if (!a.posted) bad.push('stench not on the short way');
           for (const bay of sim.openBays) {
@@ -1296,6 +1323,10 @@ async function main(): Promise<void> {
     }
     if (!sawStench) {
       console.error('L24 never spawned a stench on the short way');
+      process.exit(1);
+    }
+    if (!sawFamilySeat) {
+      console.error('L24/L33 never seated a family with a parent standing in front');
       process.exit(1);
     }
     console.log('loud layout ok');
