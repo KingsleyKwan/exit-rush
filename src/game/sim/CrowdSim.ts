@@ -350,7 +350,9 @@ export class CrowdSim {
   /**
    * Both sides of every door, inside the vestibule, backs toward the glass
    * beside the bench. The middle of the opening stays a sideways squeeze.
-   * Open doors come first — that is the squeeze the player actually uses.
+   * Open doors first, and within a door the upward flank (−Z, the way the
+   * player walks up the car) before the bottom flank. Shut doors follow the
+   * same way: the far end before the near door the player can skip.
    */
   private doorSideHomes(openBays: readonly number[]): { x: number; z: number; yaw: number }[] {
     const x = -1.52;
@@ -360,11 +362,11 @@ export class CrowdSim {
       const ao = open.has(a) ? 0 : 1;
       const bo = open.has(b) ? 0 : 1;
       if (ao !== bo) return ao - bo;
-      return b - a;
+      return a - b;
     });
     const out: { x: number; z: number; yaw: number }[] = [];
     for (const bay of bays) {
-      out.push({ x, z: bay + 0.5, yaw }, { x, z: bay - 0.5, yaw });
+      out.push({ x, z: bay - 0.5, yaw }, { x, z: bay + 0.5, yaw });
     }
     return out;
   }
@@ -594,75 +596,63 @@ export class CrowdSim {
   }
 
   /**
-   * Loudmouth / stench spots on the short way to the nearest door.
-   * The ring or cloud must be able to miss both the spawn and the open mouth,
-   * so two-door stench stands beside that short crossing rather than on the mouth.
+   * Loudmouth / stench spots on the walks to an open door, starting on the
+   * upward side (−Z). A player who walks up the car meets them; they are not
+   * piled in the bottom-door pocket that walk skips. The ring or cloud still
+   * has to miss the spawn and every open mouth.
    */
   private shortHomes(openBays: readonly number[], fromZ: number, kind: 'loud' | 'stench', shaped: boolean): { x: number; z: number }[] {
     const near = nearestDoorBay(fromZ, openBays);
-    const longWay = openBays.some((z) => Math.abs(z - near) > 0.5);
+    const other = openBays.find((z) => Math.abs(z - near) > 0.5);
+    const longWay = other !== undefined;
+    // The door further up the car (lower Z). One open door: that door itself.
+    const up = longWay ? Math.min(near, other) : near;
+    const midZ = longWay ? (near + other) / 2 : near;
     if (!shaped) {
       if (kind === 'stench') return [];
       if (longWay) {
         return [
-          { x: -0.4, z: near - 0.55 },
-          { x: -0.6, z: near - 0.95 },
-          { x: -0.25, z: near - 0.8 },
-          { x: -0.5, z: near - 1.05 },
+          { x: 0.05, z: up - 1.1 },
+          { x: -0.15, z: midZ },
+          { x: 0.4, z: up - 0.45 },
+          { x: 0.1, z: midZ - 0.7 },
         ];
       }
       return [
-        { x: 0.95, z: near + 1.2 },
-        { x: 0.85, z: near + 0.25 },
-        { x: 0.78, z: near - 0.7 },
-        { x: 0.7, z: near - 1.55 },
+        { x: 0.0, z: near - 1.55 },
+        { x: 0.45, z: near - 0.6 },
+        { x: 0.7, z: near + 0.4 },
+        { x: -0.15, z: near - 0.95 },
       ];
     }
     if (longWay) {
-      // Loudmouths screen the near door. The crossing is shorter than two stench
-      // auras, so stench stands just past the player — the cloud still covers the line.
+      // Between the two exits and past the further one. Not a screen on the near door only.
       return kind === 'loud'
         ? [
-            { x: -0.24, z: near + 0.22 },
-            { x: -0.2, z: near + 0.05 },
-            { x: -0.35, z: near - 0.45 },
+            { x: 0.05, z: up - 1.15 },
+            { x: -0.1, z: midZ },
+            { x: 0.2, z: up - 0.5 },
           ]
-        : [{ x: -0.4, z: near + 1.05 }];
+        : [
+            { x: 0.15, z: up - 1.75 },
+            { x: 0.25, z: midZ - 0.6 },
+          ];
     }
-    // One door: center of the diagonal. Seat aisles (x ≈ ±0.98) belong to the sitters.
-    // Stench aura is wider than the loud ring, so it stands further toward +X.
+    // One door: the first spots are up the car from the exit. One stays on the
+    // direct line so that walk is not empty either. Seat aisles stay with the sitters.
     return kind === 'loud'
       ? [
-          { x: 0.35, z: near + 1.7 },
-          { x: 0.3, z: near + 0.95 },
-          { x: 0.25, z: near + 0.4 },
+          { x: 0.05, z: near - 1.55 },
+          { x: -0.25, z: near - 0.55 },
+          { x: 0.1, z: near + 0.95 },
         ]
       : [
-          { x: 0.52, z: near + 0.75 },
-          { x: 0.62, z: near + 0.2 },
+          { x: 0.45, z: near - 2.05 },
+          { x: 0.5, z: near + 0.4 },
         ];
   }
 
-  /** Points on the way around. A hazard reach must not cover these. */
-  private detourPoints(openBays: readonly number[], fromZ: number): [number, number][] {
-    const near = nearestDoorBay(fromZ, openBays);
-    const far = openBays.find((z) => Math.abs(z - near) > 0.5);
-    if (far === undefined) {
-      return [
-        [-1.05, near + 2.3],
-        [-1.05, near + 1.15],
-        [-1.1, near + 0.45],
-      ];
-    }
-    const toward = far - near;
-    return [
-      [1.05, near + toward * 0.31],
-      [1.0, near + toward * 0.73],
-      [-1.15, far + Math.sign(near - far) * 0.25],
-    ];
-  }
-
-  /** A spot on a hazard home. Slides away from the player, never onto the spawn, an open mouth, or the detour. */
+  /** A spot on a hazard home. Slides away from the player, never onto the spawn or an open mouth. */
   private hazardPlace(
     homeX: number,
     homeZ: number,
@@ -671,25 +661,17 @@ export class CrowdSim {
     openBays: readonly number[],
     reach: number,
     bodyR: number,
-    shaped: boolean,
   ): [number, number] | null {
     const wall = doorWallX();
     const hw = TUNING.car.halfWidth;
     const away = Math.sign(homeZ - avoidZ) || -1;
-    const near = nearestDoorBay(avoidZ, openBays);
-    const screen = openBays.some((bay) => Math.abs(bay - near) > 0.5);
-    const detour = shaped ? this.detourPoints(openBays, avoidZ) : [];
     for (let i = 0; i < 3; i++) {
       const x = clamp(homeX, -hw + 0.45, hw - 0.5);
-      let z = clamp(homeZ + away * 0.12 * i, CAR_Z_MIN + 0.55, CAR_Z_MAX - 0.55);
-      if (screen && z < near - 1.15) z = near - 1.15;
+      const z = clamp(homeZ + away * 0.12 * i, CAR_Z_MIN + 0.55, CAR_Z_MAX - 0.55);
       if (Math.hypot(x - avoidX, z - avoidZ) < reach + 0.08) continue;
       let blocked = false;
       for (const bay of openBays) {
         if (Math.hypot(x - (wall + 0.35), z - bay) < reach + 0.05) blocked = true;
-      }
-      for (const [qx, qz] of detour) {
-        if (Math.hypot(x - qx, z - qz) < reach + 0.02) blocked = true;
       }
       if (blocked) continue;
       if (this.canFit(x, z, bodyR)) return [x, z];
@@ -717,7 +699,7 @@ export class CrowdSim {
       const reach = kind === 'loud' ? TUNING.types.loud.radius : TUNING.types.stench.auraRadius;
       const bodyR = PASSENGER_DEFS[kind].radius;
       for (const home of this.shortHomes(openBays, avoidZ, kind, shaped)) {
-        const spot = this.hazardPlace(home.x, home.z, avoidX, avoidZ, openBays, reach, bodyR, shaped);
+        const spot = this.hazardPlace(home.x, home.z, avoidX, avoidZ, openBays, reach, bodyR);
         if (spot) return spot;
       }
       return null;
@@ -772,8 +754,8 @@ export class CrowdSim {
       else later.push(kind);
     }
     if (shaped) {
-      // Specials lean on the door glass. Empty sides stay ordinary commuters
-      // so every door still has someone on both sides.
+      // Specials lean on the door glass, upward flank first. Empty sides stay
+      // ordinary commuters so every door still has someone on both sides.
       for (const home of this.doorSideHomes(openBays)) {
         if (people >= n) break;
         const idx = glass.findIndex((kind) => this.glassFits(kind, home));
@@ -799,11 +781,11 @@ export class CrowdSim {
       later.push(...glass);
     }
     const rest: PassengerKind[] = [];
-    // Hazards first, while the short-way spots are still empty.
+    // Hazards first, while the walked-path spots are still empty.
     for (const kind of later) {
       if (people >= n) break;
-      // Loudmouths always take a short-way spot or they are not spawned — a random
-      // one lands on the quiet aisle. Stench does the same once the car is shaped;
+      // Loudmouths always take a walked-path spot or they are not spawned — a random
+      // one lands in the pocket the player skips. Stench does the same once the car is shaped;
       // before L20 it still mixes in at random so the early intro is unchanged.
       const anchored = kind === 'loud' || (kind === 'stench' && shaped);
       if (!anchored) {
@@ -833,7 +815,7 @@ export class CrowdSim {
         break;
       }
     }
-    // Intro car teaches the detour: at least two loudmouths standing on the short way.
+    // Intro car: at least two loudmouths on the way to the door, not tucked in the bottom pocket.
     if (level.introKind === 'loud') {
       const homes = this.shortHomes(openBays, avoidZ, 'loud', shaped);
       for (const home of homes) {
@@ -844,7 +826,7 @@ export class CrowdSim {
         const postedThere = this.agents.some((a) => a.posted && Math.hypot(a.body.x - home.x, a.body.z - home.z) < 0.5);
         if (postedThere) continue;
         this.clearAround(home.x, home.z, 0.4);
-        const spot = this.hazardPlace(home.x, home.z, avoidX, avoidZ, openBays, TUNING.types.loud.radius, PASSENGER_DEFS.loud.radius, shaped);
+        const spot = this.hazardPlace(home.x, home.z, avoidX, avoidZ, openBays, TUNING.types.loud.radius, PASSENGER_DEFS.loud.radius);
         if (!spot) continue;
         const a = this.makeAgent('loud', spot[0], spot[1], 'rider', false);
         a.posted = true;

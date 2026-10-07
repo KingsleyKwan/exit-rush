@@ -1217,14 +1217,15 @@ async function main(): Promise<void> {
   }
 
   // From L20: sitters block the seat aisles, commuters lean on both sides of every door,
-  // and loudmouths / stench hold the short way. Spawn and the open mouth stay clear.
+  // and loudmouths / stench stand on the walk up to the door — not only in the
+  // bottom-door pocket. Spawn and the open mouth stay clear.
   {
     const R = TUNING.types.loud.radius;
     const seeds = [1, 2, 3, 4, 7, 11];
     let sawTwoDoor = false;
     let sawStench = false;
     let sawFamilySeat = false;
-    const checkLoud = (id: number, quiet: [number, number][], minLoud: number, short: [number, number] | null) => {
+    const checkLoud = (id: number, minLoud: number) => {
       for (const seed of seeds) {
         const lv = LEVELS.find((l) => l.id === id)!;
         const sim = new Sim(lv, modifiersFromSkills(defaultSkills()), mulberry32(seed));
@@ -1236,15 +1237,18 @@ async function main(): Promise<void> {
         if (louds.length < minLoud) bad.push(`louds=${louds.length}`);
         if (sim.crowd.noiseAt(sim.player.body.x, sim.player.body.z) > 0) bad.push('spawn in noise');
         if (sim.crowd.noiseAt(mouthX, bay) > 0) bad.push('door in noise');
-        for (const [x, z] of quiet) {
-          if (sim.crowd.noiseAt(x, z) > 0) bad.push(`quiet ${x},${z} noise=${sim.crowd.noiseAt(x, z).toFixed(2)}`);
+        for (const open of sim.openBays) {
+          if (sim.crowd.noiseAt(mouthX, open) > 0) bad.push(`open door ${open} in noise`);
         }
+        const upward = louds.filter((a) => a.body.z < bay - 0.5);
+        if (louds.length > 0 && upward.length < 1) bad.push('no loud on the upward walk');
+        if (id === 26 && upward.length < 2) bad.push(`upward louds=${upward.length}`);
+        if (louds.length > 0 && louds.every((a) => a.body.z > 1.9)) bad.push('all louds in the bottom door pocket');
         for (const a of louds) {
-          if (Math.hypot(a.body.x - mouthX, a.body.z - bay) < R) bad.push(`on door (${a.body.x.toFixed(2)},${a.body.z.toFixed(2)})`);
-          if (id === 26 && a.body.x < 0.15) bad.push(`on door aisle (${a.body.x.toFixed(2)},${a.body.z.toFixed(2)})`);
-          if (id !== 26 && (a.body.x > 0.45 || a.body.z < 0.6)) bad.push(`off near door (${a.body.x.toFixed(2)},${a.body.z.toFixed(2)})`);
+          for (const open of sim.openBays) {
+            if (Math.hypot(a.body.x - mouthX, a.body.z - open) < R) bad.push(`on door (${a.body.x.toFixed(2)},${a.body.z.toFixed(2)})`);
+          }
         }
-        if (short && sim.crowd.noiseAt(short[0], short[1]) <= 0) bad.push('short way is quiet');
         if (bad.length) {
           const where = louds.map((a) => `(${a.body.x.toFixed(2)},${a.body.z.toFixed(2)})`).join(' ');
           console.error(`L${id} seed ${seed} loud layout: ${bad.join('; ')} | ${where}`);
@@ -1263,6 +1267,8 @@ async function main(): Promise<void> {
         if (doors.length < 4) bad.push(`door-side=${doors.length}`);
         const glassSpecial = doors.some((a) => a.kind !== 'normal' && a.kind !== 'loud' && a.kind !== 'stench');
         if ((id === 24 || id === 33) && !glassSpecial) bad.push('no special at the glass');
+        const upGlass = doors.some((a) => a.kind !== 'normal' && a.kind !== 'loud' && a.kind !== 'stench' && a.body.z < 0.2);
+        if ((id === 24 || id === 33) && !upGlass) bad.push('specials only on the bottom side of the doors');
         for (const bay of sim.openBays) {
           const sealed = sim.crowd.agents.some((a) => {
             const bodies = a.caseBody ? [a.body, a.caseBody] : [a.body];
@@ -1314,19 +1320,20 @@ async function main(): Promise<void> {
           else if (fam.length) bad.push('family present but none on a seat');
         }
         for (const a of stenches) {
-          if (!a.posted) bad.push('stench not on the short way');
+          if (!a.posted) bad.push('stench not on the way out');
           for (const bay of sim.openBays) {
             if (Math.hypot(a.body.x - mouthX, a.body.z - bay) < TUNING.types.stench.auraRadius) bad.push('stench on mouth');
           }
         }
+        if (stenches.length > 0 && stenches.every((a) => a.body.z > 1.6)) bad.push('stench only in the bottom pocket');
         if (bad.length) {
           console.error(`L${id} seed ${seed} car shape: ${bad.join('; ')}`);
           process.exit(1);
         }
       }
     };
-    checkLoud(26, [[-1.05, 2.3], [-1.05, 1.15], [-1.1, 0.45]], 2, [0.35, 1.7]);
-    checkLoud(64, [[1.05, 1.8], [1.0, 0.7], [-1.15, 0.25]], 0, null);
+    checkLoud(26, 2);
+    checkLoud(64, 0);
     checkShape(26);
     checkShape(24);
     checkShape(33);
@@ -1340,7 +1347,7 @@ async function main(): Promise<void> {
       process.exit(1);
     }
     if (!sawStench) {
-      console.error('L24 never spawned a stench on the short way');
+      console.error('L24 never spawned a stench on the way out');
       process.exit(1);
     }
     if (!sawFamilySeat) {
