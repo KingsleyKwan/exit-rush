@@ -3,6 +3,7 @@ import { Passenger, G, M } from './Passenger';
 import type { Agent, CrowdSim } from './sim/CrowdSim';
 import { TUNING } from './sim/tuning';
 import { CHAR_MAT, LOOKS, lookGeometry, suitcaseGeometry, type Look } from './characters';
+import type { DoorBlock } from './sim/Sim';
 import { badgeTexture, stinkTexture } from './badges';
 import type { QualityLevel } from './storage';
 
@@ -45,6 +46,10 @@ export class Crowd {
   private v = new THREE.Vector3();
   private s = new THREE.Vector3();
   private q = new THREE.Quaternion();
+  private shadowQ = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(1, 0, 0), -Math.PI / 2);
+  private white = new THREE.Color(1, 1, 1);
+  /** Drawn standers for the door party. Not agents. */
+  private block: { x: number; z: number; yaw: number; look: Look }[] = [];
   private iconMats: THREE.MeshBasicMaterial[] = [];
 
   constructor() {
@@ -123,6 +128,12 @@ export class Crowd {
     this.sync();
   }
 
+  /** Standing party in a shut door. One static obstacle in the sim; these are only the bodies. */
+  setDoorBlock(block: DoorBlock | null): void {
+    const looks: Look[] = ['normal0', 'normal1', 'normal3', 'normal5'];
+    this.block = (block?.people ?? []).map((p, i) => ({ x: p.x, z: p.z, yaw: p.yaw, look: looks[i % looks.length]! }));
+  }
+
   get passengers(): Passenger[] {
     return [...this.views.values()];
   }
@@ -144,6 +155,7 @@ export class Crowd {
     this.blobs.count = 0;
     this.stink.count = 0;
     this.flies.count = 0;
+    this.block = [];
     this.sim = null;
   }
 
@@ -274,6 +286,19 @@ export class Crowd {
         }
       }
       i++;
+    }
+    for (const p of this.block) {
+      this.q.setFromAxisAngle(THREE.Object3D.DEFAULT_UP, p.yaw);
+      this.v.set(p.x, 0, p.z);
+      this.s.set(1, 1, 1);
+      this.m4.compose(this.v, this.q, this.s);
+      const body = this.bodies.get(p.look)!;
+      const bi = body.count++;
+      body.setMatrixAt(bi, this.m4);
+      body.setColorAt(bi, this.white);
+      this.v.set(p.x, 0.012, p.z);
+      this.m4.compose(this.v, this.shadowQ, this.s);
+      this.blobs.setMatrixAt(i++, this.m4);
     }
     this.blobs.count = i;
     for (const m of this.bodies.values()) {

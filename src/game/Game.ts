@@ -280,6 +280,7 @@ export class Game {
   private bindSim(sim: Sim): void {
     this.sim = sim;
     this.crowd.bind(sim.crowd);
+    this.crowd.setDoorBlock(sim.doorBlock);
     this.effects.clear();
     this.acc = 0;
   }

@@ -1275,7 +1275,8 @@ async function main(): Promise<void> {
         if (!laneBlocked(-0.98, 1.3) && !laneBlocked(-0.98, 0.96) && !laneBlocked(-0.98, 1.64)) bad.push('door seat lane open');
         for (const bay of [-2.6, 0, 2.6]) {
           const side = doors.some((a) => Math.abs(a.body.z - bay) < 0.7 && a.body.x < -1.2);
-          if (!side) bad.push(`no flank at ${bay}`);
+          const party = sim.doorBlock != null && sim.doorBlock.minZ <= bay && bay <= sim.doorBlock.maxZ;
+          if (!side && !party) bad.push(`no flank at ${bay}`);
         }
         const mouthX = doorWallX() + 0.35;
         for (const bay of sim.openBays) {
@@ -1347,6 +1348,46 @@ async function main(): Promise<void> {
       process.exit(1);
     }
     console.log('loud layout ok');
+  }
+
+  // Shut near door: one static party blocks that mouth. An open near door has none.
+  {
+    const near = DOOR_BAYS[2];
+    const mid = DOOR_BAYS[1];
+    const openLv = new Sim(LEVELS.find((l) => l.id === 1)!, modifiersFromSkills(defaultSkills()), mulberry32(1));
+    if (openLv.doorBlock) {
+      console.error('L1 left door is open — no blocking party');
+      process.exit(1);
+    }
+    const shutLv = new Sim(LEVELS.find((l) => l.id === 20)!, modifiersFromSkills(defaultSkills()), mulberry32(1));
+    const block = shutLv.doorBlock;
+    if (!block) {
+      console.error('L20 missing the left-door blocking party');
+      process.exit(1);
+    }
+    const covers = (z: number) => block.minZ <= z && z <= block.maxZ;
+    if (!covers(near) || covers(mid) || block.maxX > -0.7 || block.minX < doorWallX()) {
+      console.error('blocking party covers the wrong door', block);
+      process.exit(1);
+    }
+    const boxed = shutLv.world.boxes.some(
+      (b) => b.minX === block.minX && b.maxX === block.maxX && b.minZ === block.minZ && b.maxZ === block.maxZ,
+    );
+    if (!boxed) {
+      console.error('blocking party is not one static box');
+      process.exit(1);
+    }
+    const pl = shutLv.player.body;
+    const hit =
+      pl.x + pl.r > block.minX &&
+      pl.x - pl.r < block.maxX &&
+      pl.z + pl.r > block.minZ &&
+      pl.z - pl.r < block.maxZ;
+    if (hit) {
+      console.error('blocking party covers the player spawn');
+      process.exit(1);
+    }
+    console.log('door block ok');
   }
 
   // Seat AABB: benches must not overlap any door vestibule [bayZ ± doorHalf].

@@ -4,6 +4,7 @@ import { PlayerSim, type PlayerInput } from './PlayerSim';
 import {
   CAR_Z_MAX,
   CAR_Z_MIN,
+  DOOR_BAYS,
   DOOR_Z,
   PLAYER_START_X,
   TUNING,
@@ -19,6 +20,41 @@ import { abilitiesForBar, castMageUlt, type AbilityCtx } from './abilities';
 import type { Rng } from './rng';
 
 export type SimResult = 'win' | 'lose' | null;
+
+/** One solid clump of people standing in a doorway. Not a passenger and not pushable. */
+export interface DoorBlock {
+  minX: number;
+  maxX: number;
+  minZ: number;
+  maxZ: number;
+  people: { x: number; z: number; yaw: number }[];
+}
+
+/**
+ * Standing party in the near door (player's left, +Z) when that door is shut.
+ * Fills the opening so the squeeze is gone; the other door stays the way out.
+ */
+function nearDoorParty(wallX: number, bayZ: number): DoorBlock {
+  const people = [
+    { x: wallX + 0.48, z: bayZ - 0.45, yaw: Math.PI / 2 },
+    { x: wallX + 0.8, z: bayZ - 0.18, yaw: Math.PI / 2 - 0.25 },
+    { x: wallX + 0.48, z: bayZ + 0.18, yaw: Math.PI / 2 + 0.2 },
+    { x: wallX + 0.8, z: bayZ + 0.45, yaw: Math.PI / 2 - 0.1 },
+  ];
+  const pad = 0.3;
+  let minX = Infinity;
+  let maxX = -Infinity;
+  let minZ = Infinity;
+  let maxZ = -Infinity;
+  for (const p of people) {
+    minX = Math.min(minX, p.x - pad);
+    maxX = Math.max(maxX, p.x + pad);
+    minZ = Math.min(minZ, p.z - pad);
+    maxZ = Math.max(maxZ, p.z + pad);
+  }
+  minX = Math.max(minX, wallX + 0.02);
+  return { minX, maxX, minZ, maxZ, people };
+}
 
 interface DoorLeafPair {
   bayZ: number;
@@ -42,6 +78,8 @@ export class Sim {
   readonly level: LevelDef;
   readonly events: SimEvent[] = [];
   readonly openBays: number[];
+  /** Unpushable standing party in a shut door. Null when that door is an exit. */
+  doorBlock: DoorBlock | null = null;
   time = 0;
   timeLeft: number;
   /** 0 closed … 1 fully open (shared across open bays). */
@@ -117,6 +155,13 @@ export class Sim {
     // Closed door bays: fill the gap with a solid wall (no leaf).
     for (const bz of bays) {
       if (!open.has(bz)) w.addBox(wallX - 1, wallX, bz - dh, bz + dh);
+    }
+    // Near door shut: one standing party in the mouth. Not an agent, so shove and spells miss it.
+    const nearBay = DOOR_BAYS[2];
+    if (!open.has(nearBay)) {
+      const party = nearDoorParty(wallX, nearBay);
+      this.doorBlock = party;
+      w.addBox(party.minX, party.maxX, party.minZ, party.maxZ);
     }
 
     // Longitudinal benches (matches TrainScene v0.6):
