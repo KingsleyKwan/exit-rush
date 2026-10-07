@@ -1199,12 +1199,15 @@ async function main(): Promise<void> {
     }
   }
 
-  // Loudmouths own the short way. Spawn and the open doorway stay quiet, and so does the long way around.
+  // From L20: sitters block the seat aisles, commuters lean on both sides of every door,
+  // and loudmouths / stench hold the short way. Spawn and the open mouth stay clear.
   {
     const R = TUNING.types.loud.radius;
+    const seeds = [1, 2, 3, 4, 7, 11];
     let sawTwoDoor = false;
-    const check = (id: number, quiet: [number, number][], minLoud: number) => {
-      for (const seed of [1, 2, 3, 4, 7, 11]) {
+    let sawStench = false;
+    const checkLoud = (id: number, quiet: [number, number][], minLoud: number, short: [number, number] | null) => {
+      for (const seed of seeds) {
         const lv = LEVELS.find((l) => l.id === id)!;
         const sim = new Sim(lv, modifiersFromSkills(defaultSkills()), mulberry32(seed));
         const louds = sim.crowd.agents.filter((a) => a.kind === 'loud' && !a.boss);
@@ -1220,10 +1223,10 @@ async function main(): Promise<void> {
         }
         for (const a of louds) {
           if (Math.hypot(a.body.x - mouthX, a.body.z - bay) < R) bad.push(`on door (${a.body.x.toFixed(2)},${a.body.z.toFixed(2)})`);
-          if (id === 26 && a.body.x < 0.35) bad.push(`on quiet aisle (${a.body.x.toFixed(2)},${a.body.z.toFixed(2)})`);
+          if (id === 26 && a.body.x < 0.15) bad.push(`on door aisle (${a.body.x.toFixed(2)},${a.body.z.toFixed(2)})`);
           if (id !== 26 && (a.body.x > 0.45 || a.body.z < 0.6)) bad.push(`off near door (${a.body.x.toFixed(2)},${a.body.z.toFixed(2)})`);
         }
-        if (id === 26 && sim.crowd.noiseAt(0.95, 1.4) <= 0) bad.push('short way is quiet');
+        if (short && sim.crowd.noiseAt(short[0], short[1]) <= 0) bad.push('short way is quiet');
         if (bad.length) {
           const where = louds.map((a) => `(${a.body.x.toFixed(2)},${a.body.z.toFixed(2)})`).join(' ');
           console.error(`L${id} seed ${seed} loud layout: ${bad.join('; ')} | ${where}`);
@@ -1231,10 +1234,59 @@ async function main(): Promise<void> {
         }
       }
     };
-    check(26, [[-1.05, 2.3], [-1.05, 1.15], [-1.1, 0.45]], 2);
-    check(64, [[1.05, 1.8], [1.0, 0.7], [-1.15, 0.25]], 0);
+    const checkShape = (id: number) => {
+      for (const seed of seeds) {
+        const lv = LEVELS.find((l) => l.id === id)!;
+        const sim = new Sim(lv, modifiersFromSkills(defaultSkills()), mulberry32(seed));
+        const seated = sim.crowd.agents.filter((a) => a.seated);
+        const doors = sim.crowd.agents.filter((a) => a.posted && !a.seated && a.kind === 'normal');
+        const bad: string[] = [];
+        if (seated.length < 6) bad.push(`seated=${seated.length}`);
+        if (doors.length < 4) bad.push(`door-side=${doors.length}`);
+        const laneBlocked = (x: number, z: number) => seated.some((a) => Math.hypot(a.body.x - x, a.body.z - z) < a.body.r + 0.05);
+        if (!laneBlocked(0.98, 1.3) && !laneBlocked(0.98, 0.96) && !laneBlocked(0.98, 1.64)) bad.push('far seat lane open');
+        if (!laneBlocked(-0.98, 1.3) && !laneBlocked(-0.98, 0.96) && !laneBlocked(-0.98, 1.64)) bad.push('door seat lane open');
+        for (const bay of [-2.6, 0, 2.6]) {
+          const side = doors.some((a) => Math.abs(a.body.z - bay) < 0.7 && a.body.x < -1.2);
+          if (!side) bad.push(`no flank at ${bay}`);
+        }
+        const mouthX = doorWallX() + 0.35;
+        for (const bay of sim.openBays) {
+          if (sim.crowd.noiseAt(mouthX, bay) > 0) bad.push(`mouth noise ${bay}`);
+          if (sim.crowd.auraSlowAt(mouthX, bay) > 0) bad.push(`mouth stench ${bay}`);
+        }
+        if (sim.crowd.noiseAt(sim.player.body.x, sim.player.body.z) > 0) bad.push('spawn noise');
+        if (sim.crowd.auraSlowAt(sim.player.body.x, sim.player.body.z) > 0) bad.push('spawn stench');
+        const stenches = sim.crowd.agents.filter((a) => a.kind === 'stench' && !a.boss && a.mode === 'rider');
+        if (stenches.some((a) => a.posted)) sawStench = true;
+        for (const a of stenches) {
+          if (!a.posted) bad.push('stench not on the short way');
+          for (const bay of sim.openBays) {
+            if (Math.hypot(a.body.x - mouthX, a.body.z - bay) < TUNING.types.stench.auraRadius) bad.push('stench on mouth');
+          }
+        }
+        if (bad.length) {
+          console.error(`L${id} seed ${seed} car shape: ${bad.join('; ')}`);
+          process.exit(1);
+        }
+      }
+    };
+    checkLoud(26, [[-1.05, 2.3], [-1.05, 1.15], [-1.1, 0.45]], 2, [0.35, 1.7]);
+    checkLoud(64, [[1.05, 1.8], [1.0, 0.7], [-1.15, 0.25]], 0, null);
+    checkShape(26);
+    checkShape(24);
+    checkShape(33);
+    const early = new Sim(LEVELS.find((l) => l.id === 19)!, modifiersFromSkills(defaultSkills()), mulberry32(1));
+    if (early.crowd.agents.some((a) => a.seated || (a.posted && a.kind === 'normal'))) {
+      console.error('L19 should still be an open car');
+      process.exit(1);
+    }
     if (!sawTwoDoor) {
       console.error('L64 never spawned a loudmouth to check the two-door detour');
+      process.exit(1);
+    }
+    if (!sawStench) {
+      console.error('L24 never spawned a stench on the short way');
       process.exit(1);
     }
     console.log('loud layout ok');

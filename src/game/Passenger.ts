@@ -143,7 +143,8 @@ export class Passenger {
     if (agent.caseBody) this.caseAnchor = new THREE.Object3D();
     if (agent.boss) this.buildBoss();
     // Boarders walk in (+Z); riders face random-ish.
-    this.yaw = agent.mode === 'boarder' ? 0 : Math.random() * Math.PI * 2;
+    this.yaw = agent.seatYaw ?? (agent.mode === 'boarder' ? 0 : Math.random() * Math.PI * 2);
+    if (agent.seatYaw !== null) this.faceYaw = agent.seatYaw;
     this.update(1, 0, 0);
   }
 

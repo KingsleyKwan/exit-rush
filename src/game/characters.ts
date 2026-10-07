@@ -50,6 +50,8 @@ interface Spec {
   outline?: boolean;
   /** Crouched / squatting pose — lowers torso & shortens legs. */
   crouch?: boolean;
+  /** Sitting on a bench — hips on the cushion, knees forward into the aisle. */
+  sit?: boolean;
   /** 大聲公: right hand holds a phone to the ear (bent arm). */
   phoneEar?: boolean;
   /** Mage: folded umbrella wand. */
@@ -164,17 +166,23 @@ function buildCharacter(s: Spec): { geo: THREE.BufferGeometry; shell: THREE.Buff
   const O = !!s.outline;
   const bw = s.bw ?? 1;
   const hs = s.head ?? 1;
+  const sit = !!s.sit;
   const crouch = !!s.crouch;
-  const TW = 0.32 * bw * (crouch ? 1.12 : 1);
-  const TD = 0.21 * (crouch ? 1.15 : 1);
+  const low = sit || crouch;
+  const TW = 0.32 * bw * (crouch ? 1.12 : sit ? 1.08 : 1);
+  const TD = 0.21 * (crouch ? 1.15 : sit ? 1.12 : 1);
   const R = 0.215 * hs;
-  // Squatting: hips low, head lower — reads as crouched from the ¾ camera.
-  const HY = (crouch ? 0.72 : 0.99) + (hs - 1) * 0.12;
+  // Squatting / sitting: hips low, head lower — reads from the ¾ camera.
+  const HY = (sit ? 0.8 : crouch ? 0.72 : 0.99) + (hs - 1) * 0.12;
 
   // ---- legs + shoes
   for (const sx of [-1, 1]) {
-    const x = sx * 0.075 * bw * (crouch ? 1.25 : 1);
-    if (crouch) {
+    const x = sx * 0.075 * bw * (crouch ? 1.25 : sit ? 1.15 : 1);
+    if (sit) {
+      // Thighs along +Z, shins down: knees stick into the aisle in front of the cushion.
+      b.add(new THREE.BoxGeometry(0.13, 0.11, 0.28), s.pants, [x, 0.18, 0.16], [0.85, 0, 0], undefined, O);
+      b.add(new THREE.BoxGeometry(0.11, 0.16, 0.11), s.skin, [x, 0.09, 0.3], [-0.3, 0, 0], undefined, O);
+    } else if (crouch) {
       // Folded thighs + shins (knees forward) for a clear squat silhouette.
       b.add(new THREE.BoxGeometry(0.14, 0.12, 0.22), s.pants, [x, 0.22, 0.06], [0.55, 0, 0], undefined, O);
       b.add(new THREE.BoxGeometry(0.11, 0.16, 0.12), s.skin, [x, 0.1, 0.12], [-0.35, 0, 0], undefined, O);
@@ -186,7 +194,7 @@ function buildCharacter(s: Spec): { geo: THREE.BufferGeometry; shell: THREE.Buff
     } else {
       b.add(new THREE.BoxGeometry(0.118, 0.34, 0.135), s.pants, [x, 0.205, 0], undefined, undefined, O);
     }
-    const shoeZ = crouch ? 0.1 : 0.028;
+    const shoeZ = sit ? 0.34 : crouch ? 0.1 : 0.028;
     if (s.chunky) {
       b.add(new THREE.BoxGeometry(0.16, 0.1, 0.24), s.shoes, [x, 0.05, shoeZ], undefined, undefined, O);
       b.add(new THREE.BoxGeometry(0.168, 0.032, 0.25), 0xffb03a, [x, 0.016, shoeZ]);
@@ -203,13 +211,13 @@ function buildCharacter(s: Spec): { geo: THREE.BufferGeometry; shell: THREE.Buff
     }
   }
   // hips
-  b.add(new THREE.BoxGeometry(TW * 0.94, 0.09, TD * 0.95), s.dress ? s.dress : s.pants, [0, crouch ? 0.28 : 0.385, crouch ? 0.04 : 0], undefined, undefined, O);
+  b.add(new THREE.BoxGeometry(TW * 0.94, 0.09, TD * 0.95), s.dress ? s.dress : s.pants, [0, sit ? 0.3 : crouch ? 0.28 : 0.385, sit ? 0.02 : crouch ? 0.04 : 0], undefined, undefined, O);
 
   // ---- torso (slightly tapered square prism)
   const torsoCol = s.jacket ?? s.dress ?? s.shirt;
   const tor = new THREE.CylinderGeometry(0.5, 0.46, 1, 4, 1);
   tor.rotateY(Math.PI / 4);
-  b.add(tor, torsoCol, [0, crouch ? 0.42 : 0.57, crouch ? 0.02 : 0], [0, 0, 0], [TW * 1.414, crouch ? 0.32 : 0.4, TD * 1.414], O);
+  b.add(tor, torsoCol, [0, sit ? 0.48 : crouch ? 0.42 : 0.57, sit || crouch ? 0.02 : 0], [0, 0, 0], [TW * 1.414, sit || crouch ? 0.32 : 0.4, TD * 1.414], O);
   if (s.belly) {
     b.add(new THREE.IcosahedronGeometry(0.15, 1), s.shirt, [0, 0.5, 0.06], undefined, [1.15 * bw, 1, 0.75], O);
   }
@@ -222,12 +230,14 @@ function buildCharacter(s: Spec): { geo: THREE.BufferGeometry; shell: THREE.Buff
   }
   if (s.belt) b.add(new THREE.BoxGeometry(TW * 1.0, 0.035, TD * 1.02), 0x222226, [0, 0.39, 0]);
   if (s.collar !== undefined) {
-    b.add(new THREE.BoxGeometry(TW * 0.62, 0.045, 0.06), s.collar, [0, 0.77, 0.075], [0.35, 0, 0]);
-    b.add(new THREE.BoxGeometry(0.035, 0.12, 0.012), s.collar, [0, 0.7, TD / 2 + 0.006]);
+    const cy = sit ? 0.58 : 0.77;
+    b.add(new THREE.BoxGeometry(TW * 0.62, 0.045, 0.06), s.collar, [0, cy, 0.075], [0.35, 0, 0]);
+    b.add(new THREE.BoxGeometry(0.035, 0.12, 0.012), s.collar, [0, cy - 0.07, TD / 2 + 0.006]);
   }
   if (s.hood) {
-    b.add(new THREE.BoxGeometry(TW * 0.8, 0.13, 0.1), shade(torsoCol, 0.85), [0, 0.76, -TD / 2 - 0.02], [-0.3, 0, 0]);
-    for (const sx of [-1, 1]) b.add(new THREE.BoxGeometry(0.014, 0.12, 0.012), 0xf2f2f2, [sx * 0.045, 0.67, TD / 2 + 0.008]);
+    const hy = sit ? 0.58 : 0.76;
+    b.add(new THREE.BoxGeometry(TW * 0.8, 0.13, 0.1), shade(torsoCol, 0.85), [0, hy, -TD / 2 - 0.02], [-0.3, 0, 0]);
+    for (const sx of [-1, 1]) b.add(new THREE.BoxGeometry(0.014, 0.12, 0.012), 0xf2f2f2, [sx * 0.045, hy - 0.09, TD / 2 + 0.008]);
   }
   if (s.bigHood) {
     const hoodCol = shade(torsoCol, 0.78);
@@ -284,8 +294,8 @@ function buildCharacter(s: Spec): { geo: THREE.BufferGeometry; shell: THREE.Buff
   // ---- arms + hands
   const longCol = s.jacket ?? s.shirt;
   for (const sx of [-1, 1]) {
-    const pivot: V3 = [sx * (TW / 2 + 0.05), crouch ? 0.55 : 0.75, crouch ? 0.08 : 0];
-    let rot: V3 = crouch ? [1.05, 0, sx * 0.35] : [0, 0, sx * 0.12];
+    const pivot: V3 = [sx * (TW / 2 + 0.05), low ? 0.55 : 0.75, sit ? 0.04 : crouch ? 0.08 : 0];
+    let rot: V3 = sit ? [0.35, 0, sx * 0.2] : crouch ? [1.05, 0, sx * 0.35] : [0, 0, sx * 0.12];
     const phoneHand = s.phone && sx === 1;
     if (phoneHand) rot = [-1.15, 0, 0.28];
     if (s.phoneEar && sx === 1) {
@@ -505,6 +515,12 @@ export type Look =
   | 'normal3'
   | 'normal4'
   | 'normal5'
+  | 'seat0'
+  | 'seat1'
+  | 'seat2'
+  | 'seat3'
+  | 'seat4'
+  | 'seat5'
   | 'stench'
   | 'family'
   | 'kidGirl'
@@ -533,6 +549,12 @@ const SPECS: Record<Look | 'hero' | 'mage' | 'tech', Spec> = {
   normal3: { skin: 0xf3cba8, hair: 0x3d2d24, style: 'long', shirt: 0x5e7d62, sleeves: 'long', pants: 0x9c8b6e, shoes: 0xf0f0f0, hood: true, phone: true },
   normal4: { skin: SKIN, hair: 0x5a3e2e, style: 'bun', shirt: 0xd2b48c, sleeves: 'long', pants: 0x26262b, shoes: 0x26262b, phone: true, mouth: 'flat' },
   normal5: { skin: 0xe2ad84, hair: DARK_HAIR, style: 'short', shirt: 0x34363d, sleeves: 'short', pants: 0x4a5568, shoes: 0xf2f2f2, phone: true, mouth: 'flat' },
+  seat0: { skin: SKIN, hair: DARK_HAIR, style: 'spiky', shirt: 0x8d939c, sleeves: 'long', pants: 0x2a2c31, shoes: 0xe8e8e8, hood: true, phone: true, mouth: 'flat', sit: true },
+  seat1: { skin: 0xeab98f, hair: 0x4a3426, style: 'short', shirt: 0x34466e, sleeves: 'long', pants: 0x3d5a80, shoes: 0x2a2a2a, hood: true, phone: true, mouth: 'flat', sit: true },
+  seat2: { skin: SKIN, hair: DARK_HAIR, style: 'short', shirt: 0xe9ecef, sleeves: 'long', pants: 0x3b3f46, shoes: 0x2a1e18, collar: 0xffffff, mouth: 'flat', brows: 'sad', sit: true },
+  seat3: { skin: 0xf3cba8, hair: 0x3d2d24, style: 'long', shirt: 0x5e7d62, sleeves: 'long', pants: 0x9c8b6e, shoes: 0xf0f0f0, hood: true, phone: true, sit: true },
+  seat4: { skin: SKIN, hair: 0x5a3e2e, style: 'bun', shirt: 0xd2b48c, sleeves: 'long', pants: 0x26262b, shoes: 0x26262b, phone: true, mouth: 'flat', sit: true },
+  seat5: { skin: 0xe2ad84, hair: DARK_HAIR, style: 'short', shirt: 0x34363d, sleeves: 'short', pants: 0x4a5568, shoes: 0xf2f2f2, phone: true, mouth: 'flat', sit: true },
   stench: { skin: 0xc9a76b, hair: 0x3a302a, style: 'messy', shirt: 0xd9c84a, sleeves: 'none', pants: 0x6b7a3e, shorts: true, shoes: 0x7a5230, belly: true, stubble: true, brows: 'sad', mouth: 'frown', bw: 1.08 },
   family: { skin: 0xf3c9a4, hair: 0x5a3825, style: 'bun', shirt: 0xf3ead8, jacket: 0xe0732d, inner: 0xf3ead8, sleeves: 'long', pants: 0x5a4030, shoes: 0xd56a2a, blush: true },
   kidGirl: { skin: 0xf6cfaa, hair: 0x4a2c1d, style: 'pigtails', shirt: 0xf2c94c, dress: 0xd8552f, sleeves: 'short', pants: 0xd8552f, shoes: 0xd8552f, head: 1.18, blush: true, bigEyes: true },
@@ -548,9 +570,11 @@ const SPECS: Record<Look | 'hero' | 'mage' | 'tech', Spec> = {
 
 export const LOOKS = Object.keys(SPECS).filter((k) => k !== 'hero' && k !== 'mage' && k !== 'tech') as Look[];
 const NORMALS: Look[] = ['normal0', 'normal1', 'normal2', 'normal3', 'normal4', 'normal5'];
+const SEATS: Look[] = ['seat0', 'seat1', 'seat2', 'seat3', 'seat4', 'seat5'];
 
 /** Which look an agent wears (deterministic per agent id). */
-export function lookFor(a: Pick<Agent, 'id' | 'kind' | 'isKid'>): Look {
+export function lookFor(a: Pick<Agent, 'id' | 'kind' | 'isKid' | 'seated'>): Look {
+  if (a.seated) return SEATS[(a.id * 7 + 3) % SEATS.length];
   switch (a.kind) {
     case 'normal':
       return NORMALS[(a.id * 7 + 3) % NORMALS.length];
