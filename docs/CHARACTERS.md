@@ -231,21 +231,21 @@ Shape legend (`#` = cell):
 | `I2` | domino 1×2 | 2 | `##` | any |
 | `I3` | line 3 | 3 | `###` | 2×3+ (vertical) |
 | `L3` | L-tromino | 3 | `#.` / `##` | any ≥ 2×2 |
-| `I4` | line 4 | 4 | `####` | **does not fit 2×3** (wear 中價 `I2`) |
+| `I4` | line 4 | 4 | `####` | not sold — a line of 4 does not fit 2×3 |
 | `L4` | L-tetromino | 4 | `#.` / `#.` / `##` | 2×3+ |
 | `T4` | T-tetromino | 4 | `###` / `.#.` | 3×3+ (or 2×3 rotated) |
 | `S4` / `Z4` | S / Z tetromino | 4 | `.##` / `##.` · `##.` / `.##` | 2×3+ |
 | `U5` | U-pentomino | 5 | `#.#` / `###` | 2×3+ |
-| `X5` | plus | 5 | `.#.` / `###` / `.#.` | **does not fit 2×3** (wear 中價 `L4`) |
+| `X5` | plus | 5 | `.#.` / `###` / `.#.` | not sold — the plus needs 3×3 |
 
 Tier footprints by family:
 
 | Item family | 平 Cheap | 中價 Mid | 名貴 Luxury |
 |---|---|---|---|
 | General stat items (S1, G1, H3, D1) | `O1` | `I2` | 3-cell irregular (`I3` / `L3`) |
-| Counter items (S2, S3, G2, G3, H1, H2, D3, D4, D5) | `O1` | `I2` | 4-cell irregular (`I4` / `L4` / `T4` / `S4` / `Z4`) |
+| Counter items (S2, S3, G2, G3, H1, H2, D3, D4, D5) | `O1` | `I2` | 4-cell irregular (`L4` / `T4` / `S4` / `Z4`) |
 | Exo-Brace D2 (bulky) | `O1` | `I2` | `U5` |
-| Cores (C1, C2, C3) | `I2` | `L4` | `X5` plus |
+| Cores (C1, C2, C3) | `I2` | `L4` | `U5` |
 | Consumables (K1–K3) | `O1` only | — | — |
 
 Effect scaling (rule of thumb): **平 ≈ 40 %, 中價 ≈ 70 %, 名貴 = 100 %** of the matching Hero node. Per cell that's 40 % / 35 % / 25 % (20 % for 5-cell pieces), *before* the packing penalty of irregular shapes. 名貴 is for specialists and bosses, 平/中價 for broad coverage. 🎛️
@@ -267,7 +267,7 @@ Effect scaling (rule of thumb): **平 ≈ 40 %, 中價 ≈ 70 %, 名貴 = 100 %*
 
 Old saves that bought 3×3 / 3×4 / 4×4 (the removed 450 / 1,200 / 2,400 steps) shrink to 2×3 on load. Those coins come back, because the balance is earned minus what the current price table charges. Pieces that no longer fit leave the grid and stay owned. `gridTier` in the save may still read 2–4 until that load.
 
-A cheap universal kit is about 9 cells: one shoe, one glove, one head, all five gadgets, and one drink. Six cells cannot hold it. A 中價 piece is 2 cells. A 名貴 piece that fits (`L4`, `T4`, `S4`, `Z4`, `U5`, `I3`, `L3`) takes 3–5, so it is most of the bag. `I4` (Hover Skates 名貴) and `X5` (core 名貴) do not fit at all; wear the 中價 shape, which you already own.
+A cheap universal kit is about 9 cells: one shoe, one glove, one head, all five gadgets, and one drink. Six cells cannot hold it. A 中價 piece is 2 cells. A 名貴 piece (`L4`, `T4`, `S4`, `Z4`, `U5`, `I3`, `L3`) takes 3–5, so it is most of the bag. Every sold tier fits an empty 2×3. `I4` and `X5` are not sold.
 
 #### 5.4.4 Sample layouts · 擺位例子
 
@@ -320,9 +320,9 @@ Grid sizes are **cols × rows**.
 - **The grid is the Tech's power budget.** Six cells is one stage, not every stage. The three sets are the way to keep a second answer. Do not grow the bag to put those answers back in one grid.
 - **Early game:** a 2×2 grid with 平 tiers ≈ 40 % counters. Tech counters exist from the intro level (earlier than the Hero's 40-pt nodes) but are weak and space-starved. Bot parity checks L6–30 for the ±10 pp band (§1). If early Tech runs too strong, raise the 2×3 price or cut 平 to 30 %. Do not retune just because a later band was already off.
 - **Bosses:** weak-point drain ×2.5 applies at **any tier**. Disable durations scale with tier (and are halved on bosses), so a boss set wants the counter that fits, not every counter. The level card shows ✦ recommended counter + tier.
-- **L100:** one head, one pair of shoes, one pair of gloves, and 6 cells. A core 中價 is an `L4` and leaves 2 cells. A core 名貴 (`X5`) does not fit.
+- **L100:** one head, one pair of shoes, one pair of gloves, and 6 cells. A core 中價 is an `L4` and leaves 2 cells. A core 名貴 is a `U5` and leaves 1 cell.
 - **Sell-back stays 100 %.** The one expansion is not refunded by the sell button. Shrinking a pre-cap save is the exception: the removed expansion prices are no longer in `gridSpend`, so those coins return.
-- **Irregular = strong, when it fits:** a 名貴 piece that fits costs most of the 6 cells. `I4` and `X5` never fit. Owning that tier still lets you wear 中價 or 平 for free. The 名貴 effect itself stays in the tray. The bot measures the real packed power (auto-pack), not raw cells.
+- **Irregular = strong:** a 名貴 piece costs most of the 6 cells, and every sold tier fits an empty bag. Owning a tier still lets you wear 中價 or 平 for free. The bot measures the real packed power (auto-pack), not raw cells.
 - **Consumables in the grid (✅ decided):** every emergency drink competes with a permanent item for a cell. There is no separate pocket.
 - **Grind:** replay coins are bounded (§5.3). They buy more items to swap between sets. They do not buy a seventh cell.
 
@@ -332,7 +332,7 @@ Grid sizes are **cols × rows**.
 - **Drag** an item from the tray. The ghost footprint is green when it fits and red with a reason chip when it doesn't (「冇位」 / 「已有鞋」 / 「主動道具上限」). Snap on release with a haptic tick.
 - **Rotate:** ⟳ button while dragging/selected, or two-finger twist / double-tap.
 - **Tier switch:** tap a placed item → 平/中價/名貴 pills (owned tiers only). The footprint previews before you confirm.
-- **Tap-to-place alternative** (accessibility, no drag needed): tap an item, then tap a target cell.
+- **Tap-to-place alternative** (accessibility, no drag needed): tap an item, then tap a target cell. If that turn sticks out of the bag, the next turn that fits is used.
 - **Remove:** drag back to the tray, or tap → 「除低」.
 - **自動排 Auto-pack:** packs what fits in the current bag (largest footprints first, then a fixed rotation order). Also used by 「推介套裝」. Pieces that do not fit stay in the tray.
 - **Sets 套裝 1/2/3:** each set saves its own placements. Swapping sets is how one character covers more than one kind of car.
@@ -350,7 +350,7 @@ Prices are per tier: **平 / +中價 / +名貴 (total)**. Footprint per §5.4.2.
 |---|---|---|---|---|---|---|---|---|
 | S1 | 👟 | **跑鞋** Sprint Sneakers | Passive | Speed ×1.10 / 1.20 / 1.30; 名貴 + faster when unobstructed | `O1` / `I2` / `I3` | 100 / 200 / 350 (650) | — | — |
 | S2 | 👟 | **彈簧鞋** Spring Boots | Active | Hop over squatters + kids; CD 9 / 7.5 / 6 s | `O1` / `I2` / `Z4` | 150 / 250 / 450 (850) | 8 / 40 / 60 | Squat, Family kids |
-| S3 | 👟 | **磁浮滑板鞋** Hover Skates | Passive | Pass suitcases; pace ×0.6 / 0.7 / 0.8; 名貴 also the boss case (名貴 = `I4`, which does not fit the 6-cell bag — wear 中價) | `O1` / `I2` / `I4` | 150 / 250 / 450 (850) | 6 / 40 / 60 | Luggage |
+| S3 | 👟 | **磁浮滑板鞋** Hover Skates | Passive | Pass suitcases; pace ×0.6 / 0.7 / 0.8; 名貴 also the boss case | `O1` / `I2` / `S4` | 150 / 250 / 450 (850) | 6 / 40 / 60 | Luggage |
 | G1 | 🧤 | **液壓手套** Hydraulic Gloves | Passive | Push ×1.12 / 1.25 / 1.40; 名貴 squat shove ×2 | `O1` / `I2` / `L3` | 100 / 200 / 350 (650) | — | (Squat at LG) |
 | G2 | 🧤 | **震波拳套** Shock Gauntlets | Passive (shove) | Full-charge shove shockwave r 1.2 / 1.4 / 1.6, luggage ×2.0 / 2.3 / 2.6 | `O1` / `I2` / `T4` | 150 / 250 / 450 (850) | 6 / 40 / 60 | Luggage |
 | G3 | 🧤 | **整蠱震震手套** Joy Buzzer Gloves | Passive (shove) | Shove hit on a couple → they let go for 2.5 / 3.5 / 4.5 s | `O1` / `I2` / `L4` | 150 / 250 / 450 (850) | 18 / 40 / 60 | Couple |
@@ -362,9 +362,9 @@ Prices are per tier: **平 / +中價 / +名貴 (total)**. Footprint per §5.4.2.
 | D3 | 🔧 | **誘餌無人機** Decoy Drone | Active | Brats within 3 m chase the drone for 2.5 / 3.5 / 4.5 s; CD 10 s | `O1` / `I2` / `Z4` | 150 / 250 / 450 (850) | 15 / 40 / 60 | Brat |
 | D4 | 🔧 | **卡通平板** Cartoon Tablet | Active | Family within 2.5 m stops and huddles (no drag / no stamina cost) for 3 / 4 / 5 s; 名貴 also brats 2 s; CD 12 s | `O1` / `I2` / `L4` | 150 / 250 / 450 (850) | 12 / 40 / 60 | Family |
 | D5 | 🔧 | **手提風扇** Turbo Fan | Active | Gust cone 2.0 / 2.3 / 2.6 m (impulse 3.0 / 3.6 / 4.2); blows stench clouds away 3 / 4 / 5 s; CD 6 s | `O1` / `I2` / `S4` | 150 / 250 / 450 (850) | 9 / 40 / 60 | Stench, general lane |
-| C1 | ⚙️ | **機械臂** Mech Arms | Ult | = 鐵牛撞門 (shockwave + charge); CD 14 / 12 / 10 s | `I2` / `L4` / `X5` | 900 / 600 / 900 (2,400) | 70 / 80 / 90 | — |
-| C2 | ⚙️ | **噴射背包** Jet Pack | Ult | = 閃身落車 (burst dash); CD 14 / 12 / 10 s | `I2` / `L4` / `X5` | 900 / 600 / 900 (2,400) | 70 / 80 / 90 | — |
-| C3 | ⚙️ | **力場護盾** Force Field | Ult | = 鐵馬企穩 (burst regen + heavy stance); CD 14 / 12 / 10 s | `I2` / `L4` / `X5` | 900 / 600 / 900 (2,400) | 70 / 80 / 90 | — |
+| C1 | ⚙️ | **機械臂** Mech Arms | Ult | = 鐵牛撞門 (shockwave + charge); CD 14 / 12 / 10 s | `I2` / `L4` / `U5` | 900 / 600 / 900 (2,400) | 70 / 80 / 90 | — |
+| C2 | ⚙️ | **噴射背包** Jet Pack | Ult | = 閃身落車 (burst dash); CD 14 / 12 / 10 s | `I2` / `L4` / `U5` | 900 / 600 / 900 (2,400) | 70 / 80 / 90 | — |
+| C3 | ⚙️ | **力場護盾** Force Field | Ult | = 鐵馬企穩 (burst regen + heavy stance); CD 14 / 12 / 10 s | `I2` / `L4` / `U5` | 900 / 600 / 900 (2,400) | 70 / 80 / 90 | — |
 | K1 | 🎒 | **能量飲品** Energy Drink | Consumable | +40 stamina, clears winded | `O1` | 25 | — | — |
 | K2 | 🎒 | **雙倍特濃** Double Espresso | Consumable | 5 s speed ×1.2 | `O1` | 35 | — | — |
 | K3 | 🎒 | **薄荷香口膠** Mint Gum | Consumable | 6 s stench immunity + loudmouth drain −50 % | `O1` | 30 | 9 | Stench, Loudmouth |
@@ -565,7 +565,7 @@ export const entitlements = IS_STORE_BUILD ? await loadStoreEntitlements() : web
 ### 7.6 Balance bot support (`scripts/simTest.ts`)
 
 - New env `CHARS=hero,mage,tech` (default `hero`, so today's output is unchanged).
-- Loadout names gain a character prefix: `mage:earned`, `mage:b:60/30/10+fire`, `mage:ult-ice`, `tech:earned` (coins = first clears + 50 % ⚡ assumed, greedy shop policy from §5.6), `tech:kit:S3@3,G2@3,H1@2,D3@3,D4@2,C2@1` (validated against the 6-cell bag; shapes that do not fit are left unpacked), `tech:grid4` (name kept; it is the 6-cell bag, not 16), `tech:max`. The shop policy expands at most once (2×2 → 2×3, when coins ≥ 150 + a 150 reserve) and uses auto-pack.
+- Loadout names gain a character prefix: `mage:earned`, `mage:b:60/30/10+fire`, `mage:ult-ice`, `tech:earned` (coins = first clears + 50 % ⚡ assumed, greedy shop policy from §5.6), `tech:kit:S3@3,G2@3,H1@2,D3@3,D4@2,C2@1` (validated against the 6-cell bag; a piece that does not fit beside the others is left unpacked), `tech:grid4` (name kept; it is the 6-cell bag, not 16), `tech:max`. The shop policy expands at most once (2×2 → 2×3, when coins ≥ 150 + a 150 reserve) and uses auto-pack.
 - Bot ability policy (generic, data-driven): fire a counter ability when a matching special or boss is in the 60° forward cone within range and the resource is ready. Fire the general ability (Fire Bolt / Zap / Turbo Fan) when blocked (speed < 0.3 m/s for 0.5 s). Ult same as the Hero today. Consumables when stamina < 30 % or a matching special is near.
 - Report: the per-level table adds **Δ vs hero** columns and flags |Δ| > 10 pp in red. Targets are reported, not enforced, as today.
 - Counter micro-scenarios: one scripted scenario per new counter node/item (with vs without), like the existing Hurdle/Leap/Split checks.
@@ -660,7 +660,7 @@ Concepts can be generated with **Grok Image** and processed by `scripts/art/buil
 | A3 | Low-poly `Spec` looks in `characters.ts` for Mage + Tech (+ 6 equipment sub-parts) | Code | One merged geometry per look / kit hash | 🤖 |
 | A4 | Character-select portraits ×3 + card backgrounds | Grok Image → WebP strip | Like `portraits.webp` | 🤖 → 👤 |
 | A5 | 21 spell node icons (18 nodes + 3 ults) | SVG in `icons.ts` | Bold rounded glyphs, element colour rings | 🤖 |
-| A6 | 20 shop item icons, drawn per tier to fill its footprint (平 `O1`, 中價 `I2`, 名貴 irregular `I3`/`L3`/`I4`/`L4`/`T4`/`S4`/`Z4`/`U5`/`X5` silhouettes; the 名貴 art gets bigger and fancier) + 6 slot glyphs + coin 💰 + ✦ weak-point | SVG | Same icon language | 🤖 |
+| A6 | 20 shop item icons, drawn per tier to fill its footprint (平 `O1`, 中價 `I2`, 名貴 irregular `I3`/`L3`/`L4`/`T4`/`S4`/`Z4`/`U5` silhouettes; `I4` and `X5` are not sold; the 名貴 art gets bigger and fancier) + 6 slot glyphs + coin 💰 + ✦ weak-point | SVG | Same icon language | 🤖 |
 | A6b | Backpack grid art: cell frame, locked 🔒 expansion cells, green/red ghost footprint, rotate ⟳ glyph | SVG/CSS | | 🤖 |
 | A7 | VFX: fire bolt trail, flame burst ring, ember puffs | Particles (pooled) | Additive orange; Low tier = half count | 🤖 |
 | A8 | VFX: frost cone, ice shards, frozen tint, Ice Age dome | Particles + instance tint | | 🤖 |

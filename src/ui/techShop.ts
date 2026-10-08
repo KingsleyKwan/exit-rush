@@ -322,15 +322,24 @@ export function renderWorkshop(game: Game, _rerender: (game: Game) => void): HTM
         _rerender(game);
         return;
       }
-      const p = { id: pick.id, tier: pick.tier, x, y, rot: 0 as Rot };
-      const chk = placeCheck(placements as never, tech.gridTier, tech.items, tech.stock, p);
-      if (!chk.ok) {
-        game.toast(whyBlocked(chk.reason, itemDef(pick.id)?.slot, dict));
-        return;
+      // Rot 0 is often wider than the 2-column bag. Turn until this cell accepts it.
+      let blocked: 'bounds' | 'overlap' = 'bounds';
+      for (const rot of [0, 1, 2, 3] as Rot[]) {
+        const p = { id: pick.id, tier: pick.tier, x, y, rot };
+        const chk = placeCheck(placements as never, tech.gridTier, tech.items, tech.stock, p);
+        if (chk.ok) {
+          pick = null;
+          selected = -1;
+          game.techPlace(p);
+          return;
+        }
+        if (chk.reason !== 'bounds' && chk.reason !== 'overlap') {
+          game.toast(whyBlocked(chk.reason, itemDef(pick.id)?.slot, dict));
+          return;
+        }
+        blocked = chk.reason;
       }
-      pick = null;
-      selected = -1;
-      game.techPlace(p);
+      game.toast(whyBlocked(blocked, itemDef(pick.id)?.slot, dict));
     });
   });
 

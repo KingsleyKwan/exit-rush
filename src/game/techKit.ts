@@ -37,13 +37,13 @@ export const SHAPES: Record<ShapeCode, string[]> = {
   I2: ['##'],
   I3: ['###'],
   L3: ['#.', '##'],
-  I4: ['####'],
+  I4: ['####'], // not sold: a line of 4 does not fit 2×3
   L4: ['#.', '#.', '##'],
   T4: ['###', '.#.'],
   S4: ['.##', '##.'],
   Z4: ['##.', '.##'],
   U5: ['#.#', '###'],
-  X5: ['.#.', '###', '.#.'],
+  X5: ['.#.', '###', '.#.'], // not sold: the plus needs 3×3
 };
 
 /**
@@ -78,7 +78,7 @@ export interface ItemDef {
 export const ITEMS: ItemDef[] = [
   { id: 'S1', slot: 'shoes', price: [100, 200, 350], req: [0, 40, 60], shape: ['O1', 'I2', 'I3'], nameEn: 'Sprint Sneakers', nameZh: '跑鞋', blurbEn: 'Move faster. Luxury is quicker in open space.', blurbZh: '跑快啲。名貴喺空位再快。' },
   { id: 'S2', slot: 'shoes', price: [150, 250, 450], req: [8, 40, 60], shape: ['O1', 'I2', 'Z4'], active: true, nameEn: 'Spring Boots', nameZh: '彈簧鞋', blurbEn: 'Hop over squatters and kids.', blurbZh: '跳過踎低同細路。' },
-  { id: 'S3', slot: 'shoes', price: [150, 250, 450], req: [6, 40, 60], shape: ['O1', 'I2', 'I4'], nameEn: 'Hover Skates', nameZh: '磁浮滑板鞋', blurbEn: 'Slip past suitcases. Luxury also the giant case.', blurbZh: '穿過行李箱。名貴連大箱都過到。' },
+  { id: 'S3', slot: 'shoes', price: [150, 250, 450], req: [6, 40, 60], shape: ['O1', 'I2', 'S4'], nameEn: 'Hover Skates', nameZh: '磁浮滑板鞋', blurbEn: 'Slip past suitcases. Luxury also the giant case.', blurbZh: '穿過行李箱。名貴連大箱都過到。' },
   { id: 'G1', slot: 'gloves', price: [100, 200, 350], req: [0, 40, 60], shape: ['O1', 'I2', 'L3'], nameEn: 'Hydraulic Gloves', nameZh: '液壓手套', blurbEn: 'Harder push. Luxury shoves squatters harder.', blurbZh: '推得更大力。名貴推踎低更勁。' },
   { id: 'G2', slot: 'gloves', price: [150, 250, 450], req: [6, 40, 60], shape: ['O1', 'I2', 'T4'], nameEn: 'Shock Gauntlets', nameZh: '震波拳套', blurbEn: 'Full-charge shove sends a shockwave.', blurbZh: '蓄滿力推會爆震波。' },
   { id: 'G3', slot: 'gloves', price: [150, 250, 450], req: [18, 40, 60], shape: ['O1', 'I2', 'L4'], nameEn: 'Joy Buzzer Gloves', nameZh: '整蠱震震手套', blurbEn: 'A shove makes a couple let go.', blurbZh: '一推，情侶就鬆手。' },
@@ -90,9 +90,9 @@ export const ITEMS: ItemDef[] = [
   { id: 'D3', slot: 'gadget', price: [150, 250, 450], req: [15, 40, 60], shape: ['O1', 'I2', 'Z4'], active: true, nameEn: 'Decoy Drone', nameZh: '誘餌無人機', blurbEn: 'Brats chase the drone.', blurbZh: '衰仔追住無人機。' },
   { id: 'D4', slot: 'gadget', price: [150, 250, 450], req: [12, 40, 60], shape: ['O1', 'I2', 'L4'], active: true, nameEn: 'Cartoon Tablet', nameZh: '卡通平板', blurbEn: 'Nearby family stops to watch.', blurbZh: '附近家庭停低睇。' },
   { id: 'D5', slot: 'gadget', price: [150, 250, 450], req: [9, 40, 60], shape: ['O1', 'I2', 'S4'], active: true, nameEn: 'Turbo Fan', nameZh: '手提風扇', blurbEn: 'Gust clears a lane and blows stench away.', blurbZh: '一陣風開路，吹走臭味。' },
-  { id: 'C1', slot: 'core', price: [900, 600, 900], req: [70, 80, 90], shape: ['I2', 'L4', 'X5'], nameEn: 'Mech Arms', nameZh: '機械臂', blurbEn: 'Iron Bull charge.', blurbZh: '鐵牛撞門。' },
-  { id: 'C2', slot: 'core', price: [900, 600, 900], req: [70, 80, 90], shape: ['I2', 'L4', 'X5'], nameEn: 'Jet Pack', nameZh: '噴射背包', blurbEn: 'Slip-off dash.', blurbZh: '閃身落車。' },
-  { id: 'C3', slot: 'core', price: [900, 600, 900], req: [70, 80, 90], shape: ['I2', 'L4', 'X5'], nameEn: 'Force Field', nameZh: '力場護盾', blurbEn: 'Iron stance.', blurbZh: '鐵馬企穩。' },
+  { id: 'C1', slot: 'core', price: [900, 600, 900], req: [70, 80, 90], shape: ['I2', 'L4', 'U5'], nameEn: 'Mech Arms', nameZh: '機械臂', blurbEn: 'Iron Bull charge.', blurbZh: '鐵牛撞門。' },
+  { id: 'C2', slot: 'core', price: [900, 600, 900], req: [70, 80, 90], shape: ['I2', 'L4', 'U5'], nameEn: 'Jet Pack', nameZh: '噴射背包', blurbEn: 'Slip-off dash.', blurbZh: '閃身落車。' },
+  { id: 'C3', slot: 'core', price: [900, 600, 900], req: [70, 80, 90], shape: ['I2', 'L4', 'U5'], nameEn: 'Force Field', nameZh: '力場護盾', blurbEn: 'Iron stance.', blurbZh: '鐵馬企穩。' },
   { id: 'K1', slot: 'consumable', price: [25], req: [0], shape: ['O1'], nameEn: 'Energy Drink', nameZh: '能量飲品', blurbEn: '+40 stamina, clears winded.', blurbZh: '體力 +40，解除透支。' },
   { id: 'K2', slot: 'consumable', price: [35], req: [0], shape: ['O1'], nameEn: 'Double Espresso', nameZh: '雙倍特濃', blurbEn: '5 s of extra speed.', blurbZh: '5 秒加速。' },
   { id: 'K3', slot: 'consumable', price: [30], req: [9], shape: ['O1'], nameEn: 'Mint Gum', nameZh: '薄荷香口膠', blurbEn: '6 s stench immunity and quieter calls.', blurbZh: '6 秒唔怕臭，電話聲細啲。' },
@@ -1063,6 +1063,29 @@ export function techKitSelfTest(): string[] {
   sellItem(save, 'S1');
   eq('expand sticks', save.tech.gridTier === 1);
   eq('bag stops at 6', expandGrid(save) === false && gridOf(save.tech.gridTier).cols * gridOf(save.tech.gridTier).rows === 6);
+  const bag = gridMaxTier();
+  const { cols, rows } = gridOf(bag);
+  const unfit: string[] = [];
+  for (const it of ITEMS) {
+    for (let i = 0; i < it.shape.length; i++) {
+      const tier = (i + 1) as Tier;
+      let ok = false;
+      for (const rot of [0, 1, 2, 3] as Rot[]) {
+        for (let y = 0; y < rows && !ok; y++) {
+          for (let x = 0; x < cols; x++) {
+            if (placeCheck([], bag, { [it.id]: tier }, { [it.id]: 1 }, { id: it.id, tier, x, y, rot }).ok) {
+              ok = true;
+              break;
+            }
+          }
+        }
+      }
+      const atCorner = ([0, 1, 2, 3] as Rot[]).some((rot) =>
+        placeCheck([], bag, { [it.id]: tier }, { [it.id]: 1 }, { id: it.id, tier, x: 0, y: 0, rot }).ok);
+      if (!ok || !atCorner) unfit.push(`${it.id}@${tier}:${it.shape[i]}`);
+    }
+  }
+  eq('every buyable tier fits an empty 2x3', unfit.length === 0, unfit.join(' '));
   eq('old 4x4 spends like the cap', gridSpend(4) === 150, String(gridSpend(4)));
   const stuffed = emptyTech();
   stuffed.gridTier = 4;
