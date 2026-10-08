@@ -18,7 +18,7 @@
   font-size: 10px;
   line-height: 1.25;
   opacity: 0.7;
-  max-height: 2.6em;
+  max-height: 5.4em;
   overflow: hidden;
 }
 .constellation {
@@ -409,90 +409,135 @@
 .skills-panel .cst-detail-zh { color: #8a5a00; }
 .skills-panel .cst-detail-tip { color: #4a5568; }
 
-/* Mage book: six rows. Left is the start. Right is the stronger version of the same skill. */
-.spellbook {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-  min-width: 0;
+/* Mage book: a wheel. Centre is the start. Farther out is the stronger rank. */
+.spell-wheel {
+  position: relative;
+  width: min(100%, 520px, 68vh);
+  aspect-ratio: 1;
+  margin: 6px auto;
+  flex: none;
+  container-type: inline-size;
+  color: rgba(255, 255, 255, 0.82);
 }
-.spell-mix-cap {
-  margin: 2px 0 0;
-  font-size: 11px;
-  font-weight: 800;
-  opacity: 0.8;
+.spell-spokes {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+  pointer-events: none;
 }
-.spell-row {
+.spell-hub {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  width: 13%;
+  aspect-ratio: 1;
+  border-radius: 50%;
   display: grid;
-  grid-template-columns: 68px minmax(0, 1fr);
-  gap: 6px;
-  align-items: center;
-  border-radius: 12px;
-  padding: 5px 6px;
-  border: 1px solid transparent;
-  min-width: 0;
+  place-items: center;
+  background: radial-gradient(circle at 40% 35%, #31405c, #121826 70%);
+  border: 1px solid rgba(255, 255, 255, 0.4);
+  box-shadow: 0 0 0 4px rgba(255, 255, 255, 0.06);
+  font-size: clamp(9px, 3.2cqi, 14px);
+  font-weight: 900;
+  letter-spacing: 0.04em;
+  z-index: 1;
+  pointer-events: none;
 }
-.school-wind { border-color: rgba(79, 195, 247, 0.6); background: rgba(179, 229, 252, 0.14); }
-.school-ice { border-color: rgba(30, 136, 229, 0.6); background: rgba(30, 136, 229, 0.12); }
-.school-grav { border-color: rgba(126, 87, 194, 0.65); background: rgba(126, 87, 194, 0.14); }
-.spell-row-head {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 1px;
+.spell-ray-label {
+  position: absolute;
+  z-index: 2;
+  max-width: 20%;
+  padding: 1px 4px;
+  border-radius: 8px;
+  background: rgba(8, 12, 22, 0.72);
+  font-size: clamp(8px, 2.5cqi, 12px);
+  font-weight: 900;
+  line-height: 1.05;
   text-align: center;
-  min-width: 0;
+  pointer-events: none;
+  transform: translate(-50%, -50%);
 }
-.spell-row-head .skill-ico { width: 22px; height: 22px; }
-.spell-row-head strong { font-size: 11px; font-weight: 900; line-height: 1.15; }
-.spell-row-head em { font-style: normal; font-size: 10px; font-weight: 700; opacity: 0.75; }
-.spell-ranks { display: flex; align-items: stretch; min-width: 0; }
-.spell-link { width: 8px; height: 2px; align-self: center; flex: none; background: currentColor; opacity: 0.35; }
-.spell-node {
-  flex: 1;
+.spell-ray-label.line-i { color: #90caf9; }
+.spell-ray-label.line-w { color: #b3e5fc; }
+.spell-ray-label.line-g { color: #d1c4e9; }
+.spell-ray-label.line-iw { color: #81d4fa; }
+.spell-ray-label.line-ig { color: #9fa8da; }
+.spell-ray-label.line-wg { color: #b39ddb; }
+.spell-wheel .spell-node {
+  position: absolute;
+  width: 7.6%;
+  height: 7.6%;
   min-width: 0;
-  min-height: 48px;
-  border: 1px solid rgba(255, 255, 255, 0.18);
-  background: rgba(0, 0, 0, 0.22);
+  min-height: 0;
+  transform: translate(-50%, -50%);
+  border-radius: 50%;
+  border: 1px solid rgba(255, 255, 255, 0.28);
+  background: rgba(8, 12, 20, 0.72);
   color: inherit;
-  border-radius: 10px;
-  padding: 3px 2px;
+  padding: 0;
   display: flex;
-  flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 1px;
+  z-index: 1;
 }
-.spell-node.ready { border-color: #fff; box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.4); }
-.spell-node.locked { opacity: 0.5; }
-.spell-node.selected { outline: 2px solid rgba(255, 255, 255, 0.7); }
-.spell-name { text-align: center; line-height: 1.1; min-width: 0; }
-.spell-name b {
-  display: -webkit-box;
-  -webkit-line-clamp: 2;
-  -webkit-box-orient: vertical;
-  overflow: hidden;
-  font-size: 11px;
-}
-.spell-dot { position: relative; display: inline-flex; }
-.spell-dot .ico { width: 16px; height: 16px; }
+.spell-wheel .spell-node.ready { border-color: #fff; box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.45); }
+.spell-wheel .spell-node.locked { opacity: 0.48; }
+.spell-wheel .spell-node.selected { outline: 2px solid #ffe082; outline-offset: 1px; z-index: 3; }
+.spell-wheel .spell-dot { position: relative; display: inline-flex; align-items: center; justify-content: center; }
+.spell-wheel .spell-node .ico { width: 4.4cqi; height: 4.4cqi; }
+.spell-wheel .spell-pair { display: flex; align-items: center; }
+.spell-wheel .spell-pair .ico { width: 3.1cqi; height: 3.1cqi; }
 .spell-star {
   position: absolute;
-  top: -6px;
-  right: -8px;
+  top: -1px;
+  right: -3px;
   font-style: normal;
-  font-size: 10px;
+  font-size: 2.5cqi;
+  line-height: 1;
   color: #ffe082;
 }
-.school-wind .spell-node.on { background: linear-gradient(180deg, #e1f5fe, #4fc3f7); color: #083040; }
-.school-ice .spell-node.on { background: linear-gradient(180deg, #42a5f5, #1565c0); color: #fff; }
-.school-grav .spell-node.on { background: linear-gradient(180deg, #9575cd, #4527a0); color: #fff; }
-.school-wind .spell-row-head .skill-ico { background: linear-gradient(180deg, #e1f5fe, #4fc3f7); color: #083040; --ico-ink: #0277bd; }
-.school-ice .spell-row-head .skill-ico { background: linear-gradient(180deg, #42a5f5, #1565c0); color: #fff; --ico-ink: #0d47a1; }
-.school-grav .spell-row-head .skill-ico { background: linear-gradient(180deg, #9575cd, #4527a0); color: #fff; --ico-ink: #311b92; }
+.spell-wheel .line-w { --ico-ink: #0277bd; }
+.spell-wheel .line-i { --ico-ink: #0d47a1; }
+.spell-wheel .line-g { --ico-ink: #311b92; }
+.spell-wheel .line-w.on { background: linear-gradient(180deg, #e1f5fe, #4fc3f7); color: #083040; }
+.spell-wheel .line-i.on { background: linear-gradient(180deg, #42a5f5, #1565c0); color: #fff; }
+.spell-wheel .line-g.on { background: linear-gradient(180deg, #9575cd, #4527a0); color: #fff; }
+.spell-wheel .line-iw { --tilt: 90deg; --c1: #1e88e5; --c2: #4fc3f7; }
+.spell-wheel .line-wg { --tilt: 210deg; --c1: #4fc3f7; --c2: #7e57c2; }
+.spell-wheel .line-ig { --tilt: 330deg; --c1: #7e57c2; --c2: #1e88e5; }
+.spell-wheel .spell-node.mix {
+  background: linear-gradient(var(--tilt), color-mix(in srgb, var(--c1) 55%, #121820), color-mix(in srgb, var(--c2) 55%, #121820));
+}
+.spell-wheel .spell-node.mix.on {
+  background: linear-gradient(var(--tilt), var(--c1), var(--c2));
+  color: #fff;
+}
 .cst-detail-why { font-size: 12px; font-weight: 800; color: #ffe082; }
-.skills-panel .spell-row { color: #18202e; }
-.skills-panel .spell-node:not(.on) { background: #f3f5f8; color: #18202e; border-color: #d5dae0; }
+.skills-panel .spell-wheel { color: #18202e; }
+.skills-panel .spell-hub {
+  background: radial-gradient(circle at 40% 35%, #fff, #e7ebf2 70%);
+  color: #18202e;
+  border-color: #c5ccd6;
+}
+.skills-panel .spell-ray-label { background: rgba(255, 255, 255, 0.88); }
+.skills-panel .spell-ray-label.line-i { color: #1565c0; }
+.skills-panel .spell-ray-label.line-w { color: #0277bd; }
+.skills-panel .spell-ray-label.line-g { color: #4527a0; }
+.skills-panel .spell-ray-label.line-iw { color: #0277bd; }
+.skills-panel .spell-ray-label.line-ig { color: #3949ab; }
+.skills-panel .spell-ray-label.line-wg { color: #5e35b1; }
+.skills-panel .spell-wheel .spell-node:not(.on) {
+  background: #f3f5f8;
+  color: #18202e;
+  border-color: #d5dae0;
+}
+.skills-panel .spell-wheel .spell-node.mix:not(.on) {
+  background: linear-gradient(var(--tilt), color-mix(in srgb, var(--c1) 28%, #fff), color-mix(in srgb, var(--c2) 28%, #fff));
+}
+.skills-panel .spell-wheel .spell-node.locked { opacity: 0.72; }
 .skills-panel .cst-detail-why { color: #8a5a00; }
 
 @media (max-aspect-ratio: 4/5) {

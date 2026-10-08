@@ -1,6 +1,7 @@
 /**
  * Mage 「凱婷」 spellbook. Not the hero constellation.
- * Six lines, read left to right. The next node is a stronger version of the same one.
+ * Six rays on a wheel. The centre is the start. Ice is at 10 o'clock, wind at 2, gravity at 6.
+ * A mix sits between the two schools it needs. Farther from the centre is the stronger rank.
  * Wind w1–w4, ice i1–i4, gravity g1–g4.
  * A mix starts only when both pure starts are already learned: iw1 needs i1 and w1,
  * ig1 needs i1 and g1, wg1 needs w1 and g1. The next mix rank needs only the mix rank before it.

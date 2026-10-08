@@ -53,13 +53,13 @@ export interface Dict {
   levelsTeaser: string;
   /** How skill points are earned and spent. No placeholders. */
   skillHowto: string;
-  /** Mage book only. Lines get stronger. Mixes need both starts. */
+  /** Mage book only. Centre is the start. Farther out is stronger. */
   spellHowto: string;
   /** {name} = the skill that has to come first. */
   spellNeed: string;
   /** {a} and {b} = the two starts a mix needs. */
   spellNeedTwo: string;
-  /** Shown above the mix rows. */
+  /** Word in the centre of the mage wheel. */
   spellMixNeed: string;
   /** Rank 4 of a line. Not a separate ultimate button. */
   spellLast: string;
@@ -297,10 +297,10 @@ export const en: Dict = {
   back: 'Back',
   levelsTeaser: 'All 100 levels · clear 99 to unlock the Lv100 finale',
   skillHowto: 'Every 10 levels earns 1 point. Each skill costs 1.',
-  spellHowto: 'Wind, ice, and gravity each get stronger. A mix needs both starts. You can learn more than one last skill, unless they share an element.',
+  spellHowto: 'The start is the centre. Farther out is stronger. The skill between two schools needs both starts. Last skills cannot share an element.',
   spellNeed: 'Learn {name} first.',
   spellNeedTwo: 'Learn {a} and {b} first.',
-  spellMixNeed: 'A mix needs both starts.',
+  spellMixNeed: 'Start',
   spellLast: 'Strongest of this line.',
   spellOneEnd: 'A last skill that shares an element is already learned.',
   ultShort: 'Ult',

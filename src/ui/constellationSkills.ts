@@ -1,4 +1,4 @@
-import { MIX_LINES, PURE_LINES, barAfterLearn, canLearn, learnSpell, lineElements, rank4Blocked, spellById, type SpellLine } from '../game/SpellTree';
+import { barAfterLearn, canLearn, learnSpell, lineElements, rank4Blocked, spellById, type SpellLine } from '../game/SpellTree';
 import { spentOf } from '../game/storage';
 import { t, getLang, fmt } from '../i18n';
 import type { Game } from '../game/Game';
@@ -60,15 +60,55 @@ const LINE_ICON: Record<SpellLine, string> = {
   w: 'wind', i: 'ice', g: 'grav', iw: 'wind', ig: 'ice', wg: 'grav',
 };
 
+/** Clockwise degrees from 12. Ice 10 o'clock, wind 2, gravity 6. Mixes sit between. */
+const RAY_ANGLE: Record<SpellLine, number> = {
+  iw: 0, w: 60, wg: 120, g: 180, ig: 240, i: 300,
+};
+/** Clock order, so the eye reads ice → the mix → wind. */
+const RAY_ORDER: readonly SpellLine[] = ['iw', 'w', 'wg', 'g', 'ig', 'i'];
+/** Same four orbits on every ray. Rank 1 is the inner ring. */
+const RAY_R = [13, 22, 31, 40];
+
 function lineLabel(dict: ReturnType<typeof t>, line: SpellLine): string {
   if (line === 'w') return dict.wind;
   if (line === 'i') return dict.ice;
   if (line === 'g') return dict.grav;
   const parts = lineElements(line).map((el) => (el === 'w' ? dict.wind : el === 'i' ? dict.ice : dict.grav));
-  return parts.join('+');
+  return `${parts[0]}<br>+${parts[1]}`;
 }
 
-/** Rows, left to right. The node on the right is the stronger version. */
+function polar(angleDeg: number, radius: number): { x: number; y: number } {
+  const a = (angleDeg * Math.PI) / 180;
+  return { x: 50 + Math.sin(a) * radius, y: 50 - Math.cos(a) * radius };
+}
+
+
+
+function raySvg(): string {
+  const orbits = RAY_R.map((r) =>
+    `<circle cx="50" cy="50" r="${r}" fill="none" stroke="currentColor" stroke-width="0.35" opacity="0.28"/>`,
+  ).join('');
+  const grads = (['iw', 'wg', 'ig'] as const).map((line) => {
+    const ang = RAY_ANGLE[line];
+    const mid = polar(ang, 30);
+    const side = polar(ang + 90, 3);
+    const dx = side.x - 50;
+    const dy = side.y - 50;
+    const colors = line === 'iw' ? ['#1e88e5', '#4fc3f7'] : line === 'wg' ? ['#4fc3f7', '#7e57c2'] : ['#7e57c2', '#1e88e5'];
+    return `<linearGradient id="ray-${line}" gradientUnits="userSpaceOnUse" x1="${(mid.x - dx).toFixed(2)}" y1="${(mid.y - dy).toFixed(2)}" x2="${(mid.x + dx).toFixed(2)}" y2="${(mid.y + dy).toFixed(2)}"><stop offset="0" stop-color="${colors[0]}"/><stop offset="1" stop-color="${colors[1]}"/></linearGradient>`;
+  }).join('');
+  const rays = RAY_ORDER.map((line) => {
+    const ang = RAY_ANGLE[line];
+    const inner = polar(ang, 8);
+    const outer = polar(ang, RAY_R[3]);
+    const pure = line.length === 1;
+    const stroke = pure ? (line === 'w' ? '#4fc3f7' : line === 'i' ? '#1e88e5' : '#7e57c2') : `url(#ray-${line})`;
+    return `<line x1="${inner.x.toFixed(2)}" y1="${inner.y.toFixed(2)}" x2="${outer.x.toFixed(2)}" y2="${outer.y.toFixed(2)}" stroke="${stroke}" stroke-width="${pure ? 1.6 : 2.3}" stroke-linecap="round"/>`;
+  }).join('');
+  return `<svg class="spell-spokes" viewBox="0 0 100 100" aria-hidden="true"><defs>${grads}</defs>${orbits}${rays}</svg>`;
+}
+
+/** Wheel. The centre is the start. Farther out is the stronger rank of that same skill. */
 function renderMageBook(game: Game, rerender: (game: Game) => void): HTMLElement {
   const dict = t();
   const en = getLang() === 'en';
@@ -94,21 +134,20 @@ function renderMageBook(game: Game, rerender: (game: Game) => void): HTMLElement
     const tip = en ? n.tipEn : n.tipZh;
     const kind = n.rank === 4 ? dict.spellLast : dict.skillNodeActive;
     const title = `${n.nameEn} / ${n.nameZh} — ${tip}${why ? ` (${why})` : ''}`;
-    const label = en ? n.nameEn : n.nameZh;
-    return `<button type="button" class="spell-node ${on ? 'on' : ''} ${ready ? 'ready' : ''} ${n.rank === 4 ? 'cap' : ''} ${!on && !ready ? 'locked' : ''}" data-spell="${id}" data-tip="${tip.replace(/"/g, '&quot;')}" data-why="${why.replace(/"/g, '&quot;')}" data-kind="${kind}" data-en="${n.nameEn}" data-zh="${n.nameZh}" title="${title.replace(/"/g, '&quot;')}" aria-label="${title.replace(/"/g, '&quot;')}">
-      <span class="spell-dot">${icon(LINE_ICON[n.line])}${n.rank === 4 ? '<i class="spell-star">★</i>' : ''}</span>
-      <span class="spell-name"><b>${label}</b></span>
+    const mix = n.line.length > 1;
+    const at = polar(RAY_ANGLE[n.line], RAY_R[n.rank - 1]);
+    const glyphs = mix
+      ? `<span class="spell-pair">${lineElements(n.line).map((part) => icon(part === 'w' ? 'wind' : part === 'i' ? 'ice' : 'grav')).join('')}</span>`
+      : icon(LINE_ICON[n.line]);
+    return `<button type="button" class="spell-node line-${n.line} ${mix ? 'mix' : ''} ${on ? 'on' : ''} ${ready ? 'ready' : ''} ${n.rank === 4 ? 'cap' : ''} ${!on && !ready ? 'locked' : ''}" data-spell="${id}" data-line="${n.line}" style="left:${at.x.toFixed(2)}%;top:${at.y.toFixed(2)}%" data-tip="${tip.replace(/"/g, '&quot;')}" data-why="${why.replace(/"/g, '&quot;')}" data-kind="${kind}" data-en="${n.nameEn}" data-zh="${n.nameZh}" title="${title.replace(/"/g, '&quot;')}" aria-label="${title.replace(/"/g, '&quot;')}">
+      <span class="spell-dot">${glyphs}${n.rank === 4 ? '<i class="spell-star">★</i>' : ''}</span>
     </button>`;
   };
 
-  const row = (line: SpellLine) => {
-    const chain = [1, 2, 3, 4].map((rank) => spellById(`${line}${rank}`)!);
-    const got = chain.filter((n) => known.has(n.id)).length;
-    const tint = line === 'i' || line === 'ig' ? 'ice' : line === 'g' ? 'grav' : 'wind';
-    return `<section class="spell-row line-${line} school-${tint}">
-      <header class="spell-row-head"><span class="skill-ico">${icon(LINE_ICON[line])}</span><strong>${lineLabel(dict, line)}</strong><em>${got}/4</em></header>
-      <div class="spell-ranks">${chain.map((n) => nodeBtn(n.id)).join('<i class="spell-link" aria-hidden="true"></i>')}</div>
-    </section>`;
+  const rayLabel = (line: SpellLine) => {
+    const at = polar(RAY_ANGLE[line], 47.8);
+    const name = lineLabel(dict, line);
+    return `<span class="spell-ray-label line-${line}" style="left:${at.x.toFixed(2)}%;top:${at.y.toFixed(2)}%">${name}</span>`;
   };
 
   const panel = el(`
@@ -119,10 +158,11 @@ function renderMageBook(game: Game, rerender: (game: Game) => void): HTMLElement
         <p class="howto skill-howto">${dict.spellHowto}</p>
         ${loadoutStrip(game, { reset: true, cls: 'in-tree' })}
         ${overRun ? `<p class="howto">${dict.skillsApplyNext}</p>` : ''}
-        <div class="spellbook" role="group" aria-label="${dict.spells}">
-          ${PURE_LINES.map((line) => row(line)).join('')}
-          <p class="spell-mix-cap">${dict.spellMixNeed}</p>
-          ${MIX_LINES.map((line) => row(line)).join('')}
+        <div class="spell-wheel" role="group" aria-label="${dict.spells}">
+          ${raySvg()}
+          <div class="spell-hub">${dict.spellMixNeed}</div>
+          ${RAY_ORDER.map((line) => [1, 2, 3, 4].map((rank) => nodeBtn(`${line}${rank}`)).join('')).join('')}
+          ${RAY_ORDER.map((line) => rayLabel(line)).join('')}
         </div>
         <div class="cst-detail spell-detail" id="cst-detail" aria-live="polite">
           <div class="cst-detail-names"><span class="cst-detail-ico"></span><b class="cst-detail-en"></b><span class="cst-detail-zh"></span></div>
@@ -140,7 +180,7 @@ function renderMageBook(game: Game, rerender: (game: Game) => void): HTMLElement
     btn.classList.add('selected');
     if (!detail) return;
     detail.classList.add('on');
-    const glyph = btn.querySelector('.spell-dot > .ico');
+    const glyph = btn.querySelector('.spell-pair') ?? btn.querySelector('.spell-dot .ico');
     const slot = detail.querySelector('.cst-detail-ico');
     if (slot) slot.innerHTML = glyph ? glyph.outerHTML : '';
     detail.querySelector('.cst-detail-en')!.textContent = btn.dataset.en ?? '';

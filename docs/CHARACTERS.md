@@ -14,7 +14,7 @@ Legend: 🤖 = box agent can do it · 🛠️ = Kingsley's local Grok Build (Cap
 | | 主角「上班族」 Office Worker (FREE 免費) | 魔法師「凱婷」 Bad Girl (PAID 付費) | 高科技人「裝備L」 Gear L (PAID 付費) |
 |---|---|---|---|
 | Fantasy | Commuter who pushes through | Umbrella-wand witch who casts her way out | Gadget geek with a backpack full of toys |
-| Progression | 力量 / 速度 / 體力 constellation (existing) | 風 / 冰 / 重力, plus the three mixes. Left to right, each rank stronger. Not the hero's tree | No tree. Coins 💰 → shop 🛒 → items in 平/中價/名貴 (Cheap/Mid/Luxury) tiers placed in a **backpack grid 背囊格** (2×2, one expansion to 2×3) |
+| Progression | 力量 / 速度 / 體力 constellation (existing) | 風 / 冰 / 重力 on a wheel, plus the three mixes between them. Farther from the centre is stronger. Not the hero's tree | No tree. Coins 💰 → shop 🛒 → items in 平/中價/名貴 (Cheap/Mid/Luxury) tiers placed in a **backpack grid 背囊格** (2×2, one expansion to 2×3) |
 | Resource | Stamina 體力 | Stamina 體力 + **Mana 魔力** (separate bar) | Stamina 體力 + item cooldowns + ≤ 3 consumables (in grid) |
 | Points / coins | 1 point per 10 first clears (10) | 1 point per 10 of her own first clears (10) | Coins per clear, bounded replay coins, ⚡ fast-exit bonus |
 | Respec | Free, 3 loadouts | Free, 3 loadouts | 100 % item sell-back, 3 grid layouts (套裝); grid expansions permanent |
@@ -77,9 +77,9 @@ Budget check: a 15 s level gives about 100 + 15 × 8 = 220 mana, roughly **6–8
 
 Same point budget as the Hero, different shape. **1 point per 10 first clears, 10 total. Each skill costs 1 point.** There is no power ladder (10/20/…/60) on this book. Free respec, 3 loadouts (魔法配置 1/2/3).
 
-The book is six rows, read left to right. The next node is a stronger version of the same skill, not a different verb. Each skill costs 1 point. She can hold 10. There are 24 nodes, so a book is a choice.
+The book is a wheel. The centre is the start, not a skill. Ice (`i1`) sits at 10 o'clock, wind (`w1`) at 2 o'clock, gravity (`g1`) at 6 o'clock. Each next node on that ray is a stronger version of the same skill, not a different verb. Each skill costs 1 point. She can hold 10. There are 24 nodes, so a book is a choice.
 
-Wind `w1`–`w4`, ice `i1`–`i4`, gravity `g1`–`g4`. A mix row starts only when both pure starts are already learned: `iw1` needs `i1` and `w1`, `ig1` needs `i1` and `g1`, `wg1` needs `w1` and `g1`. The next mix rank needs only the mix rank before it. It does not need the matching pure rank.
+The mix sits in the wedge between its two schools: `iw` between ice and wind, `wg` between wind and gravity, `ig` between ice and gravity. `iw1` needs `i1` and `w1`, `ig1` needs `i1` and `g1`, `wg1` needs `w1` and `g1`. The next mix rank needs only the mix rank before it. It does not need the matching pure rank.
 
 Two rank-4 skills lock each other when they share an element. `i4` and `g4` can both be learned. `i4` blocks `ig4` and `iw4`. `ig4` blocks `i4` and `g4`, and also `iw4` and `wg4`, but not `w4`. Lower ranks do not lock. The HUD shows one button per learned line and casts the highest rank. There is no second button for the last rank. Mana and cooldown stay the same along a line, so the higher rank is strictly better.
 
@@ -407,7 +407,7 @@ General rules: icon-first, EN + 粵 (zh-HK default, colloquial). Every string go
 | Character | Bottom-nav label | Screen |
 |---|---|---|
 | Hero | 🌟 技能 Skills | Existing constellation (`constellationSkills.ts`) |
-| Mage | 📖 魔法 Spells | Her own book, not the hero constellation. Six rows, left to right: wind, ice, gravity, then the three mixes. The node on the right is the stronger version. A mix needs both starts. More than one last skill is allowed unless they share an element. Tap a ready node to spend 1 point. The HUD shows one button per learned line and casts the highest rank. |
+| Mage | 📖 魔法 Spells | Her own book, not the hero constellation. A wheel: the start is the centre, ice at 10 o'clock, wind at 2, gravity at 6. Mixes sit between the two schools. Farther out is the stronger version. A mix needs both starts. More than one last skill is allowed unless they share an element. Tap a ready node to spend 1 point. The HUD shows one button per learned line and casts the highest rank. |
 | Tech | 🛒 裝備 Gear | **Workshop 工作室**: tabs **裝備 Equip (backpack grid + tray, §5.4.6) / 商店 Shop / 套裝 Sets 1-2-3**; coin balance + 「4/6 格」 top-right; each item card shows icon, 平/中價/名貴 pills with footprints, effect, counters chip, price, 買/升級/賣. Expand stops after 2×3 |
 
 The hero constellation is unchanged. 凱婷 does not share those node positions or the fire / lightning schools.
