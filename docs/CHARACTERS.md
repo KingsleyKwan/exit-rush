@@ -2,7 +2,7 @@
 
 **Game:** 逼落車 / Exit Rush (香城鐵路 · Hong City Rail parody)
 **Cast:** 主角「上班族」 Office Worker (free, "Hero" in this doc) · 魔法師「凱婷」 Bad Girl · 高科技人「裝備L」 Gear L
-**Status:** Approved for v0.8.0 P1 (Kingsley), written against the v0.7.0 baseline (100 levels, 1 SP per first clear, free respec + 3 loadouts, bosses every 10 levels from L20 to L90, all 8 at L100).
+**Status:** Approved for v0.8.0 P1 (Kingsley). Live economy (v0.8.1): 100 levels, 1 skill point per 10 first clears, one point learns one skill, free respec + 3 loadouts, bosses every 10 levels from L20 to L90, all 8 at L100.
 **Scope:** design only. No code in this doc ships. **Every number is a proposal, marked tunable (🎛️), and must be checked with `npm run test:sim` before it lands.**
 
 Legend: 🤖 = box agent can do it · 🛠️ = Kingsley's local Grok Build (Capacitor / Xcode / device) · 👤 = owner-only decision or account action.
@@ -16,9 +16,9 @@ Legend: 🤖 = box agent can do it · 🛠️ = Kingsley's local Grok Build (Cap
 | Fantasy | Commuter who pushes through | Umbrella-wand witch who casts her way out | Gadget geek with a backpack full of toys |
 | Progression | 力量 / 速度 / 體力 constellation (existing) | 火 / 冰 / 雷 spellbook constellation (same 10…60 + ult shape) | No tree. Coins 💰 → shop 🛒 → items in 平/中價/名貴 (Cheap/Mid/Luxury) tiers placed in a **backpack grid 背囊格** (2×2, one expansion to 2×3) |
 | Resource | Stamina 體力 | Stamina 體力 + **Mana 魔力** (separate bar) | Stamina 體力 + item cooldowns + ≤ 3 consumables (in grid) |
-| Points / coins | 1 SP per first clear (100) | 1 SP per first clear (100, same shared clear list) | Coins per clear, bounded replay coins, ⚡ fast-exit bonus |
+| Points / coins | 1 point per 10 first clears (10) | 1 point per 10 of her own first clears (10) | Coins per clear, bounded replay coins, ⚡ fast-exit bonus |
 | Respec | Free, 3 loadouts | Free, 3 loadouts | 100 % item sell-back, 3 grid layouts (套裝); grid expansions permanent |
-| Power cap | 100 SP (70 per branch + ult) | 100 SP | **Grid cells** (6 max) + body rule (1 shoes / gloves / head / core) |
+| Power cap | 10 points: full branch (power 60) + ult + 3 skills | same 10 points | **Grid cells** (6 max) + body rule (1 shoes / gloves / head / core) |
 | Counters all 8 specials + 8 bosses | ✅ | ✅ | ✅ |
 | Price ✅ decided | Free | US$2.99 ≈ HK$23 | US$2.99 ≈ HK$23 (pack of both US$4.99 ≈ HK$38) |
 | Web / Pages demo | Unlocked | **Unlocked** (no IAP, no ads) | **Unlocked** (no IAP, no ads) |
@@ -28,7 +28,7 @@ Legend: 🤖 = box agent can do it · 🛠️ = Kingsley's local Grok Build (Cap
 ## 1. Pillars · 設計原則
 
 1. **Different, not stronger · 唔同玩法，唔係課金變強.** A paid character changes *how* you solve a car, not *whether* you can. Every level, L100 included, must stay beatable with the free Hero. No paid character has an exclusive level, exclusive skip, extra timer or revive.
-2. **Same power budget · 同一個力量上限.** Each character's endgame power is pegged to the Hero's 100 SP (one full branch + ultimate + ~30 pts). The Mage uses the same point economy. The Tech's power is capped by **backpack grid space (max 2×3, 6 cells)**, not by how many coins you hoard. One packed set is a stage kit. The other two sets are how you cover a different car.
+2. **Same power budget · 同一個力量上限.** Each character's endgame power is still the Hero's old budget, paid in fewer taps: **10 skill points** buy one full branch (power 60) + ultimate + 3 more skills (30 power). The Mage uses the same point economy. The Tech's power is capped by **backpack grid space (max 2×3, 6 cells)**, not by how many coins you hoard. One packed set is a stage kit. The other two sets are how you cover a different car.
 3. **Clear-rate parity · 過關率相近 (measurable).** Balance-bot target: for every level band, each character's `earned` win rate is within **±10 pp** of the Hero's. At L100, each character's best build is within ±10 pp of the Hero's best ult build (Hero target band 30–55 %, see `docs/BALANCE.md`). 🎛️
 4. **Every special has an answer in every kit · 每種乘客都有剋星.** All 8 special passengers and all 8 bosses have at least one counter per character (table in §4).
 5. **No real-money currency · 金幣唔賣錢.** Tech coins are **earned in play only**. They are never sold for real money, never granted by IAP, and never granted by ads. No loot boxes, no randomised paid items.
@@ -75,7 +75,7 @@ Budget check: a 15 s level gives about 100 + 15 × 8 = 220 mana, roughly **6–8
 
 ### 3.3 Spellbook economy · 魔法點
 
-Same as the Hero: **1 pt per first clear, 100 total; nodes at 10/20/30/40/50/60, +10 for the ultimate (branch + ult = 70).** Free respec, 3 loadouts (魔法配置 1/2/3). Tier 3 (40/50/60) = counters, as on the Hero's tree.
+Same as the Hero: **1 point per 10 first clears, 10 total. Each skill costs 1 point and lands on the next node (power 10/20/30/40/50/60). The ultimate is 1 more point after the branch is full (7 points for branch + ult).** Free respec, 3 loadouts (魔法配置 1/2/3). Tier 3 (power 40/50/60) = counters, as on the Hero's tree. A focused branch still reaches those nodes after 40 / 50 / 60 first clears.
 
 Continuous fill (like `TUNING.skills`), at 60 pts in a branch 🎛️:
 
@@ -85,7 +85,7 @@ Continuous fill (like `TUNING.skills`), at 60 pts in a branch 🎛️:
 | ❄️ 冰 Ice | stamina max +40, mana max +40, aura resist +0.45 | STA |
 | ⚡ 雷 Lightning | move speed +0.35, gapSense +0.3, cooldowns −15 % | SPD |
 
-Actives sit at **10** (starter spell) and **50** (counter spell) in each element. With 100 pts, at most 4 actives are unlocked (e.g. 50 + 50). Only **3 go on the spell bar**: the player picks them in the spellbook, and the default is the 3 most recent.
+Actives sit at power **10** (starter spell) and **50** (counter spell) in each element. Ten points can take two elements to 50 (5 skills each), so at most 4 actives are unlocked. Only **3 go on the spell bar**: the player picks them in the spellbook, and the default is the 3 most recent.
 
 ### 3.4 🔥 火 Fire · "Clear the way 開路"
 
@@ -97,7 +97,7 @@ Actives sit at **10** (starter spell) and **50** (counter spell) in each element
 | 40 | `fire_t3a` | Passive | **淨化之火** Cleansing Flame | Fire hits burn off a stench aura for 6 s. Passive aura slow −30 % | — | 惡臭人 Stench |
 | 50 | `fire_t3b` | Active | **爆炎** Flame Burst | Radial r 1.8 m, impulse 2.6; suitcases ×2.6 (like Ground Pound) | 40 / 8 s | 拉行李喼 Luggage |
 | 60 | `fire_t3c` | Passive | **熱到放手** Too Hot to Hold | A fire hit on a couple breaks their hand-hold for 5 s | — | 情侶 Couple |
-| +10 | `ultFire` | Ult | **火鳳燎原** Phoenix Blaze | Radial shockwave r 2.9 + 1.6 s blazing charge (mass ×2.2, drive ×1.8, immune to angry shoves). Same numbers as 鐵牛撞門 | 0 / 10 s | — |
+| ult | `ultFire` | Ult | **火鳳燎原** Phoenix Blaze | Radial shockwave r 2.9 + 1.6 s blazing charge (mass ×2.2, drive ×1.8, immune to angry shoves). Same numbers as 鐵牛撞門 | 0 / 10 s | — |
 
 ### 3.5 ❄️ 冰 Ice · "Stop the crowd 凍住人潮"
 
@@ -109,7 +109,7 @@ Actives sit at **10** (starter spell) and **50** (counter spell) in each element
 | 40 | `ice_t3a` | Passive | **冷靜一下** Chill Out | A chilled angry man can't wind up for 4 s. Passive: angry shove impulse on you ×0.5 | — | 暴躁男 Angry |
 | 50 | `ice_t3b` | Active | **急凍** Flash Freeze | Radial 2.2 m: bodies **frozen** for 2.5 s (rigid statues, no zigzag/darts, family cohesion off so you can split them) | 40 / 9 s | 一家大細 Family, 百厭仔 Brat |
 | 60 | `ice_t3c` | Passive | **冰面滑行** Ice Glide | Squatters can be shoved normally (shoveMul 0.35 → 1.0) and add no lateral weave drag. Slip ×3 against frozen bodies | — | 踎低客 Squat |
-| +10 | `ultIce` | Ult | **冰河時代** Ice Age | Freeze everyone within 3.2 m for 2.2 s, plus 2.8 s burst stamina **and** mana regen ×3 (Iron Stance analogue) | 0 / 10 s | — |
+| ult | `ultIce` | Ult | **冰河時代** Ice Age | Freeze everyone within 3.2 m for 2.2 s, plus 2.8 s burst stamina **and** mana regen ×3 (Iron Stance analogue) | 0 / 10 s | — |
 
 ### 3.6 ⚡ 雷 Lightning · "Stun & slip 電暈就走"
 
@@ -121,7 +121,7 @@ Actives sit at **10** (starter spell) and **50** (counter spell) in each element
 | 40 | `volt_t3a` | Passive | **斷線** Dropped Call | A lightning hit on a 大聲公 cuts his call: noise zone **off** for 6 s. Passive noise drain −30 % | — | 大聲公 Loudmouth |
 | 50 | `volt_t3b` | Active | **雷鳴** Thunderclap | Radial 2.0 m: brats knocked back + dazed 3.5 s, others dazed 1 s | 35 / 8 s | 百厭仔 Brat |
 | 60 | `volt_t3c` | Passive | **雷步** Thunder Step | For 1.5 s after any cast you phase past squatters and kids (`PASS_SQUAT \| PASS_KID`) | — | 踎低客 Squat, 一家大細 Family (kids) |
-| +10 | `ultVolt` | Ult | **雷霆閃落** Thunder Blink | Blink up to 2.2 m toward the aim/door to the nearest free spot, then 0.8 s speed ×1.6 (Slip-Off Dash analogue; capped so it can't skip a whole car) | 0 / 10 s | — |
+| ult | `ultVolt` | Ult | **雷霆閃落** Thunder Blink | Blink up to 2.2 m toward the aim/door to the nearest free spot, then 0.8 s speed ×1.6 (Slip-Off Dash analogue; capped so it can't skip a whole car) | 0 / 10 s | — |
 
 Design note: the owner's brief (Fire clears the path / scares stench, Ice freezes the crowd / slows angry, Lightning stuns brats/loudmouth) is kept as stated. Couples go to Fire ("too hot to hold hands"). Squat and kids are split between Ice and Lightning, so every element owns 2–3 specials.
 
@@ -133,7 +133,7 @@ The 「推介」 button in the spellbook proposes a build from the next unbeaten
 
 ## 4. Counter matrix · 剋制表 (all 8 specials + 8 bosses × 3 characters)
 
-Hero entries match `SkillTree.ts` / `bosses.ts`. Level = earliest the counter can exist at 1 SP per clear (Hero/Mage), or the shop unlock level (Tech).
+Hero entries match `SkillTree.ts` / `bosses.ts`. Level = earliest that counter exists if every point so far went into that branch (one skill per 10 first clears; the level is unchanged from the old 1-power-per-clear timing), or the shop unlock level (Tech).
 
 ### 4.1 Special passengers · 特別乘客
 

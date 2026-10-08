@@ -36,7 +36,7 @@ import { kitForBot, resolveKit, techKitSelfTest } from '../src/game/techKit';
 import { grantsForProductIds } from '../src/game/entitlements';
 import { defaultSpellBar } from '../src/game/SpellTree';
 import { defaultSkills, earnedFrom, migrateLegacyKeys, normalizeSave, progressOf, recordClear, SAVE_KEY, spentOf, type KeyValueStore, type SaveData, type SkillState } from '../src/game/storage';
-import { earnedPoints, resetActiveLoadout, spendPoint, spentPoints, switchLoadout, POINTS_PER_FIRST_CLEAR } from '../src/game/SkillTree';
+import { earnedPoints, resetActiveLoadout, spendPoint, spentPoints, switchLoadout } from '../src/game/SkillTree';
 import type { PlayerInput } from '../src/game/sim/PlayerSim';
 import type { PassengerKind } from '../src/game/PassengerTypes';
 import type { Agent } from '../src/game/sim/CrowdSim';
@@ -146,7 +146,10 @@ function ultBuild(b: 'str' | 'spd' | 'sta'): SkillState {
   if (b === 'sta') s.ultSta = true;
   return s;
 }
-/** Points a player has when *starting* this level (1 per clear; 100 assumes 99). */
+/**
+ * Balance fixture: raw power spread across branches, not the player's skill-point currency.
+ * A real save learns a whole skill (+10 power) per point. These spreads stay so the win-rate bands do not move.
+ */
 const earnedPts = (id: number): number => (id === 100 ? 99 : id - 1);
 
 /** Mage earned: unlock all T1s (10 each), dump rest into the counter branch for this level. */
@@ -810,36 +813,40 @@ function counterTests(): CounterResult[] {
     push('Save key migration', okA && okB && okC, `moved [${movedA.join(', ')}]; new key wins=${okB}; no-op=${okC}`);
   }
   {
-    // v0.7 economy: 1 SP per first clear; respec + 3 loadouts.
+    // 1 skill point per 10 first clears. One point learns one skill (+10 power) or the ultimate.
     const ids = (n: number) => Array.from({ length: n }, (_, i) => i + 1);
-    // Old v0.6 save: 30 clears × 3 SP → 60/15/14 + STR ult spent (99) — more than the 30 now earned → refund.
+    const rate = earnedFrom(ids(9)) === 0 && earnedFrom(ids(10)) === 1 && earnedFrom(ids(100)) === 10;
+    // 30 clears earn 3. A full branch + ult + two partials is 9 skills → refund.
     const old = normalizeSave({ version: 1, cleared: ids(30), skills: { str: 60, spd: 15, sta: 14, ultStr: true, ultSpd: false, ultSta: false, points: 0 } } as unknown as Partial<SaveData>);
-    const okOld = old.skills.points === 30 && spentPoints(old.skills) === 0 && old.respecNotice && old.activeLoadout === 0 && old.loadouts.length === 3;
-    // Old save that fits: 40 clears, 20/10/0 spent (30) → kept in slot 1, 10 spare, no notice.
+    const okOld = old.skills.points === 3 && spentPoints(old.skills) === 0 && old.respecNotice && old.activeLoadout === 0 && old.loadouts.length === 3;
+    // 40 clears earn 4. Skills at 20 and 10 cost 3, so the build stays and 1 point is spare.
     const fit = normalizeSave({ version: 1, cleared: ids(40), skills: { str: 20, spd: 10, sta: 0, ultStr: false, ultSpd: false, ultSta: false, points: 90 } } as unknown as Partial<SaveData>);
-    const okFit = fit.skills.str === 20 && fit.skills.points === 10 && !fit.respecNotice && fit.loadouts[0].str === 20;
-    push('SP economy + migration', POINTS_PER_FIRST_CLEAR === 1 && okOld && okFit, `per clear=${POINTS_PER_FIRST_CLEAR}; over-spent v0.6 save → refund ${old.skills.points} pts + notice=${old.respecNotice}; fitting save kept 20/10/0 +${fit.skills.points} spare`);
-    // Reset refunds exactly the earned total (incl. ultimates).
-    const sv = normalizeSave({ version: 1, cleared: ids(85) } as Partial<SaveData>);
-    for (let i = 0; i < 60; i++) sv.skills = spendPoint(sv.skills, 'spd');
-    sv.skills = spendPoint(sv.skills, 'spd'); // ultimate (10)
-    for (let i = 0; i < 15; i++) sv.skills = spendPoint(sv.skills, 'str');
+    const okFit = fit.skills.str === 20 && fit.skills.spd === 10 && fit.skills.points === 1 && !fit.respecNotice && fit.loadouts[0].str === 20;
+    const oneTap = spendPoint({ ...fit.skills, points: 1, str: 0 }, 'str');
+    const okTap = oneTap.str === 10 && oneTap.points === 0;
+    push('SP economy + migration', rate && okOld && okFit && okTap, `10 clears → 1 pt; over-spent refund ${old.skills.points} notice=${old.respecNotice}; kept 20/10 spare ${fit.skills.points}; one tap str=${oneTap.str}`);
+    // 80 clears earn 8. Six taps fill speed, the seventh is the ultimate, the eighth learns strength.
+    const sv = normalizeSave({ version: 1, cleared: ids(80) } as Partial<SaveData>);
+    for (let i = 0; i < 6; i++) sv.skills = spendPoint(sv.skills, 'spd');
+    sv.skills = spendPoint(sv.skills, 'spd');
+    sv.skills = spendPoint(sv.skills, 'str');
     const spent = spentPoints(sv.skills);
+    const filled = sv.skills.spd === 60 && sv.skills.ultSpd && sv.skills.str === 10 && sv.skills.points === 0;
     resetActiveLoadout(sv);
-    const okReset = spent === 85 && sv.skills.points === earnedPoints(sv) && sv.skills.points === 85 && !sv.skills.ultSpd && sv.skills.spd === 0;
-    push('Respec (reset)', okReset, `spent ${spent} (60 SPD + ult + 15 STR) → refund to ${sv.skills.points}/${earnedPoints(sv)}`);
-    // Loadouts: slot 2 = STA build, slot 1 = SPD build; switching changes the effective skills.
-    for (let i = 0; i < 40; i++) sv.skills = spendPoint(sv.skills, 'spd');
+    const okReset = spent === 8 && filled && sv.skills.points === earnedPoints(sv) && sv.skills.points === 8 && !sv.skills.ultSpd && sv.skills.spd === 0;
+    push('Respec (reset)', okReset, `spent ${spent} (6 speed + ult + 1 strength) → refund to ${sv.skills.points}/${earnedPoints(sv)}`);
+    // Loadouts keep their own skills. 4 speed skills, then 5 stamina skills on the other build.
+    for (let i = 0; i < 4; i++) sv.skills = spendPoint(sv.skills, 'spd');
     switchLoadout(sv, 1);
-    for (let i = 0; i < 50; i++) sv.skills = spendPoint(sv.skills, 'sta');
+    for (let i = 0; i < 5; i++) sv.skills = spendPoint(sv.skills, 'sta');
     const m2 = modifiersFromSkills(sv.skills);
     switchLoadout(sv, 0);
     const m1 = modifiersFromSkills(sv.skills);
-    const back = sv.skills.spd === 40 && sv.skills.sta === 0 && sv.skills.points === 45 && sv.loadouts[1].sta === 50;
+    const back = sv.skills.spd === 40 && sv.skills.sta === 0 && sv.skills.points === 4 && sv.loadouts[1].sta === 50;
     const differ = JSON.stringify(m1) !== JSON.stringify(m2);
-    push('Loadout switch', back && differ && sv.activeLoadout === 0, `slot1 SPD 40 (+${sv.skills.points} spare) ↔ slot2 STA 50; modifiers differ=${differ}`);
+    push('Loadout switch', back && differ && sv.activeLoadout === 0, `slot1 speed 40 (+${sv.skills.points} spare) ↔ slot2 stamina 50; modifiers differ=${differ}`);
     const re = normalizeSave(JSON.parse(JSON.stringify(sv)) as Partial<SaveData>);
-    push('Loadout save round-trip', re.loadouts[1].sta === 50 && re.skills.spd === 40 && re.loadouts[2].points === 85, `slots ${re.loadouts.map((l) => `${l.str}/${l.spd}/${l.sta}+${l.points}`).join(' | ')}`);
+    push('Loadout save round-trip', re.loadouts[1].sta === 50 && re.skills.spd === 40 && re.loadouts[2].points === 8, `slots ${re.loadouts.map((l) => `${l.str}/${l.spd}/${l.sta}+${l.points}`).join(' | ')}`);
   }
 
   // ---------------------------------------------------------------- v0.7 bosses
@@ -1196,7 +1203,7 @@ async function main(): Promise<void> {
       if (heroP.cleared.length !== 40) { console.error('081 migrate hero clears', heroP.cleared.length); process.exit(1); }
       if (heroP.seenBosses.includes(20) !== true) { console.error('081 migrate hero seenBosses'); process.exit(1); }
       if (mig.skills.str !== 20) { console.error('081 hero skills drifted', mig.skills); process.exit(1); }
-      // Mage seeded from clearedWith marks (6,20) → earned 2; spent 50+10+10+10=80 > 2 → refund
+      // Mage seeded from clearedWith marks (6, 20) → 2 clears → 0 points. Spent skills refund.
       if (mageP.cleared.length !== 2 || !mageP.cleared.includes(6) || !mageP.cleared.includes(20)) {
         console.error('081 mage clears from marks', mageP.cleared); process.exit(1);
       }
@@ -1209,9 +1216,9 @@ async function main(): Promise<void> {
       recordClear(mig, 99);
       if (progressOf(mig, 'hero').cleared.includes(99)) { console.error('081 mage clear leaked to hero'); process.exit(1); }
       if (!progressOf(mig, 'mage').cleared.includes(99)) { console.error('081 mage clear missing'); process.exit(1); }
-      // SP derivation: hero earned = 40, mage earned = 3 after L99 (marks 6+20 + 99)
-      if (earnedFrom(progressOf(mig, 'hero').cleared) !== 40) { console.error('081 hero SP'); process.exit(1); }
-      if (earnedFrom(progressOf(mig, 'mage').cleared) !== 3) { console.error('081 mage SP', progressOf(mig, 'mage').cleared); process.exit(1); }
+      // Skill points: 1 per 10 clears. Hero has 40 clears → 4. Mage has 3 clears → 0.
+      if (earnedFrom(progressOf(mig, 'hero').cleared) !== 4) { console.error('081 hero SP', earnedFrom(progressOf(mig, 'hero').cleared)); process.exit(1); }
+      if (earnedFrom(progressOf(mig, 'mage').cleared) !== 0) { console.error('081 mage SP', progressOf(mig, 'mage').cleared); process.exit(1); }
       console.log('save migration per-character progress ok');
     }
   }

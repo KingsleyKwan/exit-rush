@@ -2,25 +2,28 @@
 
 Assassin’s Creed Valhalla–style **constellation**: three coloured arms from a centre hub (**力量 Strength** · **速度 Speed** · **體力 Stamina**). Wisdom (智慧) was **replaced by Stamina** in v0.6; old saves migrate `wis` / `ultWis` → `sta` / `ultSta`.
 
-## Economy (v0.7)
+## Economy (v0.8.1)
 
 | Rule | Value |
 |------|-------|
-| Points on **first** clear | **1** (`SP_PER_CLEAR`, was 3 in v0.5–v0.6) |
-| Replay | **0** |
-| Max from content | 100 levels × 1 = **100** |
-| Branch fill | **60** |
-| Ultimate after fill | **+10** |
-| Full branch + ult | **70** (reachable around L71) |
-| Major skill icons | every **10** points (10 / 20 / 30 / 40 / 50 / 60) |
-| Respec | **Free and instant**: refunds every point (incl. ultimates) in the active build, after a confirm dialog |
+| Skill point | **1 per 10 first clears** (`LEVELS_PER_SKILL_POINT`). Replays award **0**. |
+| Max from content | 100 levels → **10** points |
+| One skill | **1 point**. Power lands on the next node: 10 / 20 / 30 / 40 / 50 / 60. Branch power still tops out at **60** (`BRANCH_FILL`). |
+| Ultimate | **1 point** after the branch is full. Power stays 60; the ultimate is a flag. |
+| Full branch + ult | **7** points (6 skills + ultimate). Reachable once 70 levels are first-cleared, same as before. |
+| What 10 points buy | that, plus **3** skills on other branches |
+| Respec | **Free and instant**: refunds every skill (incl. ultimates) in the active build, after a confirm dialog |
 | Loadouts | **3 builds** (配點1/2/3), each its own allocation of the **same** earned total; switch from the skill tree, level select or result card; applies from the next run |
 
-Hint line under the tree title: 「每關首次通關 +1 點 · 每10點解鎖大技 · 滿60再加10解鎖必殺」.
+Hint line under the tree title: 「每 10 關得 1 點。每個技能用 1 點。」 / "Every 10 levels earns 1 point. Each skill costs 1."
 
-**Points are derived, not stored.** On load, each build's spare points are recomputed as *earned (distinct cleared levels × 1) − spent*. If an old save spent more than it now earns (every v0.6 save with 3 SP per clear), that build is **fully refunded**, and a one-time notice 「技能點已重新計算 — 請重新配點 / Skill points recalculated — please re-allocate」 shows. A v0.6 save's existing allocation becomes build 1.
+The learn button on each arm spends 1 point and names the next skill. Tapping a node only shows its effect.
 
-What a first-time player has at each boss: L20 → 19 pts, L40 → 39, L60 → 59, L80 → 79. One branch's T3 counters (40/50/60) come online between L41 and L61, so the early kings are designed to be worn down without them (see [`BOSSES.md`](BOSSES.md)). A respec into the right branch, or a dedicated loadout per king, is the intended replay tool.
+**Points are derived, not stored.** On load, spare points are *earned − skills bought*. Earned is `floor(distinct first clears / 10)`. Each 10 power in a branch is one skill; an ultimate is one skill. Power left over below the next 10 (an old save) is kept until respec and does not count as an extra skill. If a build bought more skills than it now earns, that build is **fully refunded**, and the one-time notice 「技能點已重新計算 — 請重新配點 / Skill points recalculated — please re-allocate」 shows.
+
+A first-time player facing a boss has `floor((level − 1) / 10)` points: L20 → 1, L40 → 3, L60 → 5, L80 → 7. Spending every point on one branch still reaches power 40 at L41, power 50 at L51, and power 60 at L61, so the early kings are still worn down without their T3 counters (see [`BOSSES.md`](BOSSES.md)).
+
+The balance bot's "earned" spread is still one point of **branch power** per earlier level. That fixture is not this currency. Do not retune it so the win-rate bands match the new point count.
 
 Per branch: **4 passive + 2 active + 1 ultimate** (6 major skills + ult).
 
@@ -36,7 +39,7 @@ Per branch: **4 passive + 2 active + 1 ultimate** (6 major skills + ult).
 | 40 | `str_t3a` | Passive · counters **Couple** | **拆散情侶 Split** — a shove hit on a couple breaks their hand-hold for 4 s and pops them apart |
 | 50 | `str_t3b` | Active (full-charge shove) · counters **Luggage** | **震地 Ground Pound** — radial shockwave (r 1.6 m); suitcases take ×2.6 so they actually move |
 | 60 | `str_t3c` | Passive · counters **Angry man** | **頂硬上 Stand Firm** — angry shove impulse ×0.15, stagger ×0.15 |
-| +10 | Ult | **鐵牛撞門** Iron Bull Charge | Shockwave + brief charge (unchanged fantasy) |
+| ult | Ult | **鐵牛撞門** Iron Bull Charge | Shockwave + brief charge (unchanged fantasy) |
 
 ### 速度 Speed (cyan)
 
@@ -48,7 +51,7 @@ Per branch: **4 passive + 2 active + 1 ultimate** (6 major skills + ult).
 | 40 | `spd_t3a` | Passive · counters **Luggage** | **跨行李 Hurdle** — no contact with suitcases (they don't block, slow or steer your aim); short 0.32 s hop while passing, at ×0.7 top speed. The owner is still a normal body |
 | 50 | `spd_t3b` | Active (HUD, 6 s cd) · counters **Squatter**, **Family kids** | **飛身 Leap** — 0.55 s leap burst; no contact with squatters or family kids while airborne, no squat weave drag. Replaces Brief Dash |
 | 60 | `spd_t3c` | Passive · counters **Couple** | **穿插 Thread** — when you're at the gap between a couple, they let go and step apart |
-| +10 | Ult | **閃身落車** Slip-Off Dash | Burst dash (kept) |
+| ult | Ult | **閃身落車** Slip-Off Dash | Burst dash (kept) |
 
 Continuous SPD fill also feeds **gapSense** (aim assist / crowd yield / drag cut) — moved off the old Wisdom branch.
 
@@ -62,7 +65,7 @@ Continuous SPD fill also feeds **gapSense** (aim assist / crowd yield / drag cut
 | 40 | `sta_t3a` | Passive · counters **Stench** | **忍臭 Hold Breath** — stench aura slow fully ignored |
 | 50 | `sta_t3b` | Active (HUD, 12 s cd) · counters **Brat** | **回魂 Second Wind** — +45 stamina, clears winded; knocks brats within 1.6 m away and dazes them (no darting) for 3 s |
 | 60 | `sta_t3c` | Passive · counters **Family**, **Loudmouth** | **好脾氣 Unbothered** — pushing against family members costs no stamina and they add no crowd drag; 大聲公 noise-zone drain ×0.3 (−70%, v0.6.3) |
-| +10 | Ult | **鐵馬企穩** Iron Stance | Burst regen + heavy mass + light crowd calm (**replaces** 人潮預測 Crowd Sense path highlight) |
+| ult | Ult | **鐵馬企穩** Iron Stance | Burst regen + heavy mass + light crowd calm (**replaces** 人潮預測 Crowd Sense path highlight) |
 
 ## Tier 3 = special-passenger counters (v0.6.2, approved)
 

@@ -138,7 +138,7 @@ Mix weights are relative to `normal 10`. "Doors open" is only listed where it di
 
 ## Difficulty bands (bot, earned build)
 
-`npm run test:sim` checks each level's clear rate against its band. The build is the **earned build**: 1 SP per first clear, put into that band's natural branch, with counters added once they're reachable.
+`npm run test:sim` checks each level's clear rate against its band. The build is the **earned build**: a balance fixture of branch power (one power point per earlier level, spread over that band's natural branch, counters once they're reachable). It is not the player's skill-point currency.
 
 | Levels | Target clear |
 |--------|--------------|
@@ -151,9 +151,9 @@ Mix weights are relative to `normal 10`. "Doors open" is only listed where it di
 
 Numbers and method: [`BALANCE.md`](BALANCE.md).
 
-## Skill points (v0.7)
+## Skill points (v0.8.1)
 
-The first clear of each level awards **1** skill point; replays award **0**. 100 levels = **100 SP**: enough for one full branch + ultimate (70) plus the first T3 of a second branch. Points are re-derived from cleared levels, so v0.6 saves (3 SP per clear) are refunded and recalculated once, with a 「技能點已重新計算」 notice. Free respec and three loadouts (配點1/2/3) are described in [`SKILL_TREE.md`](SKILL_TREE.md).
+Every **10** first clears award **1** skill point; replays award **0**. One point learns one skill, and the branch power jumps to the next node (10 / 20 / 30 / 40 / 50 / 60). The ultimate is one more point after the branch is full. 100 levels = **10** points: one full branch (6) + ultimate (1) + 3 more skills. A focused branch still reaches power 40 after 40 first clears and the ultimate after 70. Spare points are re-derived on load. A build that bought more skills than it earns is refunded once, with the 「技能點已重新計算」 notice. Free respec and three loadouts (配點1/2/3) are described in [`SKILL_TREE.md`](SKILL_TREE.md).
 
 ## Teach order
 

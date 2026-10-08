@@ -2,7 +2,8 @@ import { t, getLang, fmt } from '../i18n';
 import type { Game } from '../game/Game';
 import { INTROS, type IntroKind } from '../game/intros';
 import { playableLevels } from '../game/levels';
-import { POINTS_PER_FIRST_CLEAR, MAX_POINTS_PER_LEVEL, modifiersFromSkills } from '../game/SkillTree';
+import { modifiersFromSkills } from '../game/SkillTree';
+import { LEVELS_PER_SKILL_POINT, progressOf } from '../game/storage';
 import { spellById } from '../game/SpellTree';
 import { itemDef, previewCoins } from '../game/techKit';
 import { linesFor, lineColor } from '../game/lines';
@@ -391,8 +392,11 @@ function endBonus(game: Game): string {
   if (game.save.character === 'tech') {
     return `<p class="bonus">${star}${fmt(dict.coinGain, { n: c?.coins ?? 0 })}</p>`;
   }
-  if (!c || (c.awarded && c.count === 1)) return `<p class="bonus">${star}${fmt(dict.clearBonusN, { n: POINTS_PER_FIRST_CLEAR })}</p>`;
-  if (c.awarded) return `<p class="bonus">${star}${fmt(dict.replayBonus, { n: c.count, max: MAX_POINTS_PER_LEVEL })}</p>`;
+  if (c?.awarded) return `<p class="bonus">${star}${fmt(dict.clearBonusN, { n: 1 })}</p>`;
+  if (c && c.count > 1) return `<p class="howto">${dict.clearNoBonus}</p>`;
+  const cleared = progressOf(game.save).cleared.length;
+  const into = cleared % LEVELS_PER_SKILL_POINT;
+  if (into > 0) return `<p class="howto">${fmt(dict.nextSkillPoint, { n: LEVELS_PER_SKILL_POINT - into })}</p>`;
   return `<p class="howto">${dict.clearNoBonus}</p>`;
 }
 

@@ -6,10 +6,10 @@ import { loadoutStrip, wireLoadoutStrip } from './uiShared';
 import { spentPoints } from '../game/SkillTree';
 import {
   BRANCH_FILL,
-  ULTIMATE_COST,
   ULT_DEFS,
   branchProgressLabel,
   canSpend,
+  nextNodeAt,
   nodesFor,
   nodeUnlocked,
   spendPoint,
@@ -100,9 +100,17 @@ export function renderSkills(game: Game, rerender: (game: Game) => void): HTMLEl
     const can = canSpend(s, branch);
     const ultNext = filled >= BRANCH_FILL && !ult;
     const ultDef = ultDefs[branch];
+    const nextAt = nextNodeAt(filled);
+    const nextNode = nodes.find((n) => n.at === nextAt);
+    const nextName = ultNext
+      ? (getLang() === 'en' ? ultDef.nameEn : ultDef.nameZh)
+      : nextNode
+        ? (getLang() === 'en' ? nextNode.nameEn : nextNode.nameZh)
+        : '';
     const nodeHtml = nodes
       .map((n, i) => {
         const on = nodeUnlocked(s, n);
+        const upcoming = !on && n.at === nextAt;
         const tip = getLang() === 'en' ? n.tipEn : n.tipZh;
         const counters = n.counters ?? [];
         const ctrNames = counters.map((k) => dict.passenger[k]).join(' · ');
@@ -111,7 +119,7 @@ export function renderSkills(game: Game, rerender: (game: Game) => void): HTMLEl
         // Every ~10pt unlock is a major (Valhalla-style); keep early passives slightly compact via CSS.
         const major = true;
         const compact = n.kind === 'passive' && n.at < 30;
-        return `<button type="button" class="cst-node major ${compact ? 'compact' : ''} ${on ? 'on' : ''} ${counters.length ? 'counter' : ''} t${n.tier}" style="--i:${i}" title="${title}" aria-label="${title}" data-node="${n.id}" data-tip="${tip.replace(/"/g, '&quot;')}" data-kind="${kind}" data-en="${n.nameEn}" data-zh="${n.nameZh}" data-counters="${counters.join(',')}" data-ctr-names="${ctrNames}">
+        return `<button type="button" class="cst-node major ${compact ? 'compact' : ''} ${on ? 'on' : ''} ${upcoming ? 'next' : ''} ${counters.length ? 'counter' : ''} t${n.tier}" style="--i:${i}" title="${title}" aria-label="${title}" data-node="${n.id}" data-tip="${tip.replace(/"/g, '&quot;')}" data-kind="${kind}" data-en="${n.nameEn}" data-zh="${n.nameZh}" data-counters="${counters.join(',')}" data-ctr-names="${ctrNames}">
           <span class="cst-dot">${icon(skillIcon(n.id, isMage))}${counters.length ? `<span class="cst-ctr" aria-hidden="true">${icon(`kind_${counters[0]}`, 'xs')}</span>` : ''}</span>
           <span class="cst-label">
             <span class="cst-en">${n.nameEn}</span>
@@ -128,13 +136,13 @@ export function renderSkills(game: Game, rerender: (game: Game) => void): HTMLEl
           <span class="skill-ico">${icon(branchIco(branch))}</span>
           <strong>${branchLabel(branch)}</strong>
           <div class="skill-prog">${branchProgressLabel(s, branch, dict.ultShort)}</div>
-          <button type="button" class="spend-btn" data-spend="${branch}" aria-label="${dict.spend}: ${branchLabel(branch)}" title="${can ? dict.spend : filled >= BRANCH_FILL && ult ? dict.branchFull : dict.notEnough}" ${can ? '' : 'disabled'}>
-            ${ultNext ? `${icon('star', 'xs')}${ULTIMATE_COST}` : `<span class="plus">＋</span>`}
+          <button type="button" class="spend-btn" data-spend="${branch}" aria-label="${dict.spend}: ${nextName || branchLabel(branch)}" title="${can ? `${dict.spend}: ${nextName}` : filled >= BRANCH_FILL && ult ? dict.branchFull : dict.notEnough}" ${can ? '' : 'disabled'}>
+            ${nextName ? `<span class="learn-lbl">1 · ${nextName}</span>` : `<span class="plus">${dict.branchFull}</span>`}
           </button>
         </div>
         <div class="cst-arm-line" aria-hidden="true"></div>
         <div class="cst-nodes">${nodeHtml}
-          <button type="button" class="cst-node major ult ${ult ? 'on' : ''}" title="${ultTitle}" aria-label="${ultTitle}" data-node="ult-${branch}" data-tip="${ultTip.replace(/"/g, '&quot;')}" data-kind="${dict.ultShort}" data-en="${ultDef.nameEn}" data-zh="${ultDef.nameZh}">
+          <button type="button" class="cst-node major ult ${ult ? 'on' : ''} ${ultNext ? 'next' : ''}" title="${ultTitle}" aria-label="${ultTitle}" data-node="ult-${branch}" data-tip="${ultTip.replace(/"/g, '&quot;')}" data-kind="${dict.ultShort}" data-en="${ultDef.nameEn}" data-zh="${ultDef.nameZh}">
             <span class="cst-dot">${icon(skillIcon(`ult-${branch}`, isMage))}</span>
             <span class="cst-label">
               <span class="cst-en">${ultDef.nameEn}</span>
@@ -151,7 +159,7 @@ export function renderSkills(game: Game, rerender: (game: Game) => void): HTMLEl
       ${overRun ? `<h2 class="panel-title">${icon('skills', 'sm')}${dict.skills}</h2>` : screenBar(isMage ? dict.spells : dict.skills, 'skills', pointsChip(game))}
       <div class="${overRun ? 'skills-body' : 'sub-body skills-body'}">
         ${overRun ? `<p class="points">${pointsChip(game)}</p>` : ''}
-        <p class="howto skill-howto">${fmt(dict.skillHowto, { fill: BRANCH_FILL, ult: ULTIMATE_COST })}</p>
+        <p class="howto skill-howto">${dict.skillHowto}</p>
         ${loadoutStrip(game, { reset: true, cls: 'in-tree' })}
         ${overRun ? `<p class="howto">${dict.skillsApplyNext}</p>` : ''}
         <div class="constellation ${game.save.character === 'mage' ? 'mage' : 'hero'}" role="group" aria-label="${dict.skills}">

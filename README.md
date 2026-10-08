@@ -19,6 +19,7 @@ Mobile-first 3D crowd-exit game set on the fictional **香城鐵路 / Hong City 
 - **Save migration**: all pre-0.8.1 clears belong to 上班族 (Hero). Mage keeps spent spell points only if backed by Mage clears; otherwise refund + one-time notice.
 - **UI**: character select shows each card's cleared count / highest station + progress bar; level select shows whose progress it is (portrait/name chip).
 - **Element colours**: Fire = **red**, Ice = **blue**, Lightning = **yellow** (spell buttons, spellbook, VFX, chips).
+- **Skill points:** every 10 first clears earn 1 point. One tap learns the next skill (or the ultimate). 100 levels = 10 points: a full branch + ultimate + 3 more skills. The power at each node is unchanged.
 
 ## v0.8.0 — Mage 「凱婷」 Bad Girl + character select (Gear L coming soon)
 

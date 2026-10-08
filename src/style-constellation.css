@@ -154,6 +154,7 @@
 .cst-node.compact .cst-dot { width: 36px; height: 36px; }
 .cst-node.compact .cst-dot > .ico { width: 20px; height: 20px; }
 .cst-node.on .cst-dot { background: linear-gradient(180deg, #fff59d, #ffb300); color: #5d4037; --ico-w: #ffb300; }
+.cst-node.next .cst-dot { box-shadow: 0 0 0 3px #ffb03a, 0 2px 8px rgba(0,0,0,.35); }
 .b-str .cst-node.on .cst-dot { background: linear-gradient(180deg, #ff8a3d, #d84315); color: #fff; --ico-ink: #7a2a08; --ico-w: #e25a22; }
 .b-spd .cst-node.on .cst-dot { background: linear-gradient(180deg, #4fd2f0, #0288d1); color: #fff; --ico-w: #19a4cc; }
 .b-sta .cst-node.on .cst-dot { background: linear-gradient(180deg, #66bb6a, #2e7d32); color: #fff; --ico-ink: #1b5e20; --ico-w: #43a047; }
@@ -256,16 +257,27 @@
   margin: 8px 0 4px;
   min-width: 100%;
   width: 100%;
-  min-height: 52px;
-  height: 52px;
-  padding: 0 10px;
+  min-height: 44px;
+  height: auto;
+  padding: 6px 4px;
   border-radius: 14px;
   position: relative;
   z-index: 2;
   touch-action: manipulation;
   box-sizing: border-box;
+  white-space: normal;
 }
-.cst-arm-head .spend-btn .plus { font-size: 34px; line-height: 1; }
+.cst-arm-head .spend-btn .plus,
+.cst-arm-head .spend-btn .learn-lbl {
+  display: block;
+  width: 100%;
+  font-size: 11px;
+  line-height: 1.15;
+  font-weight: 900;
+  text-align: center;
+  white-space: normal;
+  overflow: hidden;
+}
 
 /* Selected skill effect tray — always readable tip */
 .cst-detail {

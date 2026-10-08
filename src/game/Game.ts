@@ -8,7 +8,7 @@ import { InputController } from './Input';
 import { GameAudio } from './Audio';
 import { haptic } from './haptics';
 import { getLevel, playableLevels, isFinaleUnlocked, type LevelDef } from './levels';
-import { MAX_POINTS_PER_LEVEL, POINTS_PER_FIRST_CLEAR, modifiersFromSkills, resetActiveLoadout, switchLoadout } from './SkillTree';
+import { modifiersFromSkills, resetActiveLoadout, switchLoadout } from './SkillTree';
 import { CHARACTERS, characterOf, modsFor, activeTreeState, type CharacterId, type PlayerMods } from './charactersDef';
 import {
   applyRecommend,
@@ -34,7 +34,7 @@ import { IS_STORE_BUILD } from './platform';
 import { defaultSpellBar } from './SpellTree';
 import { initEntitlements, entitlements } from './entitlements';
 import { warmCharPortraits } from './charPortraits';
-import { earnedFrom, progressOf, recordClear, syncTopLevelProgress } from './storage';
+import { earnedFrom, progressOf, recordClear, spentOf, syncTopLevelProgress } from './storage';
 import type { IntroKind } from './intros';
 import type { PassengerKind } from './PassengerTypes';
 import { loadSave, writeSave, type QualityLevel, type QualitySetting, type SaveData, type SkillState } from './storage';
@@ -242,8 +242,7 @@ export class Game {
     } else if (id === 'mage') {
       const slot = this.save.mage.loadouts[this.save.mage.active] ?? this.save.mage.loadouts[0];
       const earned = earnedFrom(progressOf(this.save, 'mage').cleared);
-      const spent = slot.str + slot.spd + slot.sta + 10 * ((slot.ultStr?1:0)+(slot.ultSpd?1:0)+(slot.ultSta?1:0));
-      slot.points = Math.max(0, earned - spent);
+      slot.points = Math.max(0, earned - spentOf(slot));
       this.save.mage.loadouts[this.save.mage.active] = slot;
     }
     syncTopLevelProgress(this.save);
@@ -767,8 +766,7 @@ export class Game {
       this.save.mage.active = idx;
       const earned = earnedFrom(progressOf(this.save, 'mage').cleared);
       const slot = this.save.mage.loadouts[idx];
-      const spent = slot.str + slot.spd + slot.sta + 10 * ((slot.ultStr?1:0)+(slot.ultSpd?1:0)+(slot.ultSta?1:0));
-      slot.points = Math.max(0, earned - spent);
+      slot.points = Math.max(0, earned - spentOf(slot));
       this.save.mage.loadouts[idx] = slot;
     } else {
       switchLoadout(this.save, idx);
@@ -976,19 +974,21 @@ export class Game {
     const timer = this.level.timer;
     const techRun = this.save.character === 'tech';
     const coinsBefore = techRun ? coinBalance(this.save) : 0;
+    const pointsBefore = techRun ? 0 : earnedFrom(progressOf(this.save).cleared);
     const { count, first } = recordClear(this.save, id);
     if (techRun) {
       noteTechResult(this.save, id, true, timeLeft, timer, first, this.sim?.player.consumables);
     }
     const coins = techRun ? Math.max(0, coinBalance(this.save) - coinsBefore) : 0;
-    // v0.8.1: SP only for the active character's first clears. Tech earns coins.
-    const awarded = !techRun && first && count <= MAX_POINTS_PER_LEVEL;
+    // One skill point per 10 first clears. Tech earns coins, not points.
+    const gained = !techRun && first ? Math.max(0, earnedFrom(progressOf(this.save).cleared) - pointsBefore) : 0;
+    const awarded = gained > 0;
     if (awarded) {
       if (this.save.character === 'mage') {
-        for (const lo of this.save.mage.loadouts) lo.points += POINTS_PER_FIRST_CLEAR;
+        for (const lo of this.save.mage.loadouts) lo.points += gained;
       } else if (this.save.character === 'hero') {
-        this.save.skills.points += POINTS_PER_FIRST_CLEAR;
-        for (const lo of this.save.loadouts) lo.points += POINTS_PER_FIRST_CLEAR;
+        this.save.skills.points += gained;
+        for (const lo of this.save.loadouts) lo.points += gained;
       }
       this.audio.skillPoint();
     }

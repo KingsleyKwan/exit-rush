@@ -47,9 +47,11 @@ export interface Dict {
   /** Replay clear bonus; {n} = this level's clears, {max} = cap. */
   replayBonus: string;
   clearNoBonus: string;
+  /** {n} clears until the next skill point. */
+  nextSkillPoint: string;
   back: string;
   levelsTeaser: string;
-  /** {fill} = points to fill a branch, {ult} = ultimate cost. */
+  /** How skill points are earned and spent. No placeholders. */
   skillHowto: string;
   ultShort: string;
   skillsApplyNext: string;
@@ -278,9 +280,10 @@ export const en: Dict = {
   clearBonus: '+1 skill point',
   replayBonus: '+{n} skill points (replay {n}/{max})',
   clearNoBonus: 'No more skill points from this level — first clear only',
+  nextSkillPoint: '{n} more clears for 1 point',
   back: 'Back',
   levelsTeaser: 'All 100 levels · clear 99 to unlock the Lv100 finale',
-  skillHowto: '+1 point per first clear · major skills every 10 · +{ult} for the Ultimate after {fill}',
+  skillHowto: 'Every 10 levels earns 1 point. Each skill costs 1.',
   ultShort: 'Ult',
   skillsApplyNext: 'Changes apply from your next run.',
   examTag: 'Exam',

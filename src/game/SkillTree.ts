@@ -2,17 +2,20 @@ import { LOADOUT_SLOTS, SP_PER_CLEAR, defaultSkills, earnedFrom, progressOf, rec
 import type { PassengerKind } from './PassengerTypes';
 import { TUNING } from './sim/tuning';
 
-/** Points to fill one branch before ultimate */
+/** Power along one branch. Six skills, 10 power each. Modifiers still divide by this. */
 export const BRANCH_FILL = 60;
-/** Extra points to unlock ultimate after fill */
-export const ULTIMATE_COST = 10;
-export const BRANCH_TOTAL = BRANCH_FILL + ULTIMATE_COST;
+/** Skill points to learn the next skill, including the ultimate. */
+export const ULTIMATE_COST = 1;
+/** Skills in one branch, then the ultimate. */
+export const BRANCH_NODES = 6;
+export const BRANCH_TOTAL = BRANCH_NODES + 1;
 
 /**
- * v0.7 skill-point economy (see docs/SKILL_TREE.md):
- * - First clear of each level awards POINTS_PER_FIRST_CLEAR = 1 (was 3). Replays award nothing.
- * - 100 levels → 100 SP total vs 70 for one full branch + ultimate: one branch maxed + part of a second,
- *   so free respec + 3 loadouts (配點1/2/3) matter.
+ * Skill points (see docs/SKILL_TREE.md):
+ * - Every 10 first clears award 1 point. Replays award nothing. 100 levels → 10 points.
+ * - One point learns the next skill on a branch (power jumps 10 / 20 / 30 / 40 / 50 / 60).
+ * - The ultimate is one more skill after the branch is full.
+ * - A full branch + ultimate is 7 points, so 10 points is that plus 3 skills on other branches.
  */
 export const POINTS_PER_FIRST_CLEAR = SP_PER_CLEAR;
 /** Kept for UI/docs: only the first clear of a level awards points. */
@@ -383,24 +386,26 @@ export function modifiersFromSkills(s: SkillState): SkillModifiers {
 }
 
 export function canSpend(s: SkillState, branch: Branch): boolean {
-  if (s.points < 1) return false;
+  if (s.points < ULTIMATE_COST) return false;
   const v = s[branch];
   if (v < BRANCH_FILL) return true;
-  if (branch === 'str' && !s.ultStr) return s.points >= ULTIMATE_COST;
-  if (branch === 'spd' && !s.ultSpd) return s.points >= ULTIMATE_COST;
-  if (branch === 'sta' && !s.ultSta) return s.points >= ULTIMATE_COST;
+  if (branch === 'str' && !s.ultStr) return true;
+  if (branch === 'spd' && !s.ultSpd) return true;
+  if (branch === 'sta' && !s.ultSta) return true;
   return false;
 }
 
+/** Spend 1 point to learn the next skill. Power lands on the next node, not +1. */
 export function spendPoint(s: SkillState, branch: Branch): SkillState {
   const next = { ...s };
+  if (next.points < ULTIMATE_COST) return s;
   if (next[branch] < BRANCH_FILL) {
-    if (next.points < 1) return s;
-    next[branch] += 1;
-    next.points -= 1;
+    const at = nextNodeAt(next[branch]);
+    if (at == null) return s;
+    next[branch] = at;
+    next.points -= ULTIMATE_COST;
     return next;
   }
-  if (next.points < ULTIMATE_COST) return s;
   if (branch === 'str' && !next.ultStr) {
     next.ultStr = true;
     next.points -= ULTIMATE_COST;
@@ -417,9 +422,10 @@ export function spendPoint(s: SkillState, branch: Branch): SkillState {
 export function branchProgressLabel(s: SkillState, branch: Branch, ultLabel = 'Ult'): string {
   const v = s[branch];
   const ult = ultUnlocked(s, branch);
+  const learned = Math.min(BRANCH_NODES, Math.floor(v / 10));
   if (ult) return `${BRANCH_TOTAL}/${BRANCH_TOTAL}`;
-  if (v >= BRANCH_FILL) return `${BRANCH_FILL}/${BRANCH_FILL} → ${ultLabel} ${ULTIMATE_COST}`;
-  return `${v}/${BRANCH_FILL}`;
+  if (v >= BRANCH_FILL) return `${BRANCH_NODES}/${BRANCH_NODES} → ${ultLabel} ${ULTIMATE_COST}`;
+  return `${learned}/${BRANCH_NODES}`;
 }
 
 /** Next major node threshold above current fill (or null if filled). */
@@ -430,7 +436,7 @@ export function nextNodeAt(filled: number): number | null {
 
 // ------------------------------------------------------------------ v0.7 respec + loadouts
 
-/** Total points earned for the active character (1 per that character's first clear). */
+/** Skill points earned by the active character (1 per 10 of that character's first clears). */
 export function earnedPoints(save: SaveData): number {
   return earnedFrom(progressOf(save).cleared);
 }

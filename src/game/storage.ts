@@ -104,16 +104,23 @@ export interface SaveData {
   progressSplitNotice: boolean;
 }
 
-/** v0.7 economy: 1 skill point per first clear (was 3). Kept here so storage can migrate without importing SkillTree. */
+/** Points granted each time the player completes another block of levels. */
 export const SP_PER_CLEAR = 1;
+/** First clears per skill point. 100 levels → 10 points. */
+export const LEVELS_PER_SKILL_POINT = 10;
 export const LOADOUT_SLOTS = 3;
-/** Points a slot has spent (branch fill + 10 per ultimate). */
+/**
+ * Skills bought. Each 10 power in a branch is one skill. An ultimate is one skill.
+ * Partial power below the next 10 (old saves) does not count as an extra skill.
+ */
 export function spentOf(s: SkillState): number {
-  return s.str + s.spd + s.sta + 10 * ((s.ultStr ? 1 : 0) + (s.ultSpd ? 1 : 0) + (s.ultSta ? 1 : 0));
+  const nodes = (v: number) => Math.min(6, Math.floor(Math.max(0, v) / 10));
+  return nodes(s.str) + nodes(s.spd) + nodes(s.sta)
+    + (s.ultStr ? 1 : 0) + (s.ultSpd ? 1 : 0) + (s.ultSta ? 1 : 0);
 }
-/** Points earned so far: one per distinct cleared level. */
+/** Skill points earned: one per 10 distinct first clears. Replays add nothing. */
 export function earnedFrom(cleared: readonly number[]): number {
-  return new Set(cleared).size * SP_PER_CLEAR;
+  return Math.floor(new Set(cleared).size / LEVELS_PER_SKILL_POINT) * SP_PER_CLEAR;
 }
 /** Re-derive `points` from earned − spent; refund everything if over-spent. Returns [state, wasRefunded]. */
 export function reconcileSlot(s: SkillState, earned: number): [SkillState, boolean] {
