@@ -319,17 +319,22 @@ function markFlee(a: Agent, until: number, x: number, z: number, emit: Emit): vo
   emit({ t: 'status', agentId: a.id, kind: 'flee', until });
 }
 
-/** Weather wears a boss down. It does not strike them. */
-function weatherWear(a: Agent, school: 'wind' | 'ice' | 'grav', mods: PlayerMods): void {
+const WEAR_KINDS: Record<'wind' | 'ice' | 'grav', PassengerKind[]> = {
+  wind: ['luggage', 'couple'],
+  ice: ['stench', 'angry', 'loud'],
+  grav: ['squat', 'brat', 'family'],
+};
+
+/** Weather wears a boss down. It does not strike them. One chip per cast, even on a mix. */
+function weatherTouch(a: Agent, schools: readonly ('wind' | 'ice' | 'grav')[], mods: PlayerMods): void {
   if (!a.boss) return;
-  const base = (TUNING.weather?.wear ?? 0.08) * (mods.spellPower || 1);
+  const base = (TUNING.weather.wear ?? 0.08) * (mods.spellPower || 1);
   a.boss.stub = Math.max(0, a.boss.stub - base);
-  const match: Record<'wind' | 'ice' | 'grav', PassengerKind[]> = {
-    wind: ['luggage', 'couple'],
-    ice: ['stench', 'angry', 'loud'],
-    grav: ['squat', 'brat', 'family'],
-  };
-  drainBoss(a, match[school], mods);
+  const kinds: PassengerKind[] = [];
+  for (const school of schools) {
+    for (const k of WEAR_KINDS[school]) if (!kinds.includes(k)) kinds.push(k);
+  }
+  drainBoss(a, kinds, mods);
 }
 
 function blowBody(a: Agent, px: number, pz: number, impulse: number, mods: PlayerMods): void {
@@ -343,193 +348,142 @@ function blowBody(a: Agent, px: number, pz: number, impulse: number, mods: Playe
   }
 }
 
+function inCone(
+  a: Agent,
+  px: number,
+  pz: number,
+  dx: number,
+  dz: number,
+  range: number,
+  width: number,
+): number {
+  const vx = a.body.x - px;
+  const vz = a.body.z - pz;
+  const dist = Math.hypot(vx, vz);
+  if (dist < 0.05 || dist > range) return -1;
+  const along = (vx * dx + vz * dz) / dist;
+  if (along < 0.05) return -1;
+  const lat = Math.abs(vx * -dz + vz * dx);
+  if (lat > width + dist * 0.55) return -1;
+  return dist;
+}
+
+type WearSchool = 'wind' | 'ice' | 'grav';
+
+function coneAbility(
+  node: SpellNodeDef,
+  cost: number,
+  cd: number,
+  row: { range: number; width: number; impulse: number },
+  schools: readonly WearSchool[],
+  after: (a: Agent, ctx: AbilityCtx) => void,
+): AbilityDef {
+  return {
+    id: node.id,
+    resource: 'mana',
+    cost,
+    cd,
+    cast(ctx) {
+      const { dx, dz } = aimDir(ctx);
+      const px = ctx.player.body.x;
+      const pz = ctx.player.body.z;
+      ctx.emit({ t: 'cast', ability: node.id, x: px, z: pz, dx, dz, el: 'wind' });
+      for (const a of ctx.crowd.agents) {
+        const dist = inCone(a, px, pz, dx, dz, row.range, row.width);
+        if (dist < 0) continue;
+        blowBody(a, px, pz, row.impulse * (1.1 - dist / row.range * 0.25), ctx.mods);
+        weatherTouch(a, schools, ctx.mods);
+        after(a, ctx);
+      }
+      return true;
+    },
+  };
+}
+
+function auraAbility(
+  node: SpellNodeDef,
+  cost: number,
+  cd: number,
+  radius: number,
+  el: 'ice' | 'grav',
+  hold: boolean,
+  schools: readonly WearSchool[],
+  after: (a: Agent, ctx: AbilityCtx) => void,
+): AbilityDef {
+  return {
+    id: node.id,
+    resource: 'mana',
+    cost,
+    cd,
+    cast(ctx) {
+      const px = ctx.player.body.x;
+      const pz = ctx.player.body.z;
+      ctx.emit({ t: 'cast', ability: node.id, x: px, z: pz, dx: 0, dz: el === 'grav' ? -1 : 0, el, hold });
+      for (const a of hitAgents(ctx.crowd, px, pz, radius)) {
+        weatherTouch(a, schools, ctx.mods);
+        after(a, ctx);
+      }
+      return true;
+    },
+  };
+}
+
 /**
- * Wind always blows. It never freezes and never dazes.
- * Ice on the wind: cold, and they head somewhere else.
- * Gravity on the wind, without ice: the blow lands, then they feel heavy and stay.
+ * The cast is the line she pressed. Knowing another line does not mix in.
+ * Wind blows. Ice is cold. Gravity is heavy. iw is a cold blow that sends them off.
+ * ig is cold and they cannot move. wg is a blow, then they stay.
  */
-function applyWind(a: Agent, ctx: AbilityCtx, impulse: number, flee: number, cold: number, heavy: number): void {
-  const px = ctx.player.body.x;
-  const pz = ctx.player.body.z;
-  blowBody(a, px, pz, impulse, ctx.mods);
-  weatherWear(a, 'wind', ctx.mods);
-  const ice = !!ctx.mods.hasIce;
-  const grav = !!ctx.mods.hasGrav;
-  if (ice) {
-    markCold(a, ctx.time + cold, ctx.emit);
-    const dir = blowVector(px, pz, a.body.x, a.body.z);
-    markFlee(a, ctx.time + flee, a.body.x + dir.x * 1.35, a.body.z + dir.z * 1.35, ctx.emit);
-  } else if (grav) {
-    markHeavy(a, ctx.time + heavy, ctx.emit);
-  }
-}
-
-/** Ice + gravity: cold and cannot move. Ice + wind: cold and another way. Ice alone: just cold. */
-function applyIce(a: Agent, ctx: AbilityCtx, cold: number, freeze: number, impulse: number): void {
-  weatherWear(a, 'ice', ctx.mods);
-  const grav = !!ctx.mods.hasGrav;
-  const wind = !!ctx.mods.hasWind;
-  if (grav) {
-    markCold(a, ctx.time + freeze, ctx.emit);
-    const dur = disableDur(freeze, isBossAgent(a));
-    applyStatus(a, 'freeze', ctx.time + dur, ctx.emit);
-    a.freezeGhostUntil = Math.max(a.freezeGhostUntil, ctx.time + (a.boss ? 0.35 : 0.55));
-    return;
-  }
-  if (wind) {
-    const px = ctx.player.body.x;
-    const pz = ctx.player.body.z;
-    markCold(a, ctx.time + cold, ctx.emit);
-    blowBody(a, px, pz, impulse * 0.85, ctx.mods);
-    const dir = blowVector(px, pz, a.body.x, a.body.z);
-    markFlee(a, ctx.time + cold, a.body.x + dir.x * 1.35, a.body.z + dir.z * 1.35, ctx.emit);
-    return;
-  }
-  markCold(a, ctx.time + cold, ctx.emit);
-}
-
-/** Gravity + ice: cold and cannot move. Gravity + wind: a blow, then they stay. Gravity alone: heavy, no hit. */
-function applyGrav(a: Agent, ctx: AbilityCtx, heavy: number, freeze: number, impulse: number): void {
-  weatherWear(a, 'grav', ctx.mods);
-  const ice = !!ctx.mods.hasIce;
-  const wind = !!ctx.mods.hasWind;
-  if (ice) {
-    markCold(a, ctx.time + freeze, ctx.emit);
-    const dur = disableDur(freeze, isBossAgent(a));
-    applyStatus(a, 'freeze', ctx.time + dur, ctx.emit);
-    a.freezeGhostUntil = Math.max(a.freezeGhostUntil, ctx.time + (a.boss ? 0.35 : 0.55));
-    return;
-  }
-  if (wind) {
-    const px = ctx.player.body.x;
-    const pz = ctx.player.body.z;
-    blowBody(a, px, pz, impulse * 0.7, ctx.mods);
-    markHeavy(a, ctx.time + heavy, ctx.emit);
-    return;
-  }
-  markHeavy(a, ctx.time + heavy, ctx.emit);
-}
-
 function spellAbility(node: SpellNodeDef, mods: PlayerMods): AbilityDef | null {
   const W = TUNING.weather;
-  const cdr = mods.cdr || 1;
+  const rank = node.rank - 1;
+  const cost = W.mana[node.line];
+  const cd = W.cd[node.line] * (mods.cdr || 1);
 
-  if (node.id === 'wind_1') {
-    const wide = !!mods.crosswind;
-    const range = wide ? W.cross.range : W.blow.range;
-    const width = wide ? W.cross.width : W.blow.width;
-    const impulse = wide ? W.cross.impulse : W.blow.impulse;
-    const flee = wide ? W.cross.flee : W.blow.flee;
-    return {
-      id: node.id,
-      resource: 'mana',
-      cost: W.blow.mana,
-      cd: W.blow.cd * cdr,
-      cast(ctx) {
-        const { dx, dz } = aimDir(ctx);
-        const px = ctx.player.body.x;
-        const pz = ctx.player.body.z;
-        ctx.emit({ t: 'cast', ability: node.id, x: px, z: pz, dx, dz, el: 'wind' });
-        for (const a of ctx.crowd.agents) {
-          const vx = a.body.x - px;
-          const vz = a.body.z - pz;
-          const dist = Math.hypot(vx, vz);
-          if (dist < 0.05 || dist > range) continue;
-          const along = (vx * dx + vz * dz) / dist;
-          if (along < 0.05) continue;
-          const lat = Math.abs(vx * -dz + vz * dx);
-          if (lat > width + dist * 0.55) continue;
-          applyWind(a, ctx, impulse * (1.1 - dist / range * 0.25), flee, W.blow.cold, W.blow.heavy);
-        }
-        return true;
-      },
-    };
+  if (node.line === 'w') {
+    return coneAbility(node, cost, cd, W.w[rank], ['wind'], () => {});
   }
-
-  if (node.id === 'ice_3') {
-    return {
-      id: node.id,
-      resource: 'mana',
-      cost: W.turn.mana,
-      cd: W.turn.cd * cdr,
-      cast(ctx) {
-        const px = ctx.player.body.x;
-        const pz = ctx.player.body.z;
-        const hold = !!ctx.mods.hasGrav;
-        ctx.emit({ t: 'cast', ability: node.id, x: px, z: pz, dx: 0, dz: 0, el: 'ice', hold });
-        for (const a of hitAgents(ctx.crowd, px, pz, W.turn.radius)) {
-          applyIce(a, ctx, W.turn.cold, W.turn.freeze, W.blow.impulse);
-        }
-        return true;
-      },
-    };
+  if (node.line === 'iw') {
+    const row = W.iw[rank];
+    return coneAbility(node, cost, cd, row, ['wind', 'ice'], (a, ctx) => {
+      markCold(a, ctx.time + row.cold, ctx.emit);
+      const dir = blowVector(ctx.player.body.x, ctx.player.body.z, a.body.x, a.body.z);
+      markFlee(a, ctx.time + row.flee, a.body.x + dir.x * 1.35, a.body.z + dir.z * 1.35, ctx.emit);
+    });
   }
-
-  if (node.id === 'grav_3') {
-    return {
-      id: node.id,
-      resource: 'mana',
-      cost: W.hold.mana,
-      cd: W.hold.cd * cdr,
-      cast(ctx) {
-        const px = ctx.player.body.x;
-        const pz = ctx.player.body.z;
-        const hold = !!ctx.mods.hasIce;
-        ctx.emit({ t: 'cast', ability: node.id, x: px, z: pz, dx: 0, dz: -1, el: 'grav', hold });
-        for (const a of hitAgents(ctx.crowd, px, pz, W.hold.radius)) {
-          applyGrav(a, ctx, W.hold.heavy, W.hold.freeze, W.blow.impulse);
-        }
-        return true;
-      },
-    };
+  if (node.line === 'wg') {
+    const row = W.wg[rank];
+    return coneAbility(node, cost, cd, row, ['wind', 'grav'], (a, ctx) => {
+      markHeavy(a, ctx.time + row.heavy, ctx.emit);
+    });
   }
-
+  if (node.line === 'i') {
+    const row = W.i[rank];
+    return auraAbility(node, cost, cd, row.radius, 'ice', false, ['ice'], (a, ctx) => {
+      markCold(a, ctx.time + row.cold, ctx.emit);
+    });
+  }
+  if (node.line === 'g') {
+    const row = W.g[rank];
+    return auraAbility(node, cost, cd, row.radius, 'grav', false, ['grav'], (a, ctx) => {
+      markHeavy(a, ctx.time + row.heavy, ctx.emit);
+    });
+  }
+  if (node.line === 'ig') {
+    const row = W.ig[rank];
+    return auraAbility(node, cost, cd, row.radius, 'ice', true, ['ice', 'grav'], (a, ctx) => {
+      markCold(a, ctx.time + row.cold, ctx.emit);
+      const dur = disableDur(row.freeze, isBossAgent(a));
+      applyStatus(a, 'freeze', ctx.time + dur, ctx.emit);
+      a.freezeGhostUntil = Math.max(a.freezeGhostUntil, ctx.time + (a.boss ? 0.35 : 0.55));
+    });
+  }
   return null;
 }
 
 /**
- * Last skill of one chain. Wind → str, ice → sta, gravity → spd.
- * Same mix rules as the actives. No blink, no shockwave, no phase.
+ * Rank 4 is a stronger cast of the same line, on the same button.
+ * There is no second gale button.
  */
-export function castMageUlt(kind: 'str' | 'spd' | 'sta', ctx: AbilityCtx): boolean {
-  const p = ctx.player;
-  const mods = ctx.mods;
-  const W = TUNING.weather;
-  const cd = TUNING.ult.cooldown;
-  const px = p.body.x;
-  const pz = p.body.z;
-  if (kind === 'str' && mods.ultFire) {
-    if (p.ultCd.str > 0) return false;
-    const { dx, dz } = facing(p);
-    ctx.emit({ t: 'ult', kind: 'str', x: px, z: pz, dx, dz });
-    ctx.emit({ t: 'cast', ability: 'wind_4', x: px, z: pz, dx, dz, el: 'wind' });
-    for (const a of hitAgents(ctx.crowd, px, pz, W.headwind.radius)) {
-      applyWind(a, ctx, W.headwind.impulse, W.headwind.flee, W.headwind.flee, W.blow.heavy);
-    }
-    p.ultCd.str = cd;
-    return true;
-  }
-  if (kind === 'sta' && mods.ultIce) {
-    if (p.ultCd.sta > 0) return false;
-    const hold = !!mods.hasGrav;
-    ctx.emit({ t: 'ult', kind: 'sta', x: px, z: pz, dx: 0, dz: -1 });
-    ctx.emit({ t: 'cast', ability: 'ice_4', x: px, z: pz, dx: 0, dz: -1, el: 'ice', hold });
-    for (const a of hitAgents(ctx.crowd, px, pz, W.whiteout.radius)) {
-      applyIce(a, ctx, W.whiteout.cold, W.whiteout.freeze, W.blow.impulse);
-    }
-    p.ultCd.sta = cd;
-    return true;
-  }
-  if (kind === 'spd' && mods.ultVolt) {
-    if (p.ultCd.spd > 0) return false;
-    const hold = !!mods.hasIce;
-    ctx.emit({ t: 'ult', kind: 'spd', x: px, z: pz, dx: 0, dz: -1 });
-    ctx.emit({ t: 'cast', ability: 'grav_4', x: px, z: pz, dx: 0, dz: -1, el: 'grav', hold });
-    for (const a of hitAgents(ctx.crowd, px, pz, W.still.radius)) {
-      applyGrav(a, ctx, W.still.heavy, W.still.freeze, W.blow.impulse);
-    }
-    p.ultCd.spd = cd;
-    return true;
-  }
+export function castMageUlt(_kind: 'str' | 'spd' | 'sta', _ctx: AbilityCtx): boolean {
   return false;
 }

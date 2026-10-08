@@ -1260,6 +1260,17 @@ button {
   gap: 8px;
   margin-bottom: 6px;
 }
+.ult-col.mage-cast {
+  display: grid;
+  grid-auto-flow: column;
+  grid-template-rows: repeat(3, 44px);
+  grid-auto-columns: 44px;
+  gap: 6px;
+}
+.ult-col.mage-cast .skill-use {
+  width: 44px;
+  height: 44px;
+}
 
 .skill-use,
 .shove-btn {

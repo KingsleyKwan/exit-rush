@@ -1,4 +1,4 @@
-import { SPELL_NODES, SPELL_SCHOOLS, canLearn, defaultSpellBar, learnSpell, spellById, type SpellSchool } from '../game/SpellTree';
+import { MIX_LINES, PURE_LINES, barAfterLearn, canLearn, learnSpell, lineElements, rank4Blocked, spellById, type SpellLine } from '../game/SpellTree';
 import { spentOf } from '../game/storage';
 import { t, getLang, fmt } from '../i18n';
 import type { Game } from '../game/Game';
@@ -56,9 +56,19 @@ const pointsChip = (game: Game): string => {
   return `<span class="chip points-chip" title="${t().skillPoints}" aria-label="${t().skillPoints}: ${pts}">${icon('star', 'sm')}<b>${pts}</b></span>`;
 };
 
-const SCHOOL_ICON: Record<SpellSchool, string> = { wind: 'wind', ice: 'ice', grav: 'grav' };
+const LINE_ICON: Record<SpellLine, string> = {
+  w: 'wind', i: 'ice', g: 'grav', iw: 'wind', ig: 'ice', wg: 'grav',
+};
 
-/** Witcher-style columns. Bottom node is the start. Tap a skill to spend 1 point. */
+function lineLabel(dict: ReturnType<typeof t>, line: SpellLine): string {
+  if (line === 'w') return dict.wind;
+  if (line === 'i') return dict.ice;
+  if (line === 'g') return dict.grav;
+  const parts = lineElements(line).map((el) => (el === 'w' ? dict.wind : el === 'i' ? dict.ice : dict.grav));
+  return parts.join('+');
+}
+
+/** Rows, left to right. The node on the right is the stronger version. */
 function renderMageBook(game: Game, rerender: (game: Game) => void): HTMLElement {
   const dict = t();
   const en = getLang() === 'en';
@@ -66,32 +76,38 @@ function renderMageBook(game: Game, rerender: (game: Game) => void): HTMLElement
   const s = game.save.mage.loadouts[active] ?? game.save.mage.loadouts[0];
   const known = new Set(s.known ?? []);
   const overRun = game.skillsOverRun;
-  const schoolName = (school: SpellSchool) => (school === 'wind' ? dict.wind : school === 'ice' ? dict.ice : dict.grav);
 
   const nodeBtn = (id: string) => {
     const n = spellById(id)!;
     const on = known.has(id);
     const ready = canLearn(s, id);
-    const req = n.requires ? spellById(n.requires) : undefined;
-    const blockedCap = !!n.capstone && !on && [...known].some((k) => spellById(k)?.capstone);
+    const missing = n.requires.filter((req) => !known.has(req));
     let why = '';
-    if (!on && req && !known.has(req.id)) why = fmt(dict.spellNeed, { name: en ? req.nameEn : req.nameZh });
-    else if (blockedCap) why = dict.spellOneEnd;
+    if (!on && missing.length === 1) {
+      const req = spellById(missing[0]);
+      if (req) why = fmt(dict.spellNeed, { name: en ? req.nameEn : req.nameZh });
+    } else if (!on && missing.length >= 2) {
+      const a = spellById(missing[0]);
+      const b = spellById(missing[1]);
+      if (a && b) why = fmt(dict.spellNeedTwo, { a: en ? a.nameEn : a.nameZh, b: en ? b.nameEn : b.nameZh });
+    } else if (!on && rank4Blocked(s, id)) why = dict.spellOneEnd;
     const tip = en ? n.tipEn : n.tipZh;
-    const kind = n.capstone ? dict.ultShort : n.kind === 'active' ? dict.skillNodeActive : dict.skillNodePassive;
+    const kind = n.rank === 4 ? dict.spellLast : dict.skillNodeActive;
     const title = `${n.nameEn} / ${n.nameZh} — ${tip}${why ? ` (${why})` : ''}`;
-    return `<button type="button" class="spell-node ${on ? 'on' : ''} ${ready ? 'ready' : ''} ${n.capstone ? 'cap' : ''} ${!on && !ready ? 'locked' : ''}" data-spell="${id}" data-tip="${tip.replace(/"/g, '&quot;')}" data-why="${why.replace(/"/g, '&quot;')}" data-kind="${kind}" data-en="${n.nameEn}" data-zh="${n.nameZh}" title="${title.replace(/"/g, '&quot;')}" aria-label="${title.replace(/"/g, '&quot;')}">
-      <span class="spell-dot">${icon(SCHOOL_ICON[n.school])}${n.capstone ? '<i class="spell-star">★</i>' : ''}</span>
-      <span class="spell-name"><b>${n.nameZh}</b><small>${n.nameEn}</small></span>
+    const label = en ? n.nameEn : n.nameZh;
+    return `<button type="button" class="spell-node ${on ? 'on' : ''} ${ready ? 'ready' : ''} ${n.rank === 4 ? 'cap' : ''} ${!on && !ready ? 'locked' : ''}" data-spell="${id}" data-tip="${tip.replace(/"/g, '&quot;')}" data-why="${why.replace(/"/g, '&quot;')}" data-kind="${kind}" data-en="${n.nameEn}" data-zh="${n.nameZh}" title="${title.replace(/"/g, '&quot;')}" aria-label="${title.replace(/"/g, '&quot;')}">
+      <span class="spell-dot">${icon(LINE_ICON[n.line])}${n.rank === 4 ? '<i class="spell-star">★</i>' : ''}</span>
+      <span class="spell-name"><b>${label}</b></span>
     </button>`;
   };
 
-  const column = (school: SpellSchool) => {
-    const chain = SPELL_NODES.filter((n) => n.school === school).slice().reverse();
+  const row = (line: SpellLine) => {
+    const chain = [1, 2, 3, 4].map((rank) => spellById(`${line}${rank}`)!);
     const got = chain.filter((n) => known.has(n.id)).length;
-    return `<section class="spell-col school-${school}">
-      <header class="spell-col-head"><span class="skill-ico">${icon(SCHOOL_ICON[school])}</span><strong>${schoolName(school)}</strong><em>${got}/4</em></header>
-      <div class="spell-chain">${chain.map((n) => nodeBtn(n.id)).join('<i class="spell-link" aria-hidden="true"></i>')}</div>
+    const tint = line === 'i' || line === 'ig' ? 'ice' : line === 'g' ? 'grav' : 'wind';
+    return `<section class="spell-row line-${line} school-${tint}">
+      <header class="spell-row-head"><span class="skill-ico">${icon(LINE_ICON[line])}</span><strong>${lineLabel(dict, line)}</strong><em>${got}/4</em></header>
+      <div class="spell-ranks">${chain.map((n) => nodeBtn(n.id)).join('<i class="spell-link" aria-hidden="true"></i>')}</div>
     </section>`;
   };
 
@@ -104,7 +120,9 @@ function renderMageBook(game: Game, rerender: (game: Game) => void): HTMLElement
         ${loadoutStrip(game, { reset: true, cls: 'in-tree' })}
         ${overRun ? `<p class="howto">${dict.skillsApplyNext}</p>` : ''}
         <div class="spellbook" role="group" aria-label="${dict.spells}">
-          ${SPELL_SCHOOLS.map((school) => column(school)).join('')}
+          ${PURE_LINES.map((line) => row(line)).join('')}
+          <p class="spell-mix-cap">${dict.spellMixNeed}</p>
+          ${MIX_LINES.map((line) => row(line)).join('')}
         </div>
         <div class="cst-detail spell-detail" id="cst-detail" aria-live="polite">
           <div class="cst-detail-names"><span class="cst-detail-ico"></span><b class="cst-detail-en"></b><span class="cst-detail-zh"></span></div>
@@ -139,10 +157,7 @@ function renderMageBook(game: Game, rerender: (game: Game) => void): HTMLElement
       const next = learnSpell(s, id);
       if (next) {
         game.save.mage.loadouts[active] = next;
-        const want = defaultSpellBar(next);
-        const prev = (game.save.mage.spellBars[active] ?? []).filter((x) => want.includes(x));
-        for (const spellId of want) if (!prev.includes(spellId)) prev.push(spellId);
-        game.save.mage.spellBars[active] = prev.slice(0, 3);
+        game.save.mage.spellBars[active] = barAfterLearn(next, game.save.mage.spellBars[active] ?? []);
         game.persist();
         game.audio.ui();
         rerender(game);

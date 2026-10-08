@@ -69,16 +69,9 @@ const CHARS: CharacterId[] = (process.env.CHARS ?? 'hero')
   .filter((s): s is CharacterId => s === 'hero' || s === 'mage' || s === 'tech');
 
 
-/** One active per school, once that skill is in the book. */
+/** One button per learned line: the strongest rank she knows. */
 function mageBarForLevel(_id: number, skills: SkillState): string[] {
-  const known = new Set(skills.known ?? []);
-  const order = _id === 40 || _id === 50 || _id === 60 || _id === 80
-    ? ['grav_3', 'ice_3', 'wind_1']
-    : _id === 30 || _id === 90
-      ? ['ice_3', 'wind_1', 'grav_3']
-      : ['wind_1', 'ice_3', 'grav_3'];
-  const bar = order.filter((id) => known.has(id));
-  return bar.length ? bar : defaultSpellBar(skills);
+  return defaultSpellBar(skills);
 }
 
 function modsForChar(char: CharacterId, skills: SkillState, levelId = 1, loadoutName = 'earned'): PlayerMods {
@@ -129,30 +122,33 @@ function ultBuild(b: 'str' | 'spd' | 'sta'): SkillState {
 const earnedPts = (id: number): number => (id === 100 ? 99 : id - 1);
 
 /**
- * Bot book, not the player's 10-point currency.
- * All three schools, plus the one last skill that matches the level.
+ * Bot book, not a full unlock. Ten legal points.
+ * Freeze levels take the ice+gravity line to the end.
+ * Cold levels take bitter cold, so the freeze line stops at rank 3.
+ * Everything else takes the gale, and the cold wind stops at rank 3.
  * Raw hero power spreads stay in `earned` / `ultBuild` and are not reused here.
  */
 function mageEarned(id: number): SkillState {
-  const cap = (
-    id === 30 || id === 50 || id === 80 || id === 90 ? 'ice_4'
-    : id === 40 || id === 60 ? 'grav_4'
-    : 'wind_4'
-  );
-  const known = [
-    'wind_1', 'wind_2', 'wind_3',
-    'ice_1', 'ice_2', 'ice_3',
-    'grav_1', 'grav_2', 'grav_3',
-    cap,
-  ];
-  return {
-    str: 0, spd: 0, sta: 0,
-    ultStr: cap === 'wind_4',
-    ultSta: cap === 'ice_4',
-    ultSpd: cap === 'grav_4',
-    points: 0,
-    known,
-  };
+  const ids = (id === 40 || id === 60)
+    ? ['g1', 'g2', 'g3', 'i1', 'i2', 'ig1', 'ig2', 'ig3', 'ig4', 'w1']
+    : (id === 30 || id === 50 || id === 80 || id === 90)
+      ? ['i1', 'i2', 'i3', 'i4', 'g1', 'g2', 'ig1', 'ig2', 'ig3', 'w1']
+      : ['w1', 'w2', 'w3', 'w4', 'i1', 'iw1', 'iw2', 'iw3', 'g1', 'wg1'];
+  let book: SkillState = { ...defaultSkills(), points: ids.length, known: [] };
+  for (const spellId of ids) {
+    const next = learnSpell(book, spellId);
+    if (!next) {
+      console.error('bot book rejected', spellId, 'at level', id, book.known);
+      process.exit(1);
+    }
+    book = next;
+  }
+  return book;
+}
+
+function spellLineKey(id: string): string {
+  if (id.startsWith('iw') || id.startsWith('ig') || id.startsWith('wg')) return id.slice(0, 2);
+  return id.slice(0, 1);
 }
 
 
@@ -319,18 +315,19 @@ function runLevel(levelId: number, skills: SkillState, seed: number, char: Chara
         if (!focus || score < focus.d) focus = { kind: a.kind, d: score };
       }
       const counterFor = (kind: string): string[] => {
-        if (kind === 'luggage' || kind === 'couple') return ['wind_1', 'ice_3', 'grav_3'];
-        if (kind === 'squat' || kind === 'brat' || kind === 'family') return ['grav_3', 'ice_3', 'wind_1'];
-        if (kind === 'angry' || kind === 'loud' || kind === 'stench') return ['ice_3', 'grav_3', 'wind_1'];
-        return ['wind_1', 'ice_3', 'grav_3'];
+        if (kind === 'luggage') return ['w', 'wg', 'iw'];
+        if (kind === 'couple') return ['iw', 'w', 'wg'];
+        if (kind === 'squat' || kind === 'brat' || kind === 'family') return ['ig', 'g', 'wg'];
+        if (kind === 'angry' || kind === 'loud' || kind === 'stench') return ['i', 'ig', 'iw'];
+        return ['w', 'ig', 'i'];
       };
       const manaFull = p.mana >= p.manaMax * 0.75;
       const want = blockedT > 0.12 || !!focus || manaFull || b.contacts >= 1;
       if (want) {
-        const prefer = focus ? counterFor(focus.kind) : ['wind_1', 'ice_3', 'grav_3'];
+        const prefer = focus ? counterFor(focus.kind) : ['w', 'ig', 'i'];
         const ordered = [
-          ...prefer.filter((id) => bar.includes(id)),
-          ...bar.filter((id) => !prefer.includes(id)),
+          ...prefer.flatMap((line) => bar.filter((id) => spellLineKey(id) === line)),
+          ...bar.filter((id) => !prefer.includes(spellLineKey(id))),
         ];
         // Face the focus so directional spells land.
         if (focus) {
@@ -348,13 +345,6 @@ function runLevel(levelId: number, skills: SkillState, seed: number, char: Chara
           if ((p.spellCd[id] ?? 0) > 0) continue;
           if (sim.tryAbility(id)) { blockedT = 0; break; }
         }
-      }
-      // Mage ults when stuck hard (prefer ice ult vs angry king).
-      if (blockedT > 0.4 && sim.time > 1.2) {
-        if (focus?.kind === 'angry' && skills.ultSta && sim.tryUltimate('sta')) ults++;
-        else if (skills.ultStr && sim.tryUltimate('str')) ults++;
-        else if (skills.ultSta && sim.tryUltimate('sta')) ults++;
-        else if (skills.ultSpd && sim.tryUltimate('spd')) ults++;
       }
     }
     if (char === 'tech' && sim.time > 0.5) {
@@ -1085,82 +1075,114 @@ async function main(): Promise<void> {
     if (drift) { console.error(`${drift} hero mod parity failure(s)`); process.exit(1); }
     console.log('hero modsFor parity ok');
 
-    const breeze = { ...defaultSkills(), points: 0, known: ['wind_1'] };
+    const place = (run: Sim) => {
+      const person = run.crowd.agents.find((a) => a.kind === 'normal') ?? run.crowd.agents[0];
+      person.body.x = run.player.body.x + 0.7;
+      person.body.z = run.player.body.z;
+      person.homeX = person.body.x;
+      person.homeZ = person.body.z;
+      person.body.vx = 0;
+      person.body.vz = 0;
+      person.coldUntil = 0;
+      person.fleeUntil = 0;
+      person.freezeUntil = 0;
+      person.heavyUntil = 0;
+      person.dazedUntil = 0;
+      run.player.faceX = 1;
+      run.player.faceZ = 0;
+      return person;
+    };
+    const breeze = { ...defaultSkills(), points: 0, known: ['w1'] };
     const mageMods = modsFor(CHARACTERS.mage, breeze, defaultSpellBar(breeze));
     if (mageMods.manaMax <= 0) { console.error('mage manaMax expected > 0'); process.exit(1); }
     if (mageMods.characterId !== 'mage') { console.error('mage characterId'); process.exit(1); }
     const sim = new Sim(LEVELS.find((l) => l.id === 1)!, mageMods, mulberry32(9));
     if (sim.player.manaMax <= 0) { console.error('PlayerSim mana not initialised'); process.exit(1); }
     const manaBefore = sim.player.mana;
-    const blown = sim.crowd.agents.find((a) => a.kind === 'normal') ?? sim.crowd.agents[0];
-    blown.body.x = sim.player.body.x + 0.7;
-    blown.body.z = sim.player.body.z;
-    blown.homeX = blown.body.x;
-    blown.homeZ = blown.body.z;
-    sim.player.faceX = 1;
-    sim.player.faceZ = 0;
-    const ok = sim.tryAbility('wind_1');
+    const blown = place(sim);
+    const ok = sim.tryAbility('w1');
     if (!ok) { console.error('breeze should cast'); process.exit(1); }
     if (sim.player.mana >= manaBefore) { console.error('breeze should spend mana'); process.exit(1); }
-    if (blown.body.vx <= 0.15) { console.error('breeze should blow, vx', blown.body.vx); process.exit(1); }
-    if (blown.dazedUntil > 0 || blown.freezeUntil > 0 || blown.fleeUntil > 0) {
-      console.error('wind alone is a blow, not a hit or a redirect', blown.dazedUntil, blown.freezeUntil, blown.fleeUntil);
+    const breezeVx = blown.body.vx;
+    if (breezeVx <= 0.15) { console.error('breeze should blow, vx', breezeVx); process.exit(1); }
+    if (blown.dazedUntil > 0 || blown.freezeUntil > 0 || blown.fleeUntil > 0 || blown.coldUntil > 0) {
+      console.error('wind alone is a blow, not a hit or a redirect', blown.dazedUntil, blown.freezeUntil, blown.fleeUntil, blown.coldUntil);
       process.exit(1);
     }
     console.log(`mage mana ok (max=${sim.player.manaMax}, bar=${mageMods.spellBar.join(',')})`);
 
-    const cold = { ...defaultSkills(), points: 0, known: ['wind_1', 'ice_1'] };
-    const coldSim = new Sim(LEVELS.find((l) => l.id === 1)!, modsFor(CHARACTERS.mage, cold, ['wind_1']), mulberry32(3));
-    const coldA = coldSim.crowd.agents.find((a) => a.kind === 'normal') ?? coldSim.crowd.agents[0];
-    coldA.body.x = coldSim.player.body.x + 0.7;
-    coldA.body.z = coldSim.player.body.z;
-    coldSim.player.faceX = 1;
-    coldSim.player.faceZ = 0;
-    if (!coldSim.tryAbility('wind_1')) { console.error('wind+ice cast failed'); process.exit(1); }
-    if (!(coldA.coldUntil > 0) || !(coldA.fleeUntil > 0) || coldA.freezeUntil > 0) {
-      console.error('wind+ice should feel cold and turn, not freeze', coldA.coldUntil, coldA.fleeUntil, coldA.freezeUntil);
+    const learned = { ...defaultSkills(), points: 0, known: ['w1', 'i1', 'g1', 'iw1', 'ig1'] };
+    const coldSim = new Sim(LEVELS.find((l) => l.id === 1)!, modsFor(CHARACTERS.mage, learned, ['w1', 'iw1', 'ig1', 'i1']), mulberry32(3));
+    const pure = place(coldSim);
+    if (!coldSim.tryAbility('w1')) { console.error('pure wind cast failed'); process.exit(1); }
+    if (pure.coldUntil > 0 || pure.fleeUntil > 0 || pure.freezeUntil > 0) {
+      console.error('knowing ice does not change a wind cast', pure.coldUntil, pure.fleeUntil, pure.freezeUntil);
       process.exit(1);
     }
-    const mixed = { ...defaultSkills(), points: 0, known: ['wind_1', 'ice_1', 'grav_1'] };
-    const mixedSim = new Sim(LEVELS.find((l) => l.id === 1)!, modsFor(CHARACTERS.mage, mixed, ['wind_1']), mulberry32(5));
-    const mixedA = mixedSim.crowd.agents.find((a) => a.kind === 'normal') ?? mixedSim.crowd.agents[0];
-    mixedA.body.x = mixedSim.player.body.x + 0.7;
-    mixedA.body.z = mixedSim.player.body.z;
-    mixedSim.player.faceX = 1;
-    mixedSim.player.faceZ = 0;
-    if (!mixedSim.tryAbility('wind_1')) { console.error('wind with both schools failed'); process.exit(1); }
-    if (mixedA.freezeUntil > 0 || !(mixedA.fleeUntil > 0) || !(mixedA.coldUntil > 0)) {
-      console.error('wind does not freeze even when ice and gravity are known');
+    const turned = place(coldSim);
+    if (!coldSim.tryAbility('iw1')) { console.error('iw1 cast failed'); process.exit(1); }
+    if (!(turned.coldUntil > 0) || !(turned.fleeUntil > 0) || turned.freezeUntil > 0) {
+      console.error('iw1 should feel cold and turn, not freeze', turned.coldUntil, turned.fleeUntil, turned.freezeUntil);
       process.exit(1);
     }
-    const frozenBook = { ...defaultSkills(), points: 0, known: ['ice_1', 'ice_2', 'ice_3', 'grav_1'] };
-    const heldSim = new Sim(LEVELS.find((l) => l.id === 1)!, modsFor(CHARACTERS.mage, frozenBook, ['ice_3']), mulberry32(4));
-    const heldA = heldSim.crowd.agents.find((a) => a.kind === 'normal') ?? heldSim.crowd.agents[0];
-    heldA.body.x = heldSim.player.body.x + 0.6;
-    heldA.body.z = heldSim.player.body.z;
-    if (!heldSim.tryAbility('ice_3')) { console.error('ice+gravity cast failed'); process.exit(1); }
-    if (!(heldA.freezeUntil > heldSim.time) || !(heldA.coldUntil > 0)) {
-      console.error('ice+gravity should freeze', heldA.freezeUntil, heldA.coldUntil);
+    const heldA = place(coldSim);
+    if (!coldSim.tryAbility('ig1')) { console.error('ig1 cast failed'); process.exit(1); }
+    if (!(heldA.freezeUntil > coldSim.time) || !(heldA.coldUntil > 0) || heldA.dazedUntil > 0) {
+      console.error('ig1 should freeze, not daze', heldA.freezeUntil, heldA.coldUntil, heldA.dazedUntil);
       process.exit(1);
     }
-    if (heldA.dazedUntil > 0) { console.error('freeze is not a daze'); process.exit(1); }
-    let book = { ...defaultSkills(), points: 10, known: [] as string[] };
-    if (canLearn(book, 'wind_2')) { console.error('wind_2 needs breeze'); process.exit(1); }
-    if (!canLearn(book, 'wind_1') || !canLearn(book, 'ice_1') || !canLearn(book, 'grav_1')) {
+    const onlyCold = place(coldSim);
+    if (!coldSim.tryAbility('i1')) { console.error('i1 cast failed'); process.exit(1); }
+    if (!(onlyCold.coldUntil > 0) || onlyCold.freezeUntil > 0 || Math.abs(onlyCold.body.vx) > 0.15) {
+      console.error('ice is only cold', onlyCold.coldUntil, onlyCold.freezeUntil, onlyCold.body.vx);
+      process.exit(1);
+    }
+    const gale = { ...defaultSkills(), points: 0, known: ['w1', 'w2', 'w3', 'w4'] };
+    const galeSim = new Sim(LEVELS.find((l) => l.id === 1)!, modsFor(CHARACTERS.mage, gale, ['w4']), mulberry32(7));
+    const galeA = place(galeSim);
+    const galeMana = galeSim.player.mana;
+    if (!galeSim.tryAbility('w4')) { console.error('w4 cast failed'); process.exit(1); }
+    if (galeA.body.vx <= breezeVx) { console.error('w4 should blow harder than w1', galeA.body.vx, breezeVx); process.exit(1); }
+    if (Math.abs((galeMana - galeSim.player.mana) - (manaBefore - sim.player.mana)) > 0.01) {
+      console.error('w4 should cost the same mana as w1');
+      process.exit(1);
+    }
+    let book = { ...defaultSkills(), points: 4, known: [] as string[] };
+    if (canLearn(book, 'w2')) { console.error('w2 needs breeze'); process.exit(1); }
+    if (canLearn(book, 'iw1') || canLearn(book, 'ig1') || canLearn(book, 'wg1')) {
+      console.error('a mix needs both starts'); process.exit(1);
+    }
+    if (!canLearn(book, 'w1') || !canLearn(book, 'i1') || !canLearn(book, 'g1')) {
       console.error('three starts should be open'); process.exit(1);
     }
-    for (const id of ['wind_1', 'wind_2', 'wind_3', 'wind_4', 'ice_1', 'ice_2', 'ice_3', 'grav_1', 'grav_2', 'grav_3']) {
-      const next = learnSpell(book, id);
-      if (!next) { console.error('should learn', id, book); process.exit(1); }
-      book = next;
-    }
-    if (book.points !== 0 || !book.ultStr || book.ultSta || book.ultSpd) {
-      console.error('full book is 10 points and one last skill', book);
+    book = learnSpell(book, 'i1')!;
+    if (canLearn(book, 'iw1')) { console.error('iw1 needs wind as well as ice'); process.exit(1); }
+    book = learnSpell(book, 'w1')!;
+    if (!canLearn(book, 'iw1')) { console.error('iw1 should open after i1 and w1'); process.exit(1); }
+    if (canLearn(book, 'wg1')) { console.error('wg1 still needs gravity'); process.exit(1); }
+    const bothCaps = learnSpell(learnSpell(learnSpell(learnSpell(
+      learnSpell(learnSpell(learnSpell(learnSpell(
+        { ...defaultSkills(), points: 8, known: [] },
+        'i1')!, 'i2')!, 'i3')!, 'i4')!,
+      'g1')!, 'g2')!, 'g3')!, 'g4')!;
+    if (!bothCaps.known?.includes('i4') || !bothCaps.known.includes('g4') || bothCaps.ultStr || bothCaps.ultSta) {
+      console.error('i4 and g4 can both be learned, and neither is an ult button', bothCaps);
       process.exit(1);
     }
-    if (learnSpell(book, 'ice_4') || learnSpell(book, 'grav_4')) {
-      console.error('only one last skill'); process.exit(1);
+    const iced = ['i1', 'i2', 'i3', 'i4', 'g1', 'ig1', 'ig2', 'ig3'].reduce(
+      (s, id) => learnSpell(s, id)!,
+      { ...defaultSkills(), points: 9, known: [] as string[] },
+    );
+    if (canLearn(iced, 'ig4') || canLearn(iced, 'iw4')) {
+      console.error('i4 blocks ig4 and iw4'); process.exit(1);
     }
+    if (!canLearn(iced, 'g2')) { console.error('a lower rank is not locked by i4'); process.exit(1); }
+    const heldCap = ['i1', 'g1', 'ig1', 'ig2', 'ig3', 'ig4', 'w1', 'w2', 'w3'].reduce(
+      (s, id) => learnSpell(s, id)!,
+      { ...defaultSkills(), points: 10, known: [] as string[] },
+    );
+    if (!canLearn(heldCap, 'w4')) { console.error('ig4 does not block w4'); process.exit(1); }
+    if (canLearn(heldCap, 'i4')) { console.error('ig4 blocks i4'); process.exit(1); }
     console.log('weather book ok');
 
     const held = { x: 0, z: 0, mag: 0, shoveHeld: true };
@@ -1272,16 +1294,43 @@ async function main(): Promise<void> {
         },
       } as unknown as SaveData);
       const keptSlot = kept.mage.loadouts[0];
-      if (!keptSlot.known?.includes('wind_1') || keptSlot.known.length !== 1) {
-        console.error('weather book should be kept', keptSlot);
+      if (!keptSlot.known?.includes('w1') || keptSlot.known.length !== 1 || keptSlot.known.includes('wind_1')) {
+        console.error('weather book should be kept as w1', keptSlot);
         process.exit(1);
       }
       if (keptSlot.str !== 0 || spentOf(keptSlot) !== 1 || keptSlot.points !== 0) {
         console.error('known book spends 1 and drops old power', keptSlot);
         process.exit(1);
       }
-      if (kept.mage.spellBars[0].includes('fire_t1') || !kept.mage.spellBars[0].includes('wind_1')) {
+      if (kept.mage.spellBars[0].includes('fire_t1') || !kept.mage.spellBars[0].includes('w1')) {
         console.error('dead spell ids should leave the bar', kept.mage.spellBars[0]);
+        process.exit(1);
+      }
+      const chainIds = Array.from({ length: 100 }, (_, i) => i + 1);
+      const chain = normalizeSave({
+        ...kept,
+        progress: {
+          hero: { cleared: [], clears: {}, highestCleared: 0, seenBosses: [] },
+          mage: { cleared: chainIds, clears: {}, highestCleared: 100, seenBosses: [] },
+          tech: { cleared: [], clears: {}, highestCleared: 0, seenBosses: [] },
+        },
+        mage: {
+          loadouts: [{
+            ...defaultSkills(),
+            known: ['wind_1', 'i1', 'i2', 'i3', 'i4', 'g1', 'ig1', 'ig2', 'ig3', 'ig4'],
+          }],
+          active: 0,
+          spellBars: [['wind_1', 'ice_3']],
+        },
+      } as unknown as SaveData);
+      const chainSlot = chain.mage.loadouts[0];
+      const chainKnown = chainSlot.known ?? [];
+      if (!chainKnown.includes('w1') || !chainKnown.includes('i4') || chainKnown.includes('ig4')) {
+        console.error('old ids migrate, and i4 blocks ig4', chainKnown);
+        process.exit(1);
+      }
+      if (!chain.mage.spellBars[0].includes('w1') || !chain.mage.spellBars[0].includes('i4')) {
+        console.error('bar should migrate wind_1 to w1 and ice_3 to i4', chain.mage.spellBars[0]);
         process.exit(1);
       }
       console.log('weather book save kept');

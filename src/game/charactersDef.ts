@@ -44,7 +44,7 @@ export interface CharacterDef {
   base: BaseStats;
   progression: TreeDef | { kind: 'shop' };
   entitlement?: 'mage' | 'tech';
-  hud: { resource2?: 'mana'; maxActives: 3 };
+  hud: { resource2?: 'mana'; maxActives: number };
   /** Playstyle icons for the select card. */
   styleIcons: [string, string, string];
 }
@@ -106,7 +106,7 @@ export const CHARACTERS: Record<CharacterId, CharacterDef> = {
     },
     progression: SPELL_TREE,
     entitlement: 'mage',
-    hud: { resource2: 'mana', maxActives: 3 },
+    hud: { resource2: 'mana', maxActives: 6 },
     styleIcons: ['wind', 'ice', 'grav'],
   },
   tech: {
@@ -246,7 +246,7 @@ export function modsFor(char: CharacterDef, skills: SkillState, spellBar?: strin
   }
   if (char.id === 'mage') {
     const sm = modifiersFromSpells(skills);
-    const bar = (spellBar ?? []).filter(Boolean).slice(0, 3);
+    const bar = (spellBar ?? []).filter(Boolean).slice(0, 6);
     return {
       ...sm.skillMods,
       characterId: 'mage',
@@ -270,9 +270,9 @@ export function modsFor(char: CharacterDef, skills: SkillState, spellBar?: strin
       conductor: sm.conductor,
       droppedCall: sm.droppedCall,
       thunderStep: sm.thunderStep,
-      ultFire: !!skills.known?.includes('wind_4'),
-      ultIce: !!skills.known?.includes('ice_4'),
-      ultVolt: !!skills.known?.includes('grav_4'),
+      ultFire: false,
+      ultIce: false,
+      ultVolt: false,
       hasWind: sm.hasWind,
       hasIce: sm.hasIce,
       hasGrav: sm.hasGrav,

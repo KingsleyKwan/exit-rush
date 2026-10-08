@@ -14,11 +14,11 @@ Legend: 🤖 = box agent can do it · 🛠️ = Kingsley's local Grok Build (Cap
 | | 主角「上班族」 Office Worker (FREE 免費) | 魔法師「凱婷」 Bad Girl (PAID 付費) | 高科技人「裝備L」 Gear L (PAID 付費) |
 |---|---|---|---|
 | Fantasy | Commuter who pushes through | Umbrella-wand witch who casts her way out | Gadget geek with a backpack full of toys |
-| Progression | 力量 / 速度 / 體力 constellation (existing) | 風 / 冰 / 重力. Three chains, bottom to top. Only one last skill. Not the hero's tree | No tree. Coins 💰 → shop 🛒 → items in 平/中價/名貴 (Cheap/Mid/Luxury) tiers placed in a **backpack grid 背囊格** (2×2, one expansion to 2×3) |
+| Progression | 力量 / 速度 / 體力 constellation (existing) | 風 / 冰 / 重力, plus the three mixes. Left to right, each rank stronger. Not the hero's tree | No tree. Coins 💰 → shop 🛒 → items in 平/中價/名貴 (Cheap/Mid/Luxury) tiers placed in a **backpack grid 背囊格** (2×2, one expansion to 2×3) |
 | Resource | Stamina 體力 | Stamina 體力 + **Mana 魔力** (separate bar) | Stamina 體力 + item cooldowns + ≤ 3 consumables (in grid) |
 | Points / coins | 1 point per 10 first clears (10) | 1 point per 10 of her own first clears (10) | Coins per clear, bounded replay coins, ⚡ fast-exit bonus |
 | Respec | Free, 3 loadouts | Free, 3 loadouts | 100 % item sell-back, 3 grid layouts (套裝); grid expansions permanent |
-| Power cap | 10 points: full branch (power 60) + ult + 3 skills | 10 points: all 9 skills + one of the three last skills | **Grid cells** (6 max) + body rule (1 shoes / gloves / head / core) |
+| Power cap | 10 points: full branch (power 60) + ult + 3 skills | 10 points, chosen from 24. Last ranks lock only when they share an element | **Grid cells** (6 max) + body rule (1 shoes / gloves / head / core) |
 | Counters all 8 specials + 8 bosses | ✅ | ✅ | ✅ |
 | Price ✅ decided | Free | US$2.99 ≈ HK$23 | US$2.99 ≈ HK$23 (pack of both US$4.99 ≈ HK$38) |
 | Web / Pages demo | Unlocked | **Unlocked** (no IAP, no ads) | **Unlocked** (no IAP, no ads) |
@@ -77,50 +77,65 @@ Budget check: a 15 s level gives about 100 + 15 × 8 = 220 mana, roughly **6–8
 
 Same point budget as the Hero, different shape. **1 point per 10 first clears, 10 total. Each skill costs 1 point.** There is no power ladder (10/20/…/60) on this book. Free respec, 3 loadouts (魔法配置 1/2/3).
 
-The book is three chains, read from the bottom like a Witcher alchemy tree. A skill needs the one below it. Each chain has three skills and one last skill. **Only one last skill can be learned**, so a finished book is the other 9 skills plus one ending. That is exactly 10 points. The HUD keeps one button per school (the active) plus that one last skill.
+The book is six rows, read left to right. The next node is a stronger version of the same skill, not a different verb. Each skill costs 1 point. She can hold 10. There are 24 nodes, so a book is a choice.
 
-Old fire / lightning saves do not map. They are refunded once (points return, the old bar is cleared).
+Wind `w1`–`w4`, ice `i1`–`i4`, gravity `g1`–`g4`. A mix row starts only when both pure starts are already learned: `iw1` needs `i1` and `w1`, `ig1` needs `i1` and `g1`, `wg1` needs `w1` and `g1`. The next mix rank needs only the mix rank before it. It does not need the matching pure rank.
 
-Schools mix. Knowing a school is enough; the cast decides what the mix does:
+Two rank-4 skills lock each other when they share an element. `i4` and `g4` can both be learned. `i4` blocks `ig4` and `iw4`. `ig4` blocks `i4` and `g4`, and also `iw4` and `wg4`, but not `w4`. Lower ranks do not lock. The HUD shows one button per learned line and casts the highest rank. There is no second button for the last rank. Mana and cooldown stay the same along a line, so the higher rank is strictly better.
 
-| Cast | Alone | With the others |
+Old fire / lightning saves do not map. They are refunded once. An old wind / ice / gravity id maps onto the same rank (`wind_1` → `w1`). A save that already has a real weather book is not refunded.
+
+Mixes are learned skills. Knowing ice does not change a wind cast.
+
+| Line | What it does | Stronger rank |
 |---|---|---|
-| 風 Wind | Blows people aside. Not a hit, not a daze | + ice: they feel cold and take another way. + gravity, no ice: the blow lands, then they feel heavy and stay. Wind never freezes them |
-| 冰 Ice | They feel cold and stop pressing the door | + wind: cold, and they take another way. + gravity: cold and they cannot move |
-| 重力 Gravity | Heavy feet. They stop darting. Not a hit | + wind: a blow, then they stay. + ice: cold and they cannot move |
+| 風 `w` | Blows people aside. Not a hit, not a daze, never a freeze | Farther and harder. From `w2` she also walks a little lighter |
+| 冰 `i` | Cold only. They can still move | Colder and wider. `i1` stamina ×1.1. `i2` the smell bothers her less |
+| 重力 `g` | Heavy only. Not a freeze | Heavier. `g1` shoves move her less. `g2` a squatter's feet do not drag her |
+| 風+冰 `iw` | A blow that is also cold, so they take another way | Colder and stronger. No freeze |
+| 冰+重力 `ig` | Cold, and they cannot move | Longer hold |
+| 風+重力 `wg` | A blow, then they feel heavy and stay. They do not run off | Harder blow, heavier stop |
 
 ### 3.4 風 Wind · "Blow them aside 吹開"
 
-| Id | Kind | 粵 / EN | Needs | Effect 🎛️ |
-|---|---|---|---|---|
-| `wind_1` | Active | **微風** Breeze | — | Soft blow. People move aside. Mana 18 / 3.4 s |
-| `wind_2` | Passive | **順風** Tailwind | 微風 | She walks a little lighter (speed ×1.1) |
-| `wind_3` | Passive | **橫風** Crosswind | 順風 | The breeze is wider and people keep drifting |
-| `wind_4` | Last | **逆風** Headwind | 橫風, and no other last skill | A headwind down the aisle. Nobody wants to stand in the door. 10 s |
+Mana 18 / 3.4 s at every rank. 🎛️
+
+| Id | 粵 / EN | Needs | Effect 🎛️ |
+|---|---|---|---|
+| `w1` | **微風** Breeze | — | Soft blow |
+| `w2` | **順風** Tailwind | `w1` | Same blow, stronger. Speed ×1.1 |
+| `w3` | **勁風** Strong Wind | `w2` | Wider again |
+| `w4` | **狂風** Gale | `w3`, and no other last skill that uses wind | Strongest blow |
 
 ### 3.5 冰 Ice · "Feel the cold 覺得凍"
 
-| Id | Kind | 粵 / EN | Needs | Effect 🎛️ |
-|---|---|---|---|---|
-| `ice_1` | Passive | **涼氣** Cool Air | — | She does not get winded as fast (stamina ×1.1) |
-| `ice_2` | Passive | **冷空氣** Cold Air | 涼氣 | The smell bothers her less |
-| `ice_3` | Active | **轉彎** Turn Aside | 冷空氣 | People feel the cold. Mana 22 / 4.6 s. Mixes as in §3.3 |
-| `ice_4` | Last | **白茫茫** Whiteout | 轉彎, and no other last skill | The aisle goes white and cold. 10 s |
+Mana 18 / 3.8 s at every rank. Cold only. Not a hold. 🎛️
+
+| Id | 粵 / EN | Needs | Effect 🎛️ |
+|---|---|---|---|
+| `i1` | **涼氣** Cool Air | — | Cool. Stamina ×1.1 |
+| `i2` | **冷氣** Cold Air | `i1` | Colder. Smell bothers her less |
+| `i3` | **寒氣** Hard Cold | `i2` | Harder cold |
+| `i4` | **極凍** Bitter Cold | `i3`, and no other last skill that uses ice | Coldest. Still not a freeze |
 
 ### 3.6 重力 Gravity · "Feel the weight 覺得重"
 
-| Id | Kind | 粵 / EN | Needs | Effect 🎛️ |
-|---|---|---|---|---|
-| `grav_1` | Passive | **腳重** Heavy Feet | — | Shoves do not move her as much |
-| `grav_2` | Passive | **沉落** Sink | 腳重 | A squatter's sideways drag does not catch her. It does not make a planted squat easier to shove |
-| `grav_3` | Active | **撳住** Held Down | 沉落 | People feel heavy and stop darting. Mana 22 / 4.6 s. Mixes as in §3.3 |
-| `grav_4` | Last | **定住** Still | 撳住, and no other last skill | The aisle goes still. 10 s |
+Mana 18 / 3.8 s at every rank. Heavy only. Not a hold. 🎛️
 
-A planted squat is still the hardest body to move. Wind does not rewrite his spot. Freeze (ice + gravity) is what holds him. Bosses are worn down by standing in the weather; they are not thrown, dazed, or blinked through.
+| Id | 粵 / EN | Needs | Effect 🎛️ |
+|---|---|---|---|
+| `g1` | **腳重** Heavy Feet | — | Heavy feet. Shoves move her less |
+| `g2` | **身重** Heavy Body | `g1` | Heavier. A squatter's sideways drag does not catch her |
+| `g3` | **撳住** Held Down | `g2` | Heavier still |
+| `g4` | **壓實** Weighed Down | `g3`, and no other last skill that uses gravity | Heaviest. Still not a freeze |
+
+`iw` is mana 20 / 4.0 s: **涼風** Cool Breeze → **冷風** Cold Wind → **寒風** Hard Wind → **極寒風** Bitter Wind. `ig` is mana 22 / 4.6 s: **凍住** Cold Hold → **再凍住** Colder Hold → **凍到企定** Still Cold → **凍到郁唔到** Cannot Move. `wg` is mana 20 / 4.0 s: **重風** Heavy Wind → **壓風** Pressing Wind → **吹完停** Blow and Stop → **吹到企定** Blown Still.
+
+A planted squat is still the hardest body to move. Wind does not rewrite his spot. Only the ice+gravity line holds him. Bosses are worn down by standing in the weather; they are not thrown, dazed, or blinked through.
 
 ### 3.7 What to learn first · 點配
 
-Breeze is the only start that does something on the first point. Cool Air and Heavy Feet are felt, not cast. Turn Aside needs two ice skills under it. Held Down needs two gravity skills under it. The three ways only mix once those schools are both started.
+Each pure start is already a cast. A mix does nothing until that mix row is learned. `i4` and `g4` can sit in the same book. `ig4` cannot sit next to either of them.
 
 ---
 
@@ -132,28 +147,28 @@ Hero entries match `SkillTree.ts` / `bosses.ts`. Level = earliest that counter e
 
 | Passenger (intro) | 主角 Hero | 魔法師 Mage | 高科技人 Tech |
 |---|---|---|---|
-| 拉行李喼 Luggage (L6) | 跨行李 Hurdle (SPD 40) · 震地 Ground Pound (STR 50) | 微風 Breeze blows the case aside | 磁浮滑板鞋 Hover Skates · 震波拳套 Shock Gauntlets |
-| 踎低客 Squat (L8) | 飛身 Leap (SPD 50) | 行緊先吹。沉落 Sink keeps his feet off her. 冰+重力 freezes him | 彈簧鞋 Spring Boots · 液壓手套 名貴 |
-| 惡臭人 Stench (L9) | 忍臭 Hold Breath (STA 40) | 冷空氣 Cold Air. Cold pauses the smell | 防毒面罩 Gas Mask · 手提風扇 Turbo Fan · 薄荷香口膠 Mint Gum |
-| 一家大細 Family (L12) | 好脾氣 Unbothered (STA 60) · 飛身 Leap (kids) | 轉彎 Turn Aside. With gravity they cannot move | 卡通平板 Cartoon Tablet · 彈簧鞋 Spring Boots (kids) |
-| 百厭仔 Brat (L15) | 回魂 Second Wind (STA 50) | 撳住 Held Down stops the darting. With ice, they freeze | 誘餌無人機 Decoy Drone · 外骨骼 名貴 |
-| 情侶 Couple (L18) | 拆散情侶 Split (STR 40) · 穿插 Thread (SPD 60) | 微風 blows them off the door. With ice they take another way | 整蠱震震手套 Joy Buzzer Gloves |
-| 暴躁男 Angry (L21) | 頂硬上 Stand Firm (STR 60) | Cold stops the wind-up. With gravity, he cannot move | 外骨骼 Exo-Brace |
-| 大聲公 Loudmouth (L26) | 好脾氣 Unbothered (STA 60) | Cold: he stops shouting | 降噪耳機 Noise-Cancel Headphones · 薄荷香口膠 Mint Gum |
+| 拉行李喼 Luggage (L6) | 跨行李 Hurdle (SPD 40) · 震地 Ground Pound (STR 50) | 微風 Breeze blows the case aside. 狂風 Gale is the same blow, stronger | 磁浮滑板鞋 Hover Skates · 震波拳套 Shock Gauntlets |
+| 踎低客 Squat (L8) | 飛身 Leap (SPD 50) | 身重 keeps his feet off her. 凍住, once learned, holds him | 彈簧鞋 Spring Boots · 液壓手套 名貴 |
+| 惡臭人 Stench (L9) | 忍臭 Hold Breath (STA 40) | 冷氣 Cold Air. Cold pauses the smell | 防毒面罩 Gas Mask · 手提風扇 Turbo Fan · 薄荷香口膠 Mint Gum |
+| 一家大細 Family (L12) | 好脾氣 Unbothered (STA 60) · 飛身 Leap (kids) | 凍住 Cold Hold, once ice and gravity are both started | 卡通平板 Cartoon Tablet · 彈簧鞋 Spring Boots (kids) |
+| 百厭仔 Brat (L15) | 回魂 Second Wind (STA 50) | 撳住 Held Down. 凍住 if that mix is learned | 誘餌無人機 Decoy Drone · 外骨骼 名貴 |
+| 情侶 Couple (L18) | 拆散情侶 Split (STR 40) · 穿插 Thread (SPD 60) | 涼風 Cool Breeze sends them another way. Needs both starts | 整蠱震震手套 Joy Buzzer Gloves |
+| 暴躁男 Angry (L21) | 頂硬上 Stand Firm (STR 60) | 極凍 Bitter Cold. 凍住 only if that mix was learned instead | 外骨骼 Exo-Brace |
+| 大聲公 Loudmouth (L26) | 好脾氣 Unbothered (STA 60) | Cold. 極凍 is the same cold, stronger | 降噪耳機 Noise-Cancel Headphones · 薄荷香口膠 Mint Gum |
 
 ### 4.2 Bosses · 大佬 (L20–L90, all at L100)
 
 | Lv | Boss | 主角 Hero | 魔法師 Mage (✦ weak-point spell) | 高科技人 Tech (✦ weak-point item) |
 |---|---|---|---|---|
 | 20 | 行李箱大王 Suitcase King | 跨行李 · 震地 | ✦ 微風 Breeze | ✦ 震波拳套 · 磁浮滑板鞋 名貴 (boss case) |
-| 30 | 臭狐王 Stink Fox King | 忍臭 | ✦ 冷空氣 Cold Air | ✦ 防毒面罩 名貴 · 手提風扇 |
-| 40 | 踎低王 Squat King | 飛身 · 蓄力一推 | ✦ 沉落 · 定住 Sink · Still | ✦ 彈簧鞋 · 液壓手套 名貴 |
-| 50 | 大家長 The Patriarch | 好脾氣 · 飛身 | ✦ 轉彎 Turn Aside | ✦ 卡通平板 · 彈簧鞋 |
+| 30 | 臭狐王 Stink Fox King | 忍臭 | ✦ 冷氣 Cold Air | ✦ 防毒面罩 名貴 · 手提風扇 |
+| 40 | 踎低王 Squat King | 飛身 · 蓄力一推 | ✦ 凍住 Cold Hold | ✦ 彈簧鞋 · 液壓手套 名貴 |
+| 50 | 大家長 The Patriarch | 好脾氣 · 飛身 | ✦ 凍住 Cold Hold | ✦ 卡通平板 · 彈簧鞋 |
 | 60 | 衰仔王 Brat King | 回魂 | ✦ 撳住 Held Down | ✦ 誘餌無人機 · 外骨骼 名貴 |
-| 70 | 黏身情侶王 Clingy Couple Royals | 穿插 · 拆散情侶 | ✦ 逆風 Headwind | ✦ 整蠱震震手套 |
-| 80 | 嬲嬲豬王 Grumpy Hog King | 頂硬上 | ✦ 白茫茫 Whiteout | ✦ 外骨骼 |
-| 90 | 大聲公王 Loudmouth King | 好脾氣 | ✦ 白茫茫 Whiteout | ✦ 降噪耳機 · 薄荷香口膠 |
-| 100 | All eight · 八王齊聚 | Pick 1 branch + ult + extras | All three schools, one last skill | Pack a 16-cell grid (body rule: 1 shoes / gloves / head / core) |
+| 70 | 黏身情侶王 Clingy Couple Royals | 穿插 · 拆散情侶 | ✦ 涼風 Cool Breeze | ✦ 整蠱震震手套 |
+| 80 | 嬲嬲豬王 Grumpy Hog King | 頂硬上 | ✦ 極凍 Bitter Cold | ✦ 外骨骼 |
+| 90 | 大聲公王 Loudmouth King | 好脾氣 | ✦ 極凍 Bitter Cold | ✦ 降噪耳機 · 薄荷香口膠 |
+| 100 | All eight · 八王齊聚 | Pick 1 branch + ult + extras | A few lines, not every last rank | Pack a 16-cell grid (body rule: 1 shoes / gloves / head / core) |
 
 **Timing parity:** Hero and Mage counters need 40+ pts in a branch (≈ L41+). Tech counter items go on sale at the passenger's intro level, but the **平 tier is weak (≈ 40 % of the Hero node's effect) and the early grid is tiny (2×2)**. 中價 unlocks at L40 and 名貴 at L60, and each takes more space. Early-band win rates must stay inside the ±10 pp parity band (§1, §5.4.5).
 
@@ -392,7 +407,7 @@ General rules: icon-first, EN + 粵 (zh-HK default, colloquial). Every string go
 | Character | Bottom-nav label | Screen |
 |---|---|---|
 | Hero | 🌟 技能 Skills | Existing constellation (`constellationSkills.ts`) |
-| Mage | 📖 魔法 Spells | Her own book, not the hero constellation. Three columns: wind, ice, gravity. The start sits at the bottom; the last skill sits at the top. A skill needs the one below it. Only one last skill can be learned. Tap a ready node to spend 1 point. The HUD shows the actives she knows (微風 / 轉彎 / 撳住) plus that one last skill. |
+| Mage | 📖 魔法 Spells | Her own book, not the hero constellation. Six rows, left to right: wind, ice, gravity, then the three mixes. The node on the right is the stronger version. A mix needs both starts. More than one last skill is allowed unless they share an element. Tap a ready node to spend 1 point. The HUD shows one button per learned line and casts the highest rank. |
 | Tech | 🛒 裝備 Gear | **Workshop 工作室**: tabs **裝備 Equip (backpack grid + tray, §5.4.6) / 商店 Shop / 套裝 Sets 1-2-3**; coin balance + 「4/6 格」 top-right; each item card shows icon, 平/中價/名貴 pills with footprints, effect, counters chip, price, 買/升級/賣. Expand stops after 2×3 |
 
 The hero constellation is unchanged. 凱婷 does not share those node positions or the fire / lightning schools.
@@ -415,13 +430,13 @@ Tech:  [stamina bar]   💰 run preview +36    [act1][act2][act3] [CORE] [SHOVE]
 
 | Character | First open | First run |
 |---|---|---|
-| Mage | The book shows three starts: wind, ice, gravity. Wind blows people aside. Cold and weight make them leave the door. | Title-screen hint is 吹開, not a strike. She does not daze, explode, or blink. |
+| Mage | The book shows wind, ice, and gravity, then the mixes. Wind blows people aside. A mix happens only after that mix is learned. | Title-screen hint is 吹開, not a strike. She does not daze, explode, or blink. |
 | Tech | Retro coin grant toast (「補發 1,234 金幣！」) → guided first purchase (「推介套裝」) → **drag it into the 2×2 grid** (ghost hand shows drag + ⟳ rotate) → explain 平/中價/名貴 sizes and 🔒 expansion cells | Ghost hand on the first gadget button and the first consumable. Result screen explains ⚡ fast-exit and replay caps once |
 | Both | Trial (試玩) runs show a persistent 「試玩中 · 不計獎勵」 banner | — |
 
 ### 6.5 Try before buy · 試玩
 
-- **試玩車廂 Trial Car:** each paid character can play **L6 (luggage intro)** and **L20 (Suitcase King)** with a **preset build** (Mage: 微風, 順風, the ice chain through 轉彎, and the gravity chain through 撳住 — no last skill, so wind, cold, and weight can mix; Tech: the same 2×3 bag, all 平 — Hover Skates, Shock Gauntlets, Gas Mask, Drone, Tablet, 1 Energy Drink), unlimited times, offline. Preset because a fresh 0-point Mage has no skills and would demo badly. The trial kit is not written into the save. The trial level list is unchanged. 🎛️
+- **試玩車廂 Trial Car:** each paid character can play **L6 (luggage intro)** and **L20 (Suitcase King)** with a **preset build** (Mage: 微風 and 順風, 涼氣 and 冷氣, 腳重 and 身重, plus the first mix of each pair — 涼風, 凍住, 重風 — and no last rank; Tech: the same 2×3 bag, all 平 — Hover Skates, Shock Gauntlets, Gas Mask, Drone, Tablet, 1 Energy Drink), unlimited times, offline. Preset because a fresh 0-point Mage has no skills and would demo badly. The trial kit is not written into the save. The trial level list is unchanged. 🎛️
 - Trial runs give **no SP, coins, clears or badges**, and don't touch the save beyond a `trialsPlayed` counter. The end card shows **Buy / Back**, no nag loop (at most 1 auto-shown offer per session). L20 needs to be unlocked first; otherwise only L6 is offered.
 - Trial exists in the **iOS build only**. On the web demo everything is already unlocked.
 - This is an in-game trial, not Apple's tier-0 "XX-day Trial" IAP (see §8.3). No time limit, so there's nothing to disclose about expiry.

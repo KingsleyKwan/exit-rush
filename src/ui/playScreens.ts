@@ -13,29 +13,13 @@ import { charPortraitUrl } from '../game/charPortraits';
 
 
 function mageActions(game: Game, _dict: ReturnType<typeof t>): string {
-  const known = new Set(game.runSkills.known ?? []);
-  const schools = [
-    { school: 'wind', id: 'wind_1', ico: 'wind' },
-    { school: 'ice', id: 'ice_3', ico: 'ice' },
-    { school: 'grav', id: 'grav_3', ico: 'grav' },
-  ] as const;
-  const buttons = schools.filter((s) => known.has(s.id)).map((s) => {
-    const n = spellById(s.id);
-    const title = n ? `${n.nameZh} / ${n.nameEn}` : s.school;
-    return `<button type="button" class="skill-use act-spell el-${s.school}" data-spell="${s.id}" data-branch="${s.school}" title="${title}" aria-label="${title}">${icon(s.ico)}</button>`;
-  });
-  const ults: Array<{ id: string; kind: 'str' | 'spd' | 'sta'; ico: string; cls: string }> = [
-    { id: 'wind_4', kind: 'str', ico: 'wind', cls: 'ult-str' },
-    { id: 'ice_4', kind: 'sta', ico: 'ice', cls: 'ult-sta' },
-    { id: 'grav_4', kind: 'spd', ico: 'grav', cls: 'ult-spd' },
-  ];
-  const ult = ults.find((u) => known.has(u.id));
-  if (ult) {
-    const n = spellById(ult.id);
-    const title = n ? `${n.nameZh} / ${n.nameEn}` : ult.id;
-    buttons.push(`<button type="button" class="skill-use ${ult.cls} ult-mage" data-ult="${ult.kind}" title="${title}" aria-label="${title}">${icon(ult.ico)}</button>`);
-  }
-  return buttons.join('');
+  return (game.runMods.spellBar ?? []).map((id) => {
+    const n = spellById(id);
+    const title = n ? `${n.nameZh} / ${n.nameEn}` : id;
+    const el = !n || n.line === 'w' || n.line === 'iw' || n.line === 'wg' ? 'wind' : n.line === 'g' ? 'grav' : 'ice';
+    const ico = el === 'wind' ? 'wind' : el === 'grav' ? 'grav' : 'ice';
+    return `<button type="button" class="skill-use act-spell el-${el}" data-spell="${id}" title="${title}" aria-label="${title}">${icon(ico)}</button>`;
+  }).join('');
 }
 
 function techActions(game: Game, dict: ReturnType<typeof t>): string {
@@ -149,7 +133,7 @@ export function renderPlayHud(game: Game): HTMLElement {
         ${game.showFtueGhost ? `<span class="ghost-hand"></span><span class="ghost-label">${dict.hintDrag}</span>` : icon('drag')}
       </div>
       <div class="hud-actions">
-        <div class="ult-col">
+        <div class="ult-col ${who === 'mage' ? 'mage-cast' : ''}">
           ${who === 'mage' ? mageActions(game, dict) : who === 'tech' ? techActions(game, dict) : `
           ${ult('str', dict.ultStr, s.ultStr)}
           ${ult('spd', dict.ultSpd, s.ultSpd)}

@@ -31,7 +31,7 @@ import {
   type Tier,
 } from './techKit';
 import { IS_STORE_BUILD } from './platform';
-import { defaultSpellBar, trialSpellState } from './SpellTree';
+import { resolveSpellBar, trialSpellState } from './SpellTree';
 import { initEntitlements, entitlements } from './entitlements';
 import { warmCharPortraits } from './charPortraits';
 import { earnedFrom, progressOf, recordClear, spentOf, syncTopLevelProgress } from './storage';
@@ -223,9 +223,7 @@ export class Game {
     }
     const savedBar = this.save.mage.spellBars[this.save.mage.active];
     const bar = id === 'mage'
-      ? (this.trial?.character === 'mage'
-          ? defaultSpellBar(skills)
-          : (savedBar?.length ? savedBar : defaultSpellBar(skills)))
+      ? resolveSpellBar(skills, this.trial?.character === 'mage' ? undefined : savedBar)
       : [];
     return modsFor(char, skills, bar);
   }
@@ -1154,22 +1152,21 @@ export class Game {
         const len = Math.hypot(e.dx, e.dz) || 1;
         const dx = e.dx / len;
         const dz = e.dz / len;
-        if (e.el === 'wind' || e.ability === 'wind_1' || e.ability === 'wind_4') {
-          fx.spray(e.x, e.z, dx, dz, e.ability === 'wind_4' ? 18 : 12, 0xe1f5fe, 2.1);
-          fx.puff(e.x, 0.8, e.z, 8, 0xb3e5fc, 1.2, 0.7, 0.3);
+        const big = /4$/.test(e.ability);
+        if (e.el === 'wind') {
+          fx.spray(e.x, e.z, dx, dz, big ? 18 : 12, 0xe1f5fe, big ? 2.6 : 2.1);
+          fx.puff(e.x, 0.8, e.z, big ? 12 : 8, 0xb3e5fc, 1.2, 0.7, 0.3);
           cam.addTrauma(0.04);
           this.audio.dash();
-        } else if (e.el === 'ice' || e.ability === 'ice_3' || e.ability === 'ice_4') {
-          const rad = e.ability === 'ice_4' ? TUNING.weather.whiteout.radius : TUNING.weather.turn.radius;
-          fx.puff(e.x, 0.7, e.z, 12, 0xbbdefb, 1.1, 0.7, 0.4);
-          fx.spray(e.x, e.z, dx, dz, 8, 0xe3f2fd, 1.3);
+        } else if (e.el === 'ice') {
+          const rad = big ? 3.15 : 2.35;
+          fx.puff(e.x, 0.7, e.z, big ? 16 : 12, 0xbbdefb, 1.1, 0.7, 0.4);
+          fx.spray(e.x, e.z, dx, dz, big ? 12 : 8, 0xe3f2fd, 1.3);
           if (e.hold) this.paintFreezeShells(e.x, e.z, rad);
           cam.addTrauma(0.04);
           this.audio.sense();
-        } else if (e.el === 'grav' || e.ability === 'grav_3' || e.ability === 'grav_4') {
-          const rad = e.ability === 'grav_4' ? TUNING.weather.still.radius : TUNING.weather.hold.radius;
-          fx.puff(e.x, 0.35, e.z, 12, 0x7e57c2, 0.9, 0.55, 0.4);
-          if (e.hold) this.paintFreezeShells(e.x, e.z, rad);
+        } else if (e.el === 'grav') {
+          fx.puff(e.x, 0.35, e.z, big ? 16 : 12, 0x7e57c2, 0.9, 0.55, 0.4);
           cam.addTrauma(0.04);
           this.audio.sense();
         } else {

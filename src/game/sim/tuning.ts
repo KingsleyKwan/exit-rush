@@ -399,25 +399,62 @@ export const TUNING = {
 
   /**
    * 凱婷's weather. A blow, not a hit.
-   * Wind moves people aside. Wind + ice sends them another way.
-   * Ice + gravity holds them still. Wind never freezes, even if she knows both.
+   * Each line is the same effect, stronger at the next rank. Mana and cooldown stay put,
+   * so the higher rank is always the better cast. Mixes are their own lines.
+   * Wind never freezes. Ice never freezes. Only the ice+gravity line holds people still.
    */
   weather: {
-    blow: { range: 2.4, width: 0.95, impulse: 1.7, mana: 18, cd: 3.4, flee: 2.6, cold: 2.6, heavy: 2.2 },
-    cross: { range: 3.1, width: 1.3, impulse: 2.05, flee: 3.4 },
-    turn: { radius: 2.35, mana: 22, cd: 4.6, cold: 2.8, freeze: 2.2 },
-    hold: { radius: 2.35, mana: 22, cd: 4.6, heavy: 2.8, freeze: 2.2 },
-    headwind: { radius: 3.3, impulse: 1.85, flee: 3.6 },
-    whiteout: { radius: 3.4, cold: 3.4, freeze: 2.4 },
-    still: { radius: 3.2, heavy: 3.5, freeze: 2.4 },
-    /** Extra stubbornness a boss loses just for standing in the weather. */
+    /** Same cost for every rank of a line. */
+    mana: { w: 18, i: 18, g: 18, iw: 20, ig: 22, wg: 20 },
+    cd: { w: 3.4, i: 3.8, g: 3.8, iw: 4.0, ig: 4.6, wg: 4.0 },
+    /** Cone blow. Ranks 1–4. */
+    w: [
+      { range: 2.4, width: 0.95, impulse: 1.7 },
+      { range: 2.75, width: 1.08, impulse: 1.95 },
+      { range: 3.15, width: 1.22, impulse: 2.25 },
+      { range: 3.6, width: 1.4, impulse: 2.6 },
+    ],
+    /** Cold only. Not a hold. */
+    i: [
+      { radius: 2.05, cold: 2.2 },
+      { radius: 2.35, cold: 2.7 },
+      { radius: 2.7, cold: 3.2 },
+      { radius: 3.15, cold: 3.8 },
+    ],
+    /** Heavy only. Not a hold. */
+    g: [
+      { radius: 2.05, heavy: 2.2 },
+      { radius: 2.35, heavy: 2.7 },
+      { radius: 2.7, heavy: 3.2 },
+      { radius: 3.15, heavy: 3.8 },
+    ],
+    /** Blow, plus cold, plus they take another way. */
+    iw: [
+      { range: 2.35, width: 0.95, impulse: 1.45, cold: 2.2, flee: 2.4 },
+      { range: 2.7, width: 1.08, impulse: 1.65, cold: 2.7, flee: 2.9 },
+      { range: 3.05, width: 1.22, impulse: 1.9, cold: 3.2, flee: 3.4 },
+      { range: 3.5, width: 1.4, impulse: 2.2, cold: 3.8, flee: 4.0 },
+    ],
+    /** Cold, and they cannot move. */
+    ig: [
+      { radius: 2.1, cold: 2.2, freeze: 1.5 },
+      { radius: 2.4, cold: 2.6, freeze: 1.9 },
+      { radius: 2.75, cold: 3.1, freeze: 2.3 },
+      { radius: 3.3, cold: 3.6, freeze: 2.8 },
+    ],
+    /** A blow, then they feel heavy and stay. No flee. */
+    wg: [
+      { range: 2.3, width: 0.95, impulse: 1.35, heavy: 2.2 },
+      { range: 2.65, width: 1.08, impulse: 1.55, heavy: 2.7 },
+      { range: 3.0, width: 1.22, impulse: 1.8, heavy: 3.2 },
+      { range: 3.45, width: 1.4, impulse: 2.1, heavy: 3.8 },
+    ],
+    /** Extra stubbornness a boss loses just for standing in the weather. Once per cast. */
     wear: 0.08,
     /** Heavy Feet resist. Not the hero's full strength. */
     resist: 0.22,
     /** Cold Air: stench bothers her less. */
     aura: 0.45,
-    /** Crosswind: the breeze pushes a little harder. */
-    crossPower: 1.12,
     /** Suitcase catches the breeze a bit more than the person holding it. */
     caseMul: 1.45,
     /** Bosses are worn down, not thrown. */

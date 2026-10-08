@@ -53,10 +53,16 @@ export interface Dict {
   levelsTeaser: string;
   /** How skill points are earned and spent. No placeholders. */
   skillHowto: string;
-  /** Mage book only. Three chains, one last skill. */
+  /** Mage book only. Lines get stronger. Mixes need both starts. */
   spellHowto: string;
   /** {name} = the skill that has to come first. */
   spellNeed: string;
+  /** {a} and {b} = the two starts a mix needs. */
+  spellNeedTwo: string;
+  /** Shown above the mix rows. */
+  spellMixNeed: string;
+  /** Rank 4 of a line. Not a separate ultimate button. */
+  spellLast: string;
   spellOneEnd: string;
   ultShort: string;
   skillsApplyNext: string;
@@ -281,7 +287,7 @@ export const en: Dict = {
   level: 'Level',
   density: 'Crowd',
   howTo: 'Drag anywhere to steer · hold ✊ to shove · get out before the doors close.',
-  howToMage: 'Drag anywhere to steer. Wind blows people aside. Cold and weight make them leave the door.',
+  howToMage: 'Drag anywhere to steer. Wind blows people aside. Cold and weight mix only after that mix is learned.',
   howToTech: 'Drag anywhere to steer · use your gear to clear the way · get out before the doors close.',
   language: 'Language',
   clearBonus: '+1 skill point',
@@ -291,9 +297,12 @@ export const en: Dict = {
   back: 'Back',
   levelsTeaser: 'All 100 levels · clear 99 to unlock the Lv100 finale',
   skillHowto: 'Every 10 levels earns 1 point. Each skill costs 1.',
-  spellHowto: 'Three starts: wind, ice, gravity. Some skills need the one below. Only one last skill.',
+  spellHowto: 'Wind, ice, and gravity each get stronger. A mix needs both starts. You can learn more than one last skill, unless they share an element.',
   spellNeed: 'Learn {name} first.',
-  spellOneEnd: 'Only one last skill.',
+  spellNeedTwo: 'Learn {a} and {b} first.',
+  spellMixNeed: 'A mix needs both starts.',
+  spellLast: 'Strongest of this line.',
+  spellOneEnd: 'A last skill that shares an element is already learned.',
   ultShort: 'Ult',
   skillsApplyNext: 'Changes apply from your next run.',
   examTag: 'Exam',

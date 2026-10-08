@@ -131,21 +131,91 @@ function heroSpent(s: SkillState): number {
     + (s.ultStr ? 1 : 0) + (s.ultSpd ? 1 : 0) + (s.ultSta ? 1 : 0);
 }
 
-const WEATHER_ID = /^(wind|ice|grav)_[1-4]$/;
-const WEATHER_CAPS = ['wind_4', 'ice_4', 'grav_4'];
+/** New ids, plus the old column ids mapped onto the same rank. iw before i and w. */
+const WEATHER_ID = /^(iw|ig|wg|w|i|g)[1-4]$/;
+const OLD_WEATHER: Record<string, string> = {
+  wind_1: 'w1', wind_2: 'w2', wind_3: 'w3', wind_4: 'w4',
+  ice_1: 'i1', ice_2: 'i2', ice_3: 'i3', ice_4: 'i4',
+  grav_1: 'g1', grav_2: 'g2', grav_3: 'g3', grav_4: 'g4',
+};
+/**
+ * Same graph as SpellTree.ts. This file must not import it.
+ * A mix rank 1 needs both pure starts. A later rank needs only the one before it.
+ */
+const WEATHER_NEED: Record<string, readonly string[]> = {
+  w1: [], w2: ['w1'], w3: ['w2'], w4: ['w3'],
+  i1: [], i2: ['i1'], i3: ['i2'], i4: ['i3'],
+  g1: [], g2: ['g1'], g3: ['g2'], g4: ['g3'],
+  iw1: ['i1', 'w1'], iw2: ['iw1'], iw3: ['iw2'], iw4: ['iw3'],
+  ig1: ['i1', 'g1'], ig2: ['ig1'], ig3: ['ig2'], ig4: ['ig3'],
+  wg1: ['w1', 'g1'], wg2: ['wg1'], wg3: ['wg2'], wg4: ['wg3'],
+};
 
-/** Drop ids that are not in the weather book. Keep the first last-skill only. */
+function mapWeatherId(id: string): string | null {
+  const next = OLD_WEATHER[id] ?? id;
+  return WEATHER_ID.test(next) && WEATHER_NEED[next] ? next : null;
+}
+
+function weatherLine(id: string): string {
+  if (id.startsWith('iw') || id.startsWith('ig') || id.startsWith('wg')) return id.slice(0, 2);
+  return id.slice(0, 1);
+}
+
+/** Rank-4 ids share an element when one letter sits in both line names. */
+function rank4Shares(a: string, b: string): boolean {
+  if (!a.endsWith('4') || !b.endsWith('4')) return false;
+  const ea = weatherLine(a);
+  const eb = weatherLine(b);
+  const parts = (s: string) => (s.length === 2 ? [s[0], s[1]] : [s]);
+  return parts(ea).some((e) => parts(eb).includes(e));
+}
+
+/**
+ * Keep ids that are in the book, whose needs are already kept, and that do not
+ * clash with a kept last rank. Dropped ids give the point back through spentOf.
+ */
 function cleanKnown(ids: readonly string[]): string[] {
+  const pool: string[] = [];
+  for (const raw of ids) {
+    const id = mapWeatherId(raw);
+    if (!id || pool.includes(id)) continue;
+    pool.push(id);
+  }
   const out: string[] = [];
-  let cap = false;
-  for (const id of ids) {
-    if (!WEATHER_ID.test(id) || out.includes(id)) continue;
-    if (WEATHER_CAPS.includes(id)) {
-      if (cap) continue;
-      cap = true;
+  let progressed = true;
+  while (progressed && out.length < 10) {
+    progressed = false;
+    for (const id of pool) {
+      if (out.length >= 10 || out.includes(id)) continue;
+      if (!WEATHER_NEED[id].every((req) => out.includes(req))) continue;
+      if (id.endsWith('4') && out.some((k) => rank4Shares(id, k))) continue;
+      out.push(id);
+      progressed = true;
     }
-    out.push(id);
-    if (out.length >= 10) break;
+  }
+  return out;
+}
+
+/** One id per line, upgraded to the best rank she still knows. */
+function upgradeBar(ids: readonly string[], known: readonly string[]): string[] {
+  const out: string[] = [];
+  const seen = new Set<string>();
+  for (const raw of ids) {
+    const id = mapWeatherId(raw);
+    if (!id) continue;
+    const line = weatherLine(id);
+    if (seen.has(line)) continue;
+    let best = '';
+    let rank = 0;
+    for (const k of known) {
+      if (weatherLine(k) !== line) continue;
+      const n = Number(k.slice(line.length));
+      if (n > rank) { rank = n; best = k; }
+    }
+    if (!best) continue;
+    seen.add(line);
+    out.push(best);
+    if (out.length >= 6) break;
   }
   return out;
 }
@@ -382,9 +452,9 @@ export function normalizeSave(parsed: Partial<SaveData> | null | undefined): Sav
       spd: 0,
       sta: 0,
       known,
-      ultStr: known.includes('wind_4'),
-      ultSta: known.includes('ice_4'),
-      ultSpd: known.includes('grav_4'),
+      ultStr: false,
+      ultSta: false,
+      ultSpd: false,
     };
   };
   // v0.8.1: build per-character progress BEFORE reconciling SP.
@@ -478,7 +548,11 @@ export function normalizeSave(parsed: Partial<SaveData> | null | undefined): Sav
   const rawBars = Array.isArray(rawMage.spellBars) ? rawMage.spellBars : [];
   const spellBars: string[][] = [];
   for (let i = 0; i < LOADOUT_SLOTS; i++) {
-    let bar = Array.isArray(rawBars[i]) ? rawBars[i].filter((s): s is string => typeof s === 'string' && WEATHER_ID.test(s)).slice(0, 3) : [];
+    const known = mageLoadouts[i].known ?? [];
+    const mapped = Array.isArray(rawBars[i])
+      ? rawBars[i].filter((s): s is string => typeof s === 'string')
+      : [];
+    let bar = upgradeBar(mapped, known);
     // Fresh mage after refund: clear bars so defaults re-apply on next open.
     if (slotRefunds[i] || (mageRefunded && mageEarned === 0)) bar = [];
     spellBars.push(bar);

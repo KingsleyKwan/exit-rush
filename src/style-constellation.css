@@ -409,72 +409,89 @@
 .skills-panel .cst-detail-zh { color: #8a5a00; }
 .skills-panel .cst-detail-tip { color: #4a5568; }
 
-/* Mage book: three columns, start at the bottom, last skill at the top. */
+/* Mage book: six rows. Left is the start. Right is the stronger version of the same skill. */
 .spellbook {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 8px;
-  align-items: stretch;
-}
-.spell-col {
   display: flex;
   flex-direction: column;
   gap: 6px;
-  border-radius: 14px;
-  padding: 8px 4px 10px;
+  min-width: 0;
+}
+.spell-mix-cap {
+  margin: 2px 0 0;
+  font-size: 11px;
+  font-weight: 800;
+  opacity: 0.8;
+}
+.spell-row {
+  display: grid;
+  grid-template-columns: 68px minmax(0, 1fr);
+  gap: 6px;
+  align-items: center;
+  border-radius: 12px;
+  padding: 5px 6px;
   border: 1px solid transparent;
   min-width: 0;
 }
 .school-wind { border-color: rgba(79, 195, 247, 0.6); background: rgba(179, 229, 252, 0.14); }
 .school-ice { border-color: rgba(30, 136, 229, 0.6); background: rgba(30, 136, 229, 0.12); }
 .school-grav { border-color: rgba(126, 87, 194, 0.65); background: rgba(126, 87, 194, 0.14); }
-.spell-col-head {
+.spell-row-head {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 2px;
+  gap: 1px;
   text-align: center;
+  min-width: 0;
 }
-.spell-col-head .skill-ico { width: 28px; height: 28px; }
-.spell-col-head strong { font-size: 13px; font-weight: 900; }
-.spell-col-head em { font-style: normal; font-size: 10px; font-weight: 700; opacity: 0.75; }
-.spell-chain { display: flex; flex-direction: column; align-items: center; width: 100%; }
-.spell-link { width: 2px; height: 8px; background: currentColor; opacity: 0.35; }
+.spell-row-head .skill-ico { width: 22px; height: 22px; }
+.spell-row-head strong { font-size: 11px; font-weight: 900; line-height: 1.15; }
+.spell-row-head em { font-style: normal; font-size: 10px; font-weight: 700; opacity: 0.75; }
+.spell-ranks { display: flex; align-items: stretch; min-width: 0; }
+.spell-link { width: 8px; height: 2px; align-self: center; flex: none; background: currentColor; opacity: 0.35; }
 .spell-node {
-  width: 100%;
+  flex: 1;
+  min-width: 0;
+  min-height: 48px;
   border: 1px solid rgba(255, 255, 255, 0.18);
   background: rgba(0, 0, 0, 0.22);
   color: inherit;
-  border-radius: 12px;
-  padding: 6px 3px;
+  border-radius: 10px;
+  padding: 3px 2px;
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 2px;
+  justify-content: center;
+  gap: 1px;
 }
 .spell-node.ready { border-color: #fff; box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.4); }
 .spell-node.locked { opacity: 0.5; }
 .spell-node.selected { outline: 2px solid rgba(255, 255, 255, 0.7); }
-.spell-name { text-align: center; line-height: 1.15; }
-.spell-name b { display: block; font-size: 12px; }
-.spell-name small { display: block; font-size: 9px; opacity: 0.8; }
+.spell-name { text-align: center; line-height: 1.1; min-width: 0; }
+.spell-name b {
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  font-size: 11px;
+}
 .spell-dot { position: relative; display: inline-flex; }
+.spell-dot .ico { width: 16px; height: 16px; }
 .spell-star {
   position: absolute;
-  top: -7px;
-  right: -9px;
+  top: -6px;
+  right: -8px;
   font-style: normal;
-  font-size: 11px;
+  font-size: 10px;
   color: #ffe082;
 }
 .school-wind .spell-node.on { background: linear-gradient(180deg, #e1f5fe, #4fc3f7); color: #083040; }
 .school-ice .spell-node.on { background: linear-gradient(180deg, #42a5f5, #1565c0); color: #fff; }
 .school-grav .spell-node.on { background: linear-gradient(180deg, #9575cd, #4527a0); color: #fff; }
-.school-wind .spell-col-head .skill-ico { background: linear-gradient(180deg, #e1f5fe, #4fc3f7); color: #083040; --ico-ink: #0277bd; }
-.school-ice .spell-col-head .skill-ico { background: linear-gradient(180deg, #42a5f5, #1565c0); color: #fff; --ico-ink: #0d47a1; }
-.school-grav .spell-col-head .skill-ico { background: linear-gradient(180deg, #9575cd, #4527a0); color: #fff; --ico-ink: #311b92; }
+.school-wind .spell-row-head .skill-ico { background: linear-gradient(180deg, #e1f5fe, #4fc3f7); color: #083040; --ico-ink: #0277bd; }
+.school-ice .spell-row-head .skill-ico { background: linear-gradient(180deg, #42a5f5, #1565c0); color: #fff; --ico-ink: #0d47a1; }
+.school-grav .spell-row-head .skill-ico { background: linear-gradient(180deg, #9575cd, #4527a0); color: #fff; --ico-ink: #311b92; }
 .cst-detail-why { font-size: 12px; font-weight: 800; color: #ffe082; }
-.skills-panel .spell-col { background: rgba(255, 255, 255, 0.92); color: #18202e; }
+.skills-panel .spell-row { color: #18202e; }
 .skills-panel .spell-node:not(.on) { background: #f3f5f8; color: #18202e; border-color: #d5dae0; }
 .skills-panel .cst-detail-why { color: #8a5a00; }
 

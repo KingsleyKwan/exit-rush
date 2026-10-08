@@ -3,6 +3,7 @@ import type { Game } from '../game/Game';
 import { playableLevels, type LevelDef } from '../game/levels';
 import type { QualitySetting } from '../game/storage';
 import type { PassengerKind } from '../game/PassengerTypes';
+import { bookMarks } from '../game/SpellTree';
 import { icon, langIcon } from './icons';
 
 export function el(html: string): HTMLElement {
@@ -93,19 +94,15 @@ export function loadoutStrip(game: Game, opts: { edit?: boolean; reset?: boolean
       const sk = on ? (live ?? s) : s;
       const name = dict.loadoutN.replace('{n}', String(i + 1));
       const u = (sk.ultStr ? 1 : 0) + (sk.ultSpd ? 1 : 0) + (sk.ultSta ? 1 : 0);
-      const known = sk.known ?? [];
-      const counts = isMage
-        ? [
-            known.filter((id) => id.startsWith('wind_')).length,
-            known.filter((id) => id.startsWith('ice_')).length,
-            known.filter((id) => id.startsWith('grav_')).length,
-          ]
-        : [sk.str, sk.spd, sk.sta];
+      const marks = isMage ? bookMarks(sk.known) : null;
+      const counts = marks ? [marks.w, marks.i, marks.g] : [sk.str, sk.spd, sk.sta];
+      const stars = marks ? marks.caps : u;
+      const mix = marks && marks.mixes ? `+${marks.mixes}` : '';
       const l1 = isMage ? dict.wind : dict.strength;
       const l2 = isMage ? dict.ice : dict.speed;
       const l3 = isMage ? dict.grav : dict.staminaBranch;
-      return `<button type="button" class="lo-slot ${on ? 'on' : ''}" data-slot="${i}" aria-pressed="${on}" aria-label="${name}: ${l1} ${counts[0]}, ${l2} ${counts[1]}, ${l3} ${counts[2]}">
-        <b>${name}</b><small>${counts[0]}·${counts[1]}·${counts[2]}${u ? `<i class="lo-ult">${'★'.repeat(u)}</i>` : ''}</small>
+      return `<button type="button" class="lo-slot ${on ? 'on' : ''}" data-slot="${i}" aria-pressed="${on}" aria-label="${name}: ${l1} ${counts[0]}, ${l2} ${counts[1]}, ${l3} ${counts[2]}${mix}">
+        <b>${name}</b><small>${counts[0]}·${counts[1]}·${counts[2]}${mix}${stars ? `<i class="lo-ult">${'★'.repeat(stars)}</i>` : ''}</small>
       </button>`;
     })
     .join('');
