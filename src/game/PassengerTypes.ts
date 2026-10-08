@@ -38,8 +38,6 @@ export interface PassengerDef {
   linkPair?: boolean;
   /** Visual scale of the whole figure. */
   scale?: number;
-  /** Receives reduced shove impulse (squatting / rooted). */
-  hardToShove?: boolean;
   /** 大聲公: loud phone call — stamina-draining noise zone (TUNING.types.loud). */
   noise?: boolean;
 }
@@ -134,16 +132,17 @@ export const PASSENGER_DEFS: Record<PassengerKind, PassengerDef> = {
   squat: {
     kind: 'squat',
     color: 0x5c6bc0,
+    // Boss inputs. A walking squatter overwrites mass, damping, and scale each
+    // step from TUNING.types.squat. The king does not.
     mass: 1.7,
     radius: 0.28,
     damping: 7.5,
     restitution: 0.02,
     anchorMul: 2.0,
-    driveMul: 0.7,
-    speedMul: 0.55,
+    driveMul: 1,
+    speedMul: 0.95,
     widthMul: 1.15,
     scale: 0.82,
-    hardToShove: true,
   },
   loud: {
     kind: 'loud',

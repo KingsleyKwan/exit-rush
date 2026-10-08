@@ -74,6 +74,13 @@ export interface Agent {
   /** Original standing spot (bosses step aside from it while yielding, then return). */
   originX: number;
   originZ: number;
+  /** Squatter is down. Walking squatters are false; the king is always true. */
+  planted: boolean;
+  /** Seconds spent slow or at the stroll target, toward planting. */
+  plantArm: number;
+  /** Next standing spot a walking squatter heads for. */
+  strollX: number;
+  strollZ: number;
 }
 
 /** v0.7: a boss is worn down, not defeated — see TUNING.boss. */
@@ -211,7 +218,8 @@ export class CrowdSim {
   private makeAgent(kind: PassengerKind, x: number, z: number, mode: AgentMode, kid = false): Agent {
     const def = PASSENGER_DEFS[kind];
     const fam = TUNING.types.family;
-    const scale = (def.scale ?? 1) * (kid ? fam.kidScale : 1);
+    // A squatter starts standing. The king overwrites this with the crouch scale.
+    const scale = (kind === 'squat' ? 1 : (def.scale ?? 1)) * (kid ? fam.kidScale : 1);
     const mass = kid ? fam.kidMass : def.mass;
     const body = createBody({
       x,
@@ -266,9 +274,20 @@ export class CrowdSim {
       boss: null,
       originX: x,
       originZ: z,
+      planted: false,
+      plantArm: 0,
+      strollX: x,
+      strollZ: z,
     };
     // Hurdle hops the suitcase only; the owner still blocks (keeps L100 luggage walls honest).
-    if (kind === 'squat') body.passTag = PASS_SQUAT;
+    // Leap still clears a squatter while he is walking — the tag stays on.
+    if (kind === 'squat') {
+      body.passTag = PASS_SQUAT;
+      // Boss spawn overwrites mass after this. Damping stays on the def until
+      // syncSquat, so the king's footing is unchanged.
+      setMass(body, TUNING.types.squat.walkMass);
+      this.pickStroll(a);
+    }
     else if (kid) body.passTag = PASS_KID;
     this.agents.push(a);
     this.byBody.set(body.id, a);
@@ -513,6 +532,8 @@ export class CrowdSim {
     }
     const a = this.makeAgent(kind, home.x, home.z, 'rider');
     stamp(a);
+    // Posted after makeAgent, so the first stroll was a free one. Keep him on the glass.
+    if (a.kind === 'squat') this.pickStroll(a);
     return 1;
   }
 
@@ -922,6 +943,8 @@ export class CrowdSim {
     setMass(a.body, Math.max(1.3, def.mass) * (1 + (B.massMul - 1) * k));
     a.scale = (def.scale ?? 1) * size;
     a.boss = state;
+    // The king is already down. Do not copy the walking mass onto him.
+    if (kind === 'squat') a.planted = true;
     a.dazedUntil = -1;
     a.shoveCd = 1.2;
     return a;
@@ -1175,14 +1198,14 @@ export class CrowdSim {
 
   /** Combined stench slow (0–1, before WIS resist) at a point. */
   /**
-   * Extra crowd-drag when weaving laterally past squatting passengers
-   * (they block the lower body / hard to slip past sideways).
+   * Extra crowd-drag when weaving laterally past a planted squat
+   * (low body, hard to slip past). A walking squatter does not drag.
    */
   squatLateralDrag(px: number, pz: number, aimX: number, aimZ: number): number {
     const T = TUNING.types.squat;
     let extra = 0;
     for (const a of this.agents) {
-      if (a.kind !== 'squat') continue;
+      if (a.kind !== 'squat' || !a.planted) continue;
       const b = a.body;
       const rx = b.x - px;
       const rz = b.z - pz;
@@ -1270,6 +1293,93 @@ export class CrowdSim {
     return n;
   }
 
+  /** Walking mass and scale. Never call this on a boss. */
+  private squatWalkBody(a: Agent): void {
+    const S = TUNING.types.squat;
+    setMass(a.body, S.walkMass);
+    a.body.damping = S.walkDamping;
+    a.scale = 1;
+  }
+
+  /** Planted mass and the short crouch scale. Never call this on a boss. */
+  private squatPlantBody(a: Agent): void {
+    const S = TUNING.types.squat;
+    setMass(a.body, S.plantMass);
+    a.body.damping = S.plantDamping;
+    a.scale = PASSENGER_DEFS.squat.scale ?? 0.82;
+  }
+
+  /**
+   * Next step. No rng() — a fresh random here would reshuffle every later spawn.
+   * Posted squatters step along the glass, away from the opening.
+   */
+  private pickStroll(a: Agent): void {
+    const S = TUNING.types.squat;
+    const slot = (a.id * 17 + Math.floor(a.age * 10)) % 10;
+    const t = slot / 9;
+    const inset = 0.35;
+    const hw = TUNING.car.halfWidth;
+    const clampX = (v: number) => clamp(v, -hw + inset, hw - inset);
+    const clampZ = (v: number) => clamp(v, CAR_Z_MIN + inset, CAR_Z_MAX - inset);
+    if (a.posted) {
+      const bay = nearestDoorBay(a.originZ, TUNING.car.doorBays);
+      const away = a.originZ >= bay ? 1 : -1;
+      const dist = Math.min(S.postedReach, S.arrive + 0.12 + t * 0.35);
+      a.strollX = clampX(a.originX + 0.08);
+      a.strollZ = clampZ(a.originZ + away * dist);
+      return;
+    }
+    const ang = a.phase + a.age * 1.3;
+    const dist = S.strollMin + t * (S.strollReach - S.strollMin);
+    a.strollX = clampX(a.body.x + Math.cos(ang) * dist);
+    a.strollZ = clampZ(a.body.z + Math.sin(ang) * dist);
+  }
+
+  private plantSquat(a: Agent): void {
+    a.planted = true;
+    a.plantArm = 0;
+    a.homeX = a.body.x;
+    a.homeZ = a.body.z;
+    this.squatPlantBody(a);
+  }
+
+  /** Pose + body for one squatter. Boss returns without touching mass. */
+  private syncSquat(a: Agent, dt: number, ctx: CrowdCtx, stopped: boolean): void {
+    if (a.kind !== 'squat') return;
+    if (a.boss) {
+      a.planted = true;
+      return;
+    }
+    if (a.mode === 'boarder' && ctx.boardingActive) {
+      a.planted = false;
+      a.plantArm = 0;
+      this.squatWalkBody(a);
+      return;
+    }
+    if (stopped && !a.planted) {
+      this.plantSquat(a);
+      return;
+    }
+    const S = TUNING.types.squat;
+    const b = a.body;
+    if (!a.planted) {
+      this.squatWalkBody(a);
+      const dist = Math.hypot(a.strollX - b.x, a.strollZ - b.z);
+      const sp = Math.hypot(b.vx, b.vz);
+      if (dist < S.arrive || sp < S.stopSpeed) a.plantArm += dt;
+      else a.plantArm = Math.max(0, a.plantArm - dt);
+      if (dist < S.arrive || a.plantArm >= S.stopAfter) this.plantSquat(a);
+      return;
+    }
+    this.squatPlantBody(a);
+    if (Math.hypot(b.x - a.homeX, b.z - a.homeZ) > S.uproot) {
+      a.planted = false;
+      a.plantArm = 0;
+      this.pickStroll(a);
+      this.squatWalkBody(a);
+    }
+  }
+
   update(dt: number, ctx: CrowdCtx): void {
     this.now = ctx.time;
     const C = TUNING.crowd;
@@ -1280,7 +1390,6 @@ export class CrowdSim {
     for (const a of this.agents) {
       const b = a.body;
       const def = PASSENGER_DEFS[a.kind];
-      const m = b.mass;
       let fx = 0;
       let fz = 0;
       a.age += dt;
@@ -1288,6 +1397,7 @@ export class CrowdSim {
       // v0.8 status: frozen = ice statue (no AI). First ~1.3s: no collision so the
       // mage can dash the opened lane; then shrunk solid ice for the rest.
       if (a.freezeUntil > ctx.time) {
+        if (a.kind === 'squat' && !a.boss && !a.planted) this.plantSquat(a);
         if (!a.baseR) a.baseR = b.r;
         b.vx *= 0.08;
         b.vz *= 0.08;
@@ -1315,9 +1425,13 @@ export class CrowdSim {
       }
       const chilled = a.chillUntil > ctx.time;
       const dazed = a.dazedUntil > ctx.time;
+      this.syncSquat(a, dt, ctx, chilled || dazed);
+      const m = b.mass;
       const statusDrive = chilled || dazed ? 0 : 1;
       const statusYield = dazed ? 3 : 1;
       const statusAnchor = chilled ? 1.5 : 1;
+      const walkingSquat = a.kind === 'squat' && !a.planted && !a.boss;
+      const rootedSquat = a.kind === 'squat' && a.planted && !a.boss;
 
       if (a.mode === 'boarder' && ctx.boardingActive) {
         // Funnel through a side doorway (−X → +X), then settle deep in the car.
@@ -1348,7 +1462,41 @@ export class CrowdSim {
           a.mode = 'rider';
           a.homeX = b.x;
           a.homeZ = b.z;
+          if (a.kind === 'squat' && !a.boss) this.pickStroll(a);
           this.boardedCount++;
+        }
+      } else if (walkingSquat) {
+        // Toward the stroll. No standing-spot spring — that would cancel the walk.
+        const dx = a.strollX - b.x;
+        const dz = a.strollZ - b.z;
+        const dist = Math.hypot(dx, dz) || 1e-6;
+        const speed = T.squat.walkSpeed;
+        fx = ((dx / dist) * speed - b.vx) * C.boardAccel * m;
+        fz = ((dz / dist) * speed - b.vz) * C.boardAccel * m;
+        const cap = C.boardMaxDrive * def.driveMul * m * ai * statusDrive;
+        const fm = Math.hypot(fx, fz);
+        if (fm > cap) {
+          fx *= cap / fm;
+          fz *= cap / fm;
+        }
+        if (ctx.pressureField > 0) {
+          const dd = b.x - ctx.doorWallX;
+          if (dd > 0 && dd < C.pressureRange) {
+            fx += C.pressureForce * ctx.pressureField * (1 - dd / C.pressureRange) * m;
+          }
+        }
+        if (ctx.playerMoving > 0.2 && ctx.yieldK > 0) {
+          const rx = b.x - pl.x;
+          const rz = b.z - pl.z;
+          const along = rx * ctx.playerDirX + rz * ctx.playerDirZ;
+          if (along > 0 && along < 1.1) {
+            const lat = rx * -ctx.playerDirZ + rz * ctx.playerDirX;
+            if (Math.abs(lat) < 0.8) {
+              const s = (lat >= 0 ? 1 : -1) * ctx.yieldK * statusYield * (1 - Math.abs(lat) / 0.8) * (1 - along / 1.1) * ctx.playerMoving;
+              fx += -ctx.playerDirZ * s * m;
+              fz += ctx.playerDirX * s * m;
+            }
+          }
         }
       } else {
         // Rider (or boarder still waiting): spring to standing spot.
@@ -1356,7 +1504,8 @@ export class CrowdSim {
         const dx = (lured ? a.lureX : a.homeX) - b.x;
         const dz = (lured ? a.lureZ : a.homeZ) - b.z;
         const bossYield = !!a.boss && a.boss.yieldUntil > ctx.time;
-        const anchorMul = (a.boss ? Math.max(1.3, def.anchorMul) * (bossYield ? TUNING.boss.yieldAnchor : TUNING.boss.anchorMul) : def.anchorMul) * (a.posted ? 1.65 : 1) * statusAnchor;
+        const plantMul = rootedSquat ? T.squat.plantAnchor : 1;
+        const anchorMul = (a.boss ? Math.max(1.3, def.anchorMul) * (bossYield ? TUNING.boss.yieldAnchor : TUNING.boss.anchorMul) : def.anchorMul) * (a.posted ? 1.65 : 1) * statusAnchor * plantMul;
         const k = C.anchorK * anchorMul * m;
         fx = dx * k;
         fz = dz * k;
@@ -1367,8 +1516,8 @@ export class CrowdSim {
           fz *= cap / fm;
         }
         const disp = Math.hypot(dx, dz);
-        if (a.boss || a.posted) {
-          // Bosses and people who picked a spot (door glass, bench, short way) keep it.
+        if (a.boss || a.posted || rootedSquat) {
+          // Bosses, posted spots, and a planted squat keep the spot.
         } else if (disp > C.driftDist) {
           a.displacedT += dt;
           if (a.displacedT > C.driftAfter) {
@@ -1381,14 +1530,14 @@ export class CrowdSim {
           a.displacedT = Math.max(0, a.displacedT - dt);
         }
         // Boarding pressure squeezes riders near the left doors toward the far (+X) wall.
-        if (a.mode === 'rider' && !a.boss && ctx.pressureField > 0) {
+        if (a.mode === 'rider' && !a.boss && !rootedSquat && ctx.pressureField > 0) {
           const dd = b.x - ctx.doorWallX;
           if (dd > 0 && dd < C.pressureRange) {
             fx += C.pressureForce * ctx.pressureField * (1 - dd / C.pressureRange) * m;
           }
         }
         // Sidestep for the player ("唔該借借") — stronger with WIS.
-        if (a.mode === 'rider' && !a.boss && ctx.playerMoving > 0.2 && ctx.yieldK > 0) {
+        if (a.mode === 'rider' && !a.boss && !rootedSquat && ctx.playerMoving > 0.2 && ctx.yieldK > 0) {
           const rx = b.x - pl.x;
           const rz = b.z - pl.z;
           const along = rx * ctx.playerDirX + rz * ctx.playerDirZ;
@@ -1403,10 +1552,12 @@ export class CrowdSim {
         }
       }
 
-      // Idle sway so nobody looks frozen.
+      // Idle sway so nobody looks frozen. A planted squat stays put — sway was uprooting him.
       a.phase += dt;
-      fx += Math.sin(a.phase * 1.3 + a.id) * C.wander * m * ai;
-      fz += Math.cos(a.phase * 0.9 + a.id * 1.7) * C.wander * m * ai;
+      if (!rootedSquat) {
+        fx += Math.sin(a.phase * 1.3 + a.id) * C.wander * m * ai;
+        fz += Math.cos(a.phase * 0.9 + a.id * 1.7) * C.wander * m * ai;
+      }
 
       if (def.zigzag && a.dazedUntil <= ctx.time && !chilled) {
         a.zig += dt * T.brat.zigFreq;

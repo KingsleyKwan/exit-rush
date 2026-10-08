@@ -73,12 +73,12 @@ export const INTROS: Record<IntroKind, IntroCopy> = {
   },
   squat: {
     kind: 'squat',
-    whatEn: 'Crouched low — rooted.',
-    whatZh: '踎低喺度，好穩。',
-    blockEn: 'Hard to shove over; weave wider around them.',
-    blockZh: '好難推踎起，要旁邊大啲閃過。',
-    tipEn: 'Weave wide',
-    tipZh: '大弧度閃過',
+    whatEn: 'He walks. When he stops, he squats.',
+    whatZh: '平常行路。一停就踎低。',
+    blockEn: 'A squat is the hardest special to move. Shove him while he is still walking.',
+    blockZh: '踎低係特別乘客入面最難郁。佢行緊先推得郁。',
+    tipEn: 'Shove while he walks',
+    tipZh: '行緊先推',
   },
   loud: {
     kind: 'loud',

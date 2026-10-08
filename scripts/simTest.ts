@@ -26,7 +26,7 @@ import { cpus } from 'node:os';
 import { writeFileSync } from 'node:fs';
 import { Sim } from '../src/game/sim/Sim';
 import { mulberry32 } from '../src/game/sim/rng';
-import { passes } from '../src/game/sim/Physics';
+import { applyImpulse, passes } from '../src/game/sim/Physics';
 import { PASSENGER_DEFS } from '../src/game/PassengerTypes';
 import { DOOR_BAYS, DOOR_Z, TUNING, doorWallX, nearestDoorBay, openDoorBays } from '../src/game/sim/tuning';
 import { LEVELS } from '../src/game/levels';
@@ -609,6 +609,12 @@ function counterTests(): CounterResult[] {
       const s = emptySim(sk(0, spd, 0));
       place(s, 1.3, 0);
       const sq = [-0.6, 0, 0.6].flatMap((z) => spawn(s, 'squat', 0, z));
+      // Pin the wall down. A walking squatter would stroll off and the leap would not be the thing being measured.
+      for (const a of sq) {
+        a.planted = true;
+        a.homeX = a.body.x;
+        a.homeZ = a.body.z;
+      }
       let overlapped = false;
       const t = timeToX(s, -1.2, (ss) => {
         if (ss.player.body.x < 0.75) ss.tryLeap();
@@ -620,6 +626,61 @@ function counterTests(): CounterResult[] {
     const off = run(49);
     const on = run(50);
     push('Leap (squat)', on.t < off.t * 0.8 && on.overlapped, `t ${off.t.toFixed(2)}s → ${on.t.toFixed(2)}s, passed-over=${on.overlapped}`);
+  }
+  // 踎低客 walks, then plants into the heaviest special body. The king does not get that lighter walk mass.
+  {
+    const S = TUNING.types.squat;
+    const s = emptySim(sk(0, 0, 0), 4);
+    const a = spawn(s, 'squat', 0, 0)[0];
+    s.step(DT, NO_MOVE);
+    const walking = !a.planted && Math.abs(a.body.mass - S.walkMass) < 1e-6 && Math.abs(a.body.damping - S.walkDamping) < 1e-6;
+    let steps = 0;
+    for (; steps < 240 && !a.planted; steps++) s.step(DT, NO_MOVE);
+    const planted = a.planted && Math.abs(a.body.mass - S.plantMass) < 1e-6 && Math.abs(a.body.damping - S.plantDamping) < 1e-6;
+    a.body.x += S.uproot + 0.1;
+    s.step(DT, NO_MOVE);
+    const uprooted = !a.planted && Math.abs(a.body.mass - S.walkMass) < 1e-6;
+    const kingSim = emptySim(sk(0, 0, 0), 5);
+    kingSim.crowd.spawnBoss('squat', 0, 0);
+    const king = kingSim.crowd.bosses()[0];
+    const kingMass = king.body.mass;
+    const kingDamp = king.body.damping;
+    for (let i = 0; i < 30; i++) kingSim.step(DT, NO_MOVE);
+    const expect = Math.max(1.3, PASSENGER_DEFS.squat.mass) * (1 + (TUNING.boss.massMul - 1));
+    const kingOk = king.planted && Math.abs(kingMass - expect) < 1e-6 && king.body.mass === kingMass && king.body.damping === kingDamp && kingDamp === PASSENGER_DEFS.squat.damping;
+    const nudge = (kind: PassengerKind, prep: (ag: Agent, sim: Sim) => void) => {
+      const sim = emptySim(sk(0, 0, 0), 11);
+      const ag = spawn(sim, kind, 0, 0)[0];
+      if (ag.caseBody) {
+        sim.world.remove(ag.caseBody);
+        ag.caseBody = null;
+      }
+      prep(ag, sim);
+      sim.step(DT, NO_MOVE);
+      const x0 = ag.body.x;
+      applyImpulse(ag.body, -2.4, 0);
+      for (let i = 0; i < 25; i++) sim.step(DT, NO_MOVE);
+      return Math.abs(ag.body.x - x0);
+    };
+    const plantedDisp = nudge('squat', (ag) => {
+      ag.planted = true;
+      ag.homeX = ag.body.x;
+      ag.homeZ = ag.body.z;
+    });
+    const walkDisp = nudge('squat', (ag) => {
+      ag.planted = false;
+      ag.plantArm = 0;
+      ag.strollX = ag.body.x;
+      ag.strollZ = ag.body.z + 1.6;
+    });
+    const lugDisp = nudge('luggage', () => {});
+    const angryDisp = nudge('angry', () => {});
+    const hardest = plantedDisp < lugDisp && plantedDisp < angryDisp && plantedDisp < walkDisp;
+    push(
+      'Squat walks then plants',
+      walking && planted && uprooted && steps > 5 && kingOk && hardest,
+      `walk=${walking} plant after ${steps} steps uproot=${uprooted}; king mass ${kingMass.toFixed(2)} damp ${kingDamp}; disp plant ${plantedDisp.toFixed(3)} < walk ${walkDisp.toFixed(3)} / case-owner ${lugDisp.toFixed(3)} / angry ${angryDisp.toFixed(3)}`,
+    );
   }
   // SPD 50 Leap also clears family kids (they're PASS_KID while airborne).
   {

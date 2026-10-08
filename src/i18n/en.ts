@@ -346,7 +346,7 @@ export const en: Dict = {
     couple: 'Holding hands. Go around, not through.',
     angry: 'Winds up, then shoves hard.',
     luggage: 'That giant suitcase blocks the aisle.',
-    squat: 'Crouched low — shove barely works; weave wide.',
+    squat: 'Walks like anyone. Once he squats, he is the hardest to move.',
     loud: 'Shouting into the phone. The noise ring drains stamina.',
   },
   typeIcons: 'Type icons',

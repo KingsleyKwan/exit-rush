@@ -2,7 +2,6 @@ import { PASS_KID, PASS_LUGGAGE, PASS_SQUAT, applyImpulse, createBody, setMass, 
 import type { SkillModifiers } from '../SkillTree';
 import type { PlayerMods } from '../charactersDef';
 import type { CrowdSim } from './CrowdSim';
-import { PASSENGER_DEFS } from '../PassengerTypes';
 import type { Emit, UltKind } from './events';
 import { DOOR_Z, PLAYER_START_X, PLAYER_START_Z, TUNING, doorWallX } from './tuning';
 
@@ -458,7 +457,8 @@ export class PlayerSim {
       const fall = Math.max(0, 1 - Math.max(0, d - b.r - o.r) / S.range);
       let typeMul = 1;
       const ag0 = crowd.byBody.get(o.id);
-      if (ag0 && PASSENGER_DEFS[ag0.kind].hardToShove) typeMul = TUNING.types.squat.shoveMul;
+      // Only a planted squat eats the shove. A walking one is an ordinary body.
+      if (ag0?.kind === 'squat' && ag0.planted) typeMul = TUNING.types.squat.shoveMul;
       const J =
         S.impulse *
         power *

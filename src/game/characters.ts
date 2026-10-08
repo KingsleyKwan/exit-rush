@@ -534,6 +534,7 @@ export type Look =
   | 'angry'
   | 'luggage'
   | 'squat'
+  | 'squatWalk'
   | 'loud';
 
 const SKIN = 0xf2c6a0;
@@ -571,6 +572,7 @@ const SPECS: Record<Look | 'hero' | 'mage' | 'tech', Spec> = {
   angry: { skin: 0xe7a07c, hair: DARK_HAIR, style: 'short', shirt: 0xd32f2f, sleeves: 'short', pants: 0x2b2b2e, shoes: 0x1a1a1a, collar: 0xb71c1c, bw: 1.14, brows: 'angry', mouth: 'frown', belt: true },
   luggage: { skin: 0xf0c49c, hair: 0x3a302a, style: 'short', hat: 0xcfae7a, shirt: 0x26a69a, sleeves: 'short', pants: 0xc2a878, shorts: true, shoes: 0x7a5230, camera: true },
   squat: { skin: SKIN, hair: DARK_HAIR, style: 'short', shirt: 0x5c6bc0, sleeves: 'short', pants: 0x37474f, shoes: 0x263238, crouch: true, bw: 1.1, brows: 'firm', mouth: 'flat', phone: true },
+  squatWalk: { skin: SKIN, hair: DARK_HAIR, style: 'short', shirt: 0x5c6bc0, sleeves: 'short', pants: 0x37474f, shoes: 0x263238, bw: 1.1, brows: 'firm', mouth: 'flat', phone: true },
   loud: { skin: 0xeab48c, hair: 0x2a2026, style: 'short', shirt: 0xf39c12, sleeves: 'short', pants: 0x3e3a4a, shoes: 0xf5f5f5, collar: 0xd35400, bw: 1.06, brows: 'firm', mouth: 'shout', phoneEar: true },
 };
 
@@ -579,7 +581,8 @@ const NORMALS: Look[] = ['normal0', 'normal1', 'normal2', 'normal3', 'normal4', 
 const SEATS: Look[] = ['seat0', 'seat1', 'seat2', 'seat3', 'seat4', 'seat5'];
 
 /** Which look an agent wears (deterministic per agent id). */
-export function lookFor(a: Pick<Agent, 'id' | 'kind' | 'isKid' | 'seated'>): Look {
+export function lookFor(a: Pick<Agent, 'id' | 'kind' | 'isKid' | 'seated' | 'planted' | 'boss'>): Look {
+  if (a.kind === 'squat') return a.boss || a.planted ? 'squat' : 'squatWalk';
   if (a.seated && a.kind === 'family') {
     if (!a.isKid) return 'familySit';
     return a.id % 2 ? 'kidGirlSit' : 'kidBoySit';

@@ -223,8 +223,30 @@ export const TUNING = {
     brat: { zigFreq: 5.5, zigForce: 3.4, dartEvery: 1.6, dartImpulse: 1.1 },
     angry: { range: 1.0, windup: 0.32, impulse: 3.6, retaliateCd: 0.5, neighbourImpulse: 1.0 },
     luggage: { caseRadius: 0.2, caseMass: 2.6, caseDamping: 7, rest: 0.4, k: 95, linkDamping: 8 },
-    /** Squatting passenger: hard to shove over; lateral weave penalty. */
-    squat: { shoveMul: 0.35, lateralDrag: 0.55 },
+    /**
+     * Squatter. Walks like anyone, then plants when he stops. Planted mass is
+     * above the suitcase (2.6), so a squat is the heaviest special body.
+     * The king ignores these and keeps the def mass, damping, and anchor.
+     */
+    squat: {
+      shoveMul: 0.2,
+      lateralDrag: 0.7,
+      walkMass: 1.15,
+      walkDamping: 4,
+      walkSpeed: 1.15,
+      plantMass: 3.4,
+      plantDamping: 12,
+      /** Extra multiplier on the def anchor while planted (not the king). */
+      plantAnchor: 1.8,
+      arrive: 0.35,
+      stopSpeed: 0.22,
+      stopAfter: 0.4,
+      /** Dragged this far off the squat spot: stand up and walk. */
+      uproot: 0.95,
+      strollMin: 1.1,
+      strollReach: 2.0,
+      postedReach: 0.8,
+    },
     /**
      * 大聲公 Loudmouth: stamina drain (per s) inside `radius`, scaling from `edge`×peak at the rim to
      * peak at the centre (linear falloff); overlapping zones sum but are capped at `stackCap`× (=no

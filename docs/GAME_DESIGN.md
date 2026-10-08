@@ -56,7 +56,7 @@ Colour-coded low-poly (box body + capsule/sphere head). Behaviours differ:
 | `couple` | Couple | 情侶 | Magenta pair | Occupies ~2 tiles; linked |
 | `angry` | Angry man | 暴躁男 | Red | Periodic shove impulse on player |
 | `luggage` | Luggage | 拉行李喼 | Brown + dark case | High mass; slows push heavily |
-| `squat` | Squatter | 踎低客 | Indigo crouched | Hard to shove over; lateral weave |
+| `squat` | Squatter | 踎低客 | Indigo | Walks normally; squats when he stops — hardest special to move |
 | `loud` | Loudmouth | 大聲公 | Orange, phone to ear | Noise ring drains stamina while you're inside (rider only) |
 
 Future: tourist with map, influencer filming, elderly with cane, etc.
@@ -107,7 +107,7 @@ All gameplay physics runs in a **pure-TypeScript sim** (`src/game/sim/`, no thre
 | family | Adult + 2 kids; **cohesion force** toward the cluster centroid — hard to split, closes back up. |
 | couple | Two bodies on a **damped spring** ("holding hands" link reddens under tension) — push between them and they pull back together. |
 | angry | Heavy (1.6), strong drive. When you're close: 0.32 s wind-up (swell + red glow + grunt) → **knockback impulse** + short stun, barges neighbours. Shoving him makes him retaliate fast. 1 s i-frames after a hit. |
-| squat | Heavy, high damping, `hardToShove` (shove ×0.35); lateral weave drag near them.
+| squat | Walks at mass 1.15. On stop: plants (mass 3.4, damping 12, shove ×0.2, anchor ×1.8, lateral weave). Dragged ~0.95 m off the spot, he stands and walks. The king stays planted on the old mass. Leap still hops both poses. |
 | loud | Normal-ish body (1.15, slow walker); **rider only** (never boards). Noise zone r 1.3 m: player stamina drain = 40/s × (0.08 + 0.92 × (1 − d/r)), zones don't stack past one centre's worth; regen ×0.5 inside. STA 60 Unbothered ×0.3. Orange floor ring + sound-wave rings + 「喂！！」 bubble; HUD stamina pulse + 「好嘈！」 chip. |
 | stench | Aura slows you (green vignette, scaled by WIS `auraResist`) and **repels other passengers** — an obvious gap you pay for in speed. |
 

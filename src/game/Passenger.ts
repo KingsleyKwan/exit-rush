@@ -43,7 +43,7 @@ function angleLerp(a: number, b: number, t: number): number {
  */
 export class Passenger {
   readonly agent: Agent;
-  readonly look: Look;
+  look: Look;
   /** World position + bob (added to the crowd group; carries floor decals). */
   readonly mesh = new THREE.Group();
   /** Body instance transform (yaw, squash, waddle). */
@@ -208,6 +208,8 @@ export class Passenger {
 
   update(alpha: number, dt: number, time: number): void {
     const a = this.agent;
+    this.look = lookFor(a);
+    this.mesh.scale.setScalar(a.scale);
     const b = a.body;
     const x = b.px + (b.x - b.px) * alpha;
     const z = b.pz + (b.z - b.pz) * alpha;
