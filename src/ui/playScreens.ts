@@ -12,39 +12,30 @@ import { el, iconBtn, langBtn, qualityLabel, stationName, loadoutStrip, wireLoad
 import { charPortraitUrl } from '../game/charPortraits';
 
 
-function mageActions(game: Game, dict: ReturnType<typeof t>): string {
-  const s = game.runSkills;
-  // Always one visible slot per element (highest-tier unlocked), then one ult.
-  // Never drop a branch mid-run — cooldown uses a pie overlay, button stays.
-  const raw = game.runMods.spellBar ?? [];
-  const byBranch = new Map<string, string>();
-  for (const id of raw) {
-    const n = spellById(id);
-    if (!n) continue;
-    const prev = byBranch.get(n.branch);
-    if (!prev || (spellById(prev)?.at ?? 0) < n.at) byBranch.set(n.branch, id);
+function mageActions(game: Game, _dict: ReturnType<typeof t>): string {
+  const known = new Set(game.runSkills.known ?? []);
+  const schools = [
+    { school: 'wind', id: 'wind_1', ico: 'wind' },
+    { school: 'ice', id: 'ice_3', ico: 'ice' },
+    { school: 'grav', id: 'grav_3', ico: 'grav' },
+  ] as const;
+  const buttons = schools.filter((s) => known.has(s.id)).map((s) => {
+    const n = spellById(s.id);
+    const title = n ? `${n.nameZh} / ${n.nameEn}` : s.school;
+    return `<button type="button" class="skill-use act-spell el-${s.school}" data-spell="${s.id}" data-branch="${s.school}" title="${title}" aria-label="${title}">${icon(s.ico)}</button>`;
+  });
+  const ults: Array<{ id: string; kind: 'str' | 'spd' | 'sta'; ico: string; cls: string }> = [
+    { id: 'wind_4', kind: 'str', ico: 'wind', cls: 'ult-str' },
+    { id: 'ice_4', kind: 'sta', ico: 'ice', cls: 'ult-sta' },
+    { id: 'grav_4', kind: 'spd', ico: 'grav', cls: 'ult-spd' },
+  ];
+  const ult = ults.find((u) => known.has(u.id));
+  if (ult) {
+    const n = spellById(ult.id);
+    const title = n ? `${n.nameZh} / ${n.nameEn}` : ult.id;
+    buttons.push(`<button type="button" class="skill-use ${ult.cls} ult-mage" data-ult="${ult.kind}" title="${title}" aria-label="${title}">${icon(ult.ico)}</button>`);
   }
-  // Fallback stubs so fire/ice/volt always occupy a slot when that T1 is unlocked.
-  for (const [branch, stub] of [['fire', 'fire_t1'], ['ice', 'ice_t1'], ['volt', 'volt_t1']] as const) {
-    if (!byBranch.has(branch) && spellById(stub) && (branch === 'fire' ? s.str : branch === 'ice' ? s.sta : s.spd) >= 10) {
-      byBranch.set(branch, stub);
-    }
-  }
-  const spellBtn = (branch: 'fire' | 'ice' | 'volt') => {
-    const id = byBranch.get(branch);
-    const ico = branch;
-    if (!id) {
-      return `<button type="button" class="skill-use act-spell el-${branch} dim" disabled title="${branch}" aria-label="${branch}">${icon(ico)}</button>`;
-    }
-    const n = spellById(id)!;
-    const title = `${n.nameZh} / ${n.nameEn}`;
-    return `<button type="button" class="skill-use act-spell el-${branch}" data-spell="${id}" data-branch="${branch}" title="${title}" aria-label="${title}">${icon(ico)}</button>`;
-  };
-  const ults: string[] = [];
-  if (s.ultStr) ults.push(`<button type="button" class="skill-use ult-str ult-mage" data-ult="str" title="${dict.fire}" aria-label="${dict.fire}">${icon('fire')}</button>`);
-  if (s.ultSpd) ults.push(`<button type="button" class="skill-use ult-spd ult-mage" data-ult="spd" title="${dict.volt}" aria-label="${dict.volt}">${icon('volt')}</button>`);
-  if (s.ultSta) ults.push(`<button type="button" class="skill-use ult-sta ult-mage" data-ult="sta" title="${dict.ice}" aria-label="${dict.ice}">${icon('ice')}</button>`);
-  return [spellBtn('fire'), spellBtn('ice'), spellBtn('volt'), ...ults.slice(0, 1)].join('');
+  return buttons.join('');
 }
 
 function techActions(game: Game, dict: ReturnType<typeof t>): string {

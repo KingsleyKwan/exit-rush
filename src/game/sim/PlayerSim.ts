@@ -163,10 +163,10 @@ export class PlayerSim {
     b.passMask =
       (this.mods.hurdle || magePhase ? PASS_LUGGAGE : 0) |
       ((leaping || phasing) ? PASS_SQUAT | PASS_KID : 0);
-    // Mage: slip through any currently-frozen obstacle (Flash Freeze / Ice Age pathing).
+    // A frozen passenger is a statue. She can step past. Cold air does not let her phase.
     if (mageMods.characterId === 'mage') {
       for (const a of crowd.agents) {
-        if (a.freezeUntil > now || (mageMods.iceGlide && a.chillUntil > now)) {
+        if (a.freezeUntil > now) {
           b.passMask |= PASS_SQUAT | PASS_KID | PASS_LUGGAGE;
           break;
         }

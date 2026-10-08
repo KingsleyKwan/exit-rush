@@ -4,7 +4,7 @@
  * See docs/CHARACTERS.md.
  */
 import { SKILL_NODES, ULT_DEFS, modifiersFromSkills, type Branch, type SkillModifiers, type SkillNodeDef } from './SkillTree';
-import { SPELL_NODES, SPELL_ULT_DEFS, modifiersFromSpells, type SpellBranch } from './SpellTree';
+import { SPELL_NODES, SPELL_ULT_DEFS, modifiersFromSpells, type SpellSchool } from './SpellTree';
 import type { SaveData, SkillState } from './storage';
 import { TUNING } from './sim/tuning';
 import { resolveKit, type ActiveKit } from './techKit';
@@ -25,7 +25,7 @@ export interface BaseStats {
 
 export interface TreeDef {
   kind: 'tree';
-  /** Branch ids used by spend UI (hero: str/spd/sta · mage: fire/ice/volt mapped onto SkillState). */
+  /** Branch ids used by the hero spend UI. The mage book does not spend these. */
   branches: Branch[];
   colours: Record<Branch, string>;
   nodes: SkillNodeDef[];
@@ -59,11 +59,11 @@ export const HERO_TREE: TreeDef = {
   labelKey: 'hero',
 };
 
-/** Mage spellbook — fire→str, volt→spd, ice→sta on the shared SkillState shape. */
+/** Mage spellbook — wind, ice, gravity. Not the hero's three arms. */
 export const SPELL_TREE: TreeDef = {
   kind: 'tree',
   branches: ['str', 'spd', 'sta'],
-  colours: { str: '#ff7043', spd: '#ffd54f', sta: '#4dd0e1' },
+  colours: { str: '#4fc3f7', spd: '#7e57c2', sta: '#64b5f6' },
   nodes: SPELL_NODES as unknown as SkillNodeDef[],
   ults: SPELL_ULT_DEFS as unknown as typeof ULT_DEFS,
   labelKey: 'mage',
@@ -92,8 +92,8 @@ export const CHARACTERS: Record<CharacterId, CharacterDef> = {
     id: 'mage',
     nameEn: 'Bad Girl',
     nameZh: '凱婷',
-    pitchEn: 'Cast your way out!',
-    pitchZh: '用魔法開路！',
+    pitchEn: 'Wind, ice, and gravity.',
+    pitchZh: '風、冰、同重力。',
     skin: 'mage',
     base: {
       mass: TUNING.mage?.baseMass ?? 1.1,
@@ -107,7 +107,7 @@ export const CHARACTERS: Record<CharacterId, CharacterDef> = {
     progression: SPELL_TREE,
     entitlement: 'mage',
     hud: { resource2: 'mana', maxActives: 3 },
-    styleIcons: ['fire', 'ice', 'volt'],
+    styleIcons: ['wind', 'ice', 'grav'],
   },
   tech: {
     id: 'tech',
@@ -160,6 +160,12 @@ export interface PlayerMods extends SkillModifiers {
   ultFire: boolean;
   ultIce: boolean;
   ultVolt: boolean;
+  /** Which weather schools she has learned. */
+  hasWind: boolean;
+  hasIce: boolean;
+  hasGrav: boolean;
+  /** Crosswind: the breeze is wider. */
+  crosswind: boolean;
   /** Gear L. Absent on hero/mage — hero skill fields stay bit-identical. */
   techLeapCd?: number;
   techUltCd?: number;
@@ -183,6 +189,7 @@ function emptyMageFlags(): Pick<
   | 'coolHead' | 'frostShield' | 'chillOut' | 'iceGlide'
   | 'staticStep' | 'conductor' | 'droppedCall' | 'thunderStep'
   | 'ultFire' | 'ultIce' | 'ultVolt'
+  | 'hasWind' | 'hasIce' | 'hasGrav' | 'crosswind'
 > {
   return {
     hotBlood: false,
@@ -200,6 +207,10 @@ function emptyMageFlags(): Pick<
     ultFire: false,
     ultIce: false,
     ultVolt: false,
+    hasWind: false,
+    hasIce: false,
+    hasGrav: false,
+    crosswind: false,
   };
 }
 
@@ -259,9 +270,13 @@ export function modsFor(char: CharacterDef, skills: SkillState, spellBar?: strin
       conductor: sm.conductor,
       droppedCall: sm.droppedCall,
       thunderStep: sm.thunderStep,
-      ultFire: skills.ultStr,
-      ultIce: skills.ultSta,
-      ultVolt: skills.ultSpd,
+      ultFire: !!skills.known?.includes('wind_4'),
+      ultIce: !!skills.known?.includes('ice_4'),
+      ultVolt: !!skills.known?.includes('grav_4'),
+      hasWind: sm.hasWind,
+      hasIce: sm.hasIce,
+      hasGrav: sm.hasGrav,
+      crosswind: sm.crosswind,
     };
   }
   const resolved = kit ?? resolveKit({
@@ -296,15 +311,15 @@ export function characterOf(id: CharacterId | undefined | null): CharacterDef {
   return CHARACTERS[id && id in CHARACTERS ? id : 'hero'];
 }
 
-/** Map mage element branch → SkillState branch field. */
-export function spellBranchToSkill(b: SpellBranch): Branch {
-  if (b === 'fire') return 'str';
-  if (b === 'volt') return 'spd';
+/** Ult slot for a school: wind → str, gravity → spd, ice → sta. */
+export function spellBranchToSkill(b: SpellSchool): Branch {
+  if (b === 'wind') return 'str';
+  if (b === 'grav') return 'spd';
   return 'sta';
 }
 
-export function skillBranchToSpell(b: Branch): SpellBranch {
-  if (b === 'str') return 'fire';
-  if (b === 'spd') return 'volt';
+export function skillBranchToSpell(b: Branch): SpellSchool {
+  if (b === 'str') return 'wind';
+  if (b === 'spd') return 'grav';
   return 'ice';
 }

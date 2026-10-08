@@ -31,7 +31,7 @@ import {
   type Tier,
 } from './techKit';
 import { IS_STORE_BUILD } from './platform';
-import { defaultSpellBar } from './SpellTree';
+import { defaultSpellBar, trialSpellState } from './SpellTree';
 import { initEntitlements, entitlements } from './entitlements';
 import { warmCharPortraits } from './charPortraits';
 import { earnedFrom, progressOf, recordClear, spentOf, syncTopLevelProgress } from './storage';
@@ -221,10 +221,11 @@ export class Game {
       const tech = this.trial ? trialTech() : this.save.tech;
       return modsFor(char, skills, [], resolveKit(tech));
     }
+    const savedBar = this.save.mage.spellBars[this.save.mage.active];
     const bar = id === 'mage'
-      ? (this.save.mage.spellBars[this.save.mage.active]?.length
-          ? this.save.mage.spellBars[this.save.mage.active]
-          : defaultSpellBar(skills))
+      ? (this.trial?.character === 'mage'
+          ? defaultSpellBar(skills)
+          : (savedBar?.length ? savedBar : defaultSpellBar(skills)))
       : [];
     return modsFor(char, skills, bar);
   }
@@ -521,7 +522,9 @@ export class Game {
     this.doorBannerOpen = openN;
     this.doorBannerT = openN < 3 ? 3.6 : 0;
     this.closedDoorToastAt = -99;
-    this.runSkills = { ...activeTreeState(this.save) };
+    this.runSkills = this.trial?.character === 'mage'
+      ? trialSpellState()
+      : { ...activeTreeState(this.save) };
     this.runMods = this.computeMods(this.runSkills);
     const sim = new Sim(level, this.runMods, Math.random);
     this.bindSim(sim);
@@ -779,7 +782,7 @@ export class Game {
   resetSkills(): void {
     if (this.save.character === 'mage') {
       const earned = earnedFrom(progressOf(this.save, 'mage').cleared);
-      const empty = { str: 0, spd: 0, sta: 0, ultStr: false, ultSpd: false, ultSta: false, points: earned };
+      const empty = { str: 0, spd: 0, sta: 0, ultStr: false, ultSpd: false, ultSta: false, points: earned, known: [] as string[] };
       this.save.mage.loadouts[this.save.mage.active] = { ...empty };
       this.save.mage.spellBars[this.save.mage.active] = [];
     } else {
@@ -1098,6 +1101,7 @@ export class Game {
         haptic([35, 30, 60], 0);
         break;
       case 'ult':
+        if ((this.trial?.character ?? this.save.character) === 'mage') break;
         if (e.kind === 'str') {
           fx.shockwave(e.x, e.z, TUNING.ult.str.radius, 0xffb74d, 0.55);
           fx.shockwave(e.x, e.z, TUNING.ult.str.radius * 0.6, 0xffffff, 0.3);
@@ -1150,35 +1154,28 @@ export class Game {
         const len = Math.hypot(e.dx, e.dz) || 1;
         const dx = e.dx / len;
         const dz = e.dz / len;
-        if (e.ability === 'fire_t1' || e.ability === 'ultFire') {
-          fx.boltTrail(e.x, e.z, dx, dz, e.ability === 'ultFire' ? 2.6 : TUNING.spells.fireBolt.range, 0xe0201a);
-          if (e.ability === 'ultFire') fx.shockwave(e.x, e.z, TUNING.ult.str.radius * 0.85, 0xe0201a, 0.5);
-          cam.addTrauma(0.18);
-          this.audio.shockwave();
-        } else if (e.ability === 'fire_t3b') {
-          fx.shockwave(e.x, e.z, TUNING.spells.flameBurst.radius, 0xd50000, 0.5);
-          fx.puff(e.x, 0.5, e.z, 28, 0xe0201a, 4.2, 1.5, 0.55, 0.9);
-          fx.puff(e.x, 0.8, e.z, 16, 0xff8a80, 3.0, 1.2, 0.45, 1.2);
-          cam.addTrauma(0.35);
-          this.audio.shockwave();
-        } else if (e.ability === 'ice_t1') {
-          fx.iceBurst(e.x, e.z, TUNING.spells.frostBreath.range * 0.7, true, dx, dz);
-          this.paintFreezeShells(e.x, e.z, TUNING.spells.frostBreath.range);
-          cam.addTrauma(0.14);
-        } else if (e.ability === 'ice_t3b' || e.ability === 'ultIce') {
-          const rad = e.ability === 'ultIce' ? TUNING.spells.iceAge.radius : TUNING.spells.flashFreeze.radius;
-          fx.iceBurst(e.x, e.z, rad);
-          this.paintFreezeShells(e.x, e.z, rad + 0.4);
-          cam.addTrauma(0.28);
-          this.audio.shockwave();
-        } else if (e.ability === 'volt_t1' || e.ability === 'volt_t3b' || e.ability === 'ultVolt') {
-          fx.puff(e.x, 1.0, e.z, 12, 0xffd400, 2.2, 1.2, 0.35, 0.5);
-          fx.shockwave(e.x, e.z, e.ability === 'volt_t3b' ? TUNING.spells.thunderclap.radius : 1.1, 0xffd400, 0.3);
-          cam.addTrauma(0.16);
+        if (e.el === 'wind' || e.ability === 'wind_1' || e.ability === 'wind_4') {
+          fx.spray(e.x, e.z, dx, dz, e.ability === 'wind_4' ? 18 : 12, 0xe1f5fe, 2.1);
+          fx.puff(e.x, 0.8, e.z, 8, 0xb3e5fc, 1.2, 0.7, 0.3);
+          cam.addTrauma(0.04);
+          this.audio.dash();
+        } else if (e.el === 'ice' || e.ability === 'ice_3' || e.ability === 'ice_4') {
+          const rad = e.ability === 'ice_4' ? TUNING.weather.whiteout.radius : TUNING.weather.turn.radius;
+          fx.puff(e.x, 0.7, e.z, 12, 0xbbdefb, 1.1, 0.7, 0.4);
+          fx.spray(e.x, e.z, dx, dz, 8, 0xe3f2fd, 1.3);
+          if (e.hold) this.paintFreezeShells(e.x, e.z, rad);
+          cam.addTrauma(0.04);
+          this.audio.sense();
+        } else if (e.el === 'grav' || e.ability === 'grav_3' || e.ability === 'grav_4') {
+          const rad = e.ability === 'grav_4' ? TUNING.weather.still.radius : TUNING.weather.hold.radius;
+          fx.puff(e.x, 0.35, e.z, 12, 0x7e57c2, 0.9, 0.55, 0.4);
+          if (e.hold) this.paintFreezeShells(e.x, e.z, rad);
+          cam.addTrauma(0.04);
+          this.audio.sense();
         } else {
-          const colors: Record<string, number> = { fire: 0xe0201a, ice: 0x2196f3, volt: 0xffd400 };
+          const colors: Record<string, number> = { wind: 0xb3e5fc, ice: 0x81d4fa, grav: 0x7e57c2 };
           fx.puff(e.x, 0.9, e.z, 10, colors[e.el] ?? 0xce93d8, 1.6, 1.1, 0.45);
-          cam.addTrauma(0.1);
+          cam.addTrauma(0.06);
         }
         haptic(14, 0);
         break;

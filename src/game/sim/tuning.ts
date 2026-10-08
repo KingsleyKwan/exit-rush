@@ -397,6 +397,33 @@ export const TUNING = {
     thunderBlink: { range: 2.2, speedDur: 0.8, speedMul: 1.6 },
   },
 
+  /**
+   * 凱婷's weather. A blow, not a hit.
+   * Wind moves people aside. Wind + ice sends them another way.
+   * Ice + gravity holds them still. Wind never freezes, even if she knows both.
+   */
+  weather: {
+    blow: { range: 2.4, width: 0.95, impulse: 1.7, mana: 18, cd: 3.4, flee: 2.6, cold: 2.6, heavy: 2.2 },
+    cross: { range: 3.1, width: 1.3, impulse: 2.05, flee: 3.4 },
+    turn: { radius: 2.35, mana: 22, cd: 4.6, cold: 2.8, freeze: 2.2 },
+    hold: { radius: 2.35, mana: 22, cd: 4.6, heavy: 2.8, freeze: 2.2 },
+    headwind: { radius: 3.3, impulse: 1.85, flee: 3.6 },
+    whiteout: { radius: 3.4, cold: 3.4, freeze: 2.4 },
+    still: { radius: 3.2, heavy: 3.5, freeze: 2.4 },
+    /** Extra stubbornness a boss loses just for standing in the weather. */
+    wear: 0.08,
+    /** Heavy Feet resist. Not the hero's full strength. */
+    resist: 0.22,
+    /** Cold Air: stench bothers her less. */
+    aura: 0.45,
+    /** Crosswind: the breeze pushes a little harder. */
+    crossPower: 1.12,
+    /** Suitcase catches the breeze a bit more than the person holding it. */
+    caseMul: 1.45,
+    /** Bosses are worn down, not thrown. */
+    bossImpulse: 0.35,
+  },
+
   door: {
     /** Warning lights + accelerating beeps for the last N seconds. */
     warnTime: 5,

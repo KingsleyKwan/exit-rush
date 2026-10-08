@@ -11,9 +11,14 @@ export interface SkillState {
   /** Stamina ultimate (v0.6). Old `ultWis` migrates here. */
   ultSta: boolean;
   points: number;
+  /**
+   * Mage spell ids (wind / ice / gravity). Absent on the hero.
+   * When this list is non-empty, it is the whole book — str/spd/sta are not mage power.
+   */
+  known?: string[];
 }
 
-/** v0.8 Mage spell loadouts — same SkillState shape (str=fire, spd=volt, sta=ice). */
+/** v0.8 Mage spell loadouts. The book lives in `known` (wind / ice / gravity). */
 export interface MageProgress {
   loadouts: SkillState[];
   active: number;
@@ -110,13 +115,39 @@ export const SP_PER_CLEAR = 1;
 export const LEVELS_PER_SKILL_POINT = 10;
 export const LOADOUT_SLOTS = 3;
 /**
- * Skills bought. Each 10 power in a branch is one skill. An ultimate is one skill.
+ * Skills bought.
+ * Hero: each 10 power in a branch is one skill. An ultimate is one skill.
  * Partial power below the next 10 (old saves) does not count as an extra skill.
+ * Mage: one point per id in `known`, once that list exists. Hero math is unchanged.
  */
 export function spentOf(s: SkillState): number {
+  if (s.known && s.known.length > 0) return Math.min(10, s.known.length);
+  return heroSpent(s);
+}
+
+function heroSpent(s: SkillState): number {
   const nodes = (v: number) => Math.min(6, Math.floor(Math.max(0, v) / 10));
   return nodes(s.str) + nodes(s.spd) + nodes(s.sta)
     + (s.ultStr ? 1 : 0) + (s.ultSpd ? 1 : 0) + (s.ultSta ? 1 : 0);
+}
+
+const WEATHER_ID = /^(wind|ice|grav)_[1-4]$/;
+const WEATHER_CAPS = ['wind_4', 'ice_4', 'grav_4'];
+
+/** Drop ids that are not in the weather book. Keep the first last-skill only. */
+function cleanKnown(ids: readonly string[]): string[] {
+  const out: string[] = [];
+  let cap = false;
+  for (const id of ids) {
+    if (!WEATHER_ID.test(id) || out.includes(id)) continue;
+    if (WEATHER_CAPS.includes(id)) {
+      if (cap) continue;
+      cap = true;
+    }
+    out.push(id);
+    if (out.length >= 10) break;
+  }
+  return out;
 }
 /** Skill points earned: one per 10 distinct first clears. Replays add nothing. */
 export function earnedFrom(cleared: readonly number[]): number {
@@ -332,15 +363,30 @@ export function normalizeSave(parsed: Partial<SaveData> | null | undefined): Sav
   const sta = num(sk.sta, num(sk.wis, 0));
   const ultSta = bool(sk.ultSta) || bool(sk.ultWis);
   const cap = (v: number) => Math.min(60, Math.floor(v));
-  const toSkills = (o: Partial<SkillState> & { wis?: number; ultWis?: boolean }): SkillState => ({
-    str: cap(num(o.str, 0)),
-    spd: cap(num(o.spd, 0)),
-    sta: cap(num(o.sta, num(o.wis, 0))),
-    ultStr: bool(o.ultStr),
-    ultSpd: bool(o.ultSpd),
-    ultSta: bool(o.ultSta) || bool(o.ultWis),
-    points: 0,
-  });
+  const toSkills = (o: Partial<SkillState> & { wis?: number; ultWis?: boolean }, withKnown = false): SkillState => {
+    const base: SkillState = {
+      str: cap(num(o.str, 0)),
+      spd: cap(num(o.spd, 0)),
+      sta: cap(num(o.sta, num(o.wis, 0))),
+      ultStr: bool(o.ultStr),
+      ultSpd: bool(o.ultSpd),
+      ultSta: bool(o.ultSta) || bool(o.ultWis),
+      points: 0,
+    };
+    if (!withKnown || !Array.isArray(o.known)) return base;
+    const known = cleanKnown(o.known.filter((id): id is string => typeof id === 'string'));
+    if (known.length === 0) return { ...base, known: [] };
+    return {
+      ...base,
+      str: 0,
+      spd: 0,
+      sta: 0,
+      known,
+      ultStr: known.includes('wind_4'),
+      ultSta: known.includes('ice_4'),
+      ultSpd: known.includes('grav_4'),
+    };
+  };
   // v0.8.1: build per-character progress BEFORE reconciling SP.
   const rawCwEarly = (parsed as { clearedWith?: Record<string, unknown> }).clearedWith;
   const clearedWithEarly: Record<string, CharacterIdSave[]> = {};
@@ -411,18 +457,30 @@ export function normalizeSave(parsed: Partial<SaveData> | null | undefined): Sav
   const mageRawSlots = Array.isArray(rawMage.loadouts) ? rawMage.loadouts : [];
   const mageEarned = earnedFrom(progress.mage.cleared);
   let mageRefunded = false;
+  let weatherRefund = false;
+  const slotRefunds: boolean[] = [];
   const mageLoadouts: SkillState[] = [];
   for (let i = 0; i < LOADOUT_SLOTS; i++) {
-    const [slot, r] = reconcileSlot(toSkills((mageRawSlots[i] ?? {}) as Partial<SkillState>), mageEarned);
+    let slotIn = toSkills((mageRawSlots[i] ?? {}) as Partial<SkillState>, true);
+    // The old fire / lightning book does not map onto wind, ice, and gravity. Refund it once.
+    const attackBook = (!slotIn.known || slotIn.known.length === 0) && heroSpent(slotIn) > 0;
+    if (attackBook) {
+      slotIn = { ...defaultSkills(), points: 0, known: [] };
+      weatherRefund = true;
+      slotRefunds.push(true);
+    } else {
+      slotRefunds.push(false);
+    }
+    const [slot, r] = reconcileSlot(slotIn, mageEarned);
     mageLoadouts.push(slot);
-    mageRefunded ||= r;
+    mageRefunded ||= r || attackBook;
   }
   const rawBars = Array.isArray(rawMage.spellBars) ? rawMage.spellBars : [];
   const spellBars: string[][] = [];
   for (let i = 0; i < LOADOUT_SLOTS; i++) {
-    let bar = Array.isArray(rawBars[i]) ? rawBars[i].filter((s): s is string => typeof s === 'string').slice(0, 3) : [];
+    let bar = Array.isArray(rawBars[i]) ? rawBars[i].filter((s): s is string => typeof s === 'string' && WEATHER_ID.test(s)).slice(0, 3) : [];
     // Fresh mage after refund: clear bars so defaults re-apply on next open.
-    if (mageRefunded && mageEarned === 0) bar = [];
+    if (slotRefunds[i] || (mageRefunded && mageEarned === 0)) bar = [];
     spellBars.push(bar);
   }
   const rawTech = (parsed as { tech?: Partial<TechProgress> }).tech ?? {};
@@ -473,7 +531,7 @@ export function normalizeSave(parsed: Partial<SaveData> | null | undefined): Sav
     ftueDone: parsed.ftueDone === true,
     loadouts,
     activeLoadout: active,
-    respecNotice: parsed.respecNotice === true || refunded,
+    respecNotice: parsed.respecNotice === true || refunded || (weatherRefund && !migratingSplit),
     character,
     entitlementCache,
     mage: { loadouts: mageLoadouts, active: mageActive, spellBars },

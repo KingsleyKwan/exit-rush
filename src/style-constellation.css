@@ -409,6 +409,75 @@
 .skills-panel .cst-detail-zh { color: #8a5a00; }
 .skills-panel .cst-detail-tip { color: #4a5568; }
 
+/* Mage book: three columns, start at the bottom, last skill at the top. */
+.spellbook {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+  align-items: stretch;
+}
+.spell-col {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  border-radius: 14px;
+  padding: 8px 4px 10px;
+  border: 1px solid transparent;
+  min-width: 0;
+}
+.school-wind { border-color: rgba(79, 195, 247, 0.6); background: rgba(179, 229, 252, 0.14); }
+.school-ice { border-color: rgba(30, 136, 229, 0.6); background: rgba(30, 136, 229, 0.12); }
+.school-grav { border-color: rgba(126, 87, 194, 0.65); background: rgba(126, 87, 194, 0.14); }
+.spell-col-head {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  text-align: center;
+}
+.spell-col-head .skill-ico { width: 28px; height: 28px; }
+.spell-col-head strong { font-size: 13px; font-weight: 900; }
+.spell-col-head em { font-style: normal; font-size: 10px; font-weight: 700; opacity: 0.75; }
+.spell-chain { display: flex; flex-direction: column; align-items: center; width: 100%; }
+.spell-link { width: 2px; height: 8px; background: currentColor; opacity: 0.35; }
+.spell-node {
+  width: 100%;
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  background: rgba(0, 0, 0, 0.22);
+  color: inherit;
+  border-radius: 12px;
+  padding: 6px 3px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+}
+.spell-node.ready { border-color: #fff; box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.4); }
+.spell-node.locked { opacity: 0.5; }
+.spell-node.selected { outline: 2px solid rgba(255, 255, 255, 0.7); }
+.spell-name { text-align: center; line-height: 1.15; }
+.spell-name b { display: block; font-size: 12px; }
+.spell-name small { display: block; font-size: 9px; opacity: 0.8; }
+.spell-dot { position: relative; display: inline-flex; }
+.spell-star {
+  position: absolute;
+  top: -7px;
+  right: -9px;
+  font-style: normal;
+  font-size: 11px;
+  color: #ffe082;
+}
+.school-wind .spell-node.on { background: linear-gradient(180deg, #e1f5fe, #4fc3f7); color: #083040; }
+.school-ice .spell-node.on { background: linear-gradient(180deg, #42a5f5, #1565c0); color: #fff; }
+.school-grav .spell-node.on { background: linear-gradient(180deg, #9575cd, #4527a0); color: #fff; }
+.school-wind .spell-col-head .skill-ico { background: linear-gradient(180deg, #e1f5fe, #4fc3f7); color: #083040; --ico-ink: #0277bd; }
+.school-ice .spell-col-head .skill-ico { background: linear-gradient(180deg, #42a5f5, #1565c0); color: #fff; --ico-ink: #0d47a1; }
+.school-grav .spell-col-head .skill-ico { background: linear-gradient(180deg, #9575cd, #4527a0); color: #fff; --ico-ink: #311b92; }
+.cst-detail-why { font-size: 12px; font-weight: 800; color: #ffe082; }
+.skills-panel .spell-col { background: rgba(255, 255, 255, 0.92); color: #18202e; }
+.skills-panel .spell-node:not(.on) { background: #f3f5f8; color: #18202e; border-color: #d5dae0; }
+.skills-panel .cst-detail-why { color: #8a5a00; }
+
 @media (max-aspect-ratio: 4/5) {
   .skills-screen .skills-body {
     padding-left: max(6px, var(--safe-l));

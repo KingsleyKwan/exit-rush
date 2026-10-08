@@ -29,7 +29,7 @@ export function renderCharacters(game: Game): HTMLElement {
     const port = charPortraitUrl(id);
     const portHtml = port
       ? `<img class="char-port-img" src="${port}" width="112" height="126" alt="" decoding="async" />`
-      : `<span class="char-port-fallback">${icon(id === 'mage' ? 'fire' : id === 'tech' ? 'shop' : 'str', 'lg')}</span>`;
+      : `<span class="char-port-fallback">${icon(id === 'mage' ? 'wind' : id === 'tech' ? 'shop' : 'str', 'lg')}</span>`;
 
     let action = '';
     if (coming) {
@@ -43,10 +43,10 @@ export function renderCharacters(game: Game): HTMLElement {
       action = `<button type="button" class="primary dim" disabled>${icon('lock', 'sm')}<span>${dict.locked}</span></button>`;
     }
 
-    const EL_TINT: Record<string, string> = { fire: 'tint-fire', ice: 'tint-ice', volt: 'tint-volt' };
+    const EL_TINT: Record<string, string> = { fire: 'tint-fire', ice: 'tint-ice', volt: 'tint-volt', wind: 'tint-wind', grav: 'tint-grav' };
     const styleIcos = c.styleIcons
       .map((k) => {
-        const name = (['str', 'spd', 'sta', 'fire', 'ice', 'volt', 'shop', 'bag', 'star'] as string[]).includes(k) ? k : 'star';
+        const name = (['str', 'spd', 'sta', 'fire', 'ice', 'volt', 'wind', 'grav', 'shop', 'bag', 'star'] as string[]).includes(k) ? k : 'star';
         const tint = EL_TINT[k] ?? '';
         return `<span class="char-style-ico ${tint}">${icon(name, 'sm')}</span>`;
       })

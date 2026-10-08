@@ -1,6 +1,6 @@
 export type UltKind = 'str' | 'spd' | 'sta';
 
-export type SpellElement = 'fire' | 'ice' | 'volt';
+export type SpellElement = 'wind' | 'ice' | 'grav' | 'fire' | 'volt';
 
 /** Gameplay events emitted by the sim; the view layer turns them into juice. */
 export type SimEvent =
@@ -17,7 +17,7 @@ export type SimEvent =
   | { t: 'win' }
   | { t: 'lose' }
   // v0.8 mage
-  | { t: 'cast'; ability: string; x: number; z: number; dx: number; dz: number; el: SpellElement }
+  | { t: 'cast'; ability: string; x: number; z: number; dx: number; dz: number; el: SpellElement; hold?: boolean }
   | { t: 'status'; agentId: number; kind: string; until: number }
   | { t: 'chain'; pts: { x: number; z: number }[] }
   | { t: 'gadget'; id: string; x: number; z: number }

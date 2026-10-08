@@ -63,6 +63,14 @@ export interface Agent {
   callOffUntil: number;
   /** Chill Out: angry wind-up suppressed until. */
   chillWindupUntil: number;
+  /** Weather: feels cold. Does not freeze, and does not plant a walking squatter. */
+  coldUntil: number;
+  /** Weather: heavy feet. Slows darting. Not a statue. */
+  heavyUntil: number;
+  /** Weather: would rather stand somewhere else until this time. Does not rewrite a planted home. */
+  fleeUntil: number;
+  fleeX: number;
+  fleeZ: number;
   /** Gear L decoy: brat steers here until this time. */
   lureUntil: number;
   lureX: number;
@@ -267,6 +275,11 @@ export class CrowdSim {
       auraOffUntil: -1,
       callOffUntil: -1,
       chillWindupUntil: -1,
+      coldUntil: -1,
+      heavyUntil: -1,
+      fleeUntil: -1,
+      fleeX: 0,
+      fleeZ: 0,
       lureUntil: -1,
       lureX: 0,
       lureZ: 0,
@@ -1364,11 +1377,19 @@ export class CrowdSim {
     const b = a.body;
     if (!a.planted) {
       this.squatWalkBody(a);
+      // A breeze sends him walking. Heavy feet slow him, but do not drop him into the crouch.
+      if (a.fleeUntil > ctx.time) {
+        a.plantArm = 0;
+        a.strollX = a.fleeX;
+        a.strollZ = a.fleeZ;
+        return;
+      }
+      const heavy = a.heavyUntil > ctx.time;
       const dist = Math.hypot(a.strollX - b.x, a.strollZ - b.z);
       const sp = Math.hypot(b.vx, b.vz);
-      if (dist < S.arrive || sp < S.stopSpeed) a.plantArm += dt;
+      if (!heavy && (dist < S.arrive || sp < S.stopSpeed)) a.plantArm += dt;
       else a.plantArm = Math.max(0, a.plantArm - dt);
-      if (dist < S.arrive || a.plantArm >= S.stopAfter) this.plantSquat(a);
+      if (!heavy && (dist < S.arrive || a.plantArm >= S.stopAfter)) this.plantSquat(a);
       return;
     }
     this.squatPlantBody(a);
@@ -1427,7 +1448,9 @@ export class CrowdSim {
       const dazed = a.dazedUntil > ctx.time;
       this.syncSquat(a, dt, ctx, chilled || dazed);
       const m = b.mass;
-      const statusDrive = chilled || dazed ? 0 : 1;
+      let statusDrive = chilled || dazed ? 0 : 1;
+      if (a.coldUntil > ctx.time) statusDrive *= 0.35;
+      if (a.heavyUntil > ctx.time && a.fleeUntil <= ctx.time) statusDrive *= 0.22;
       const statusYield = dazed ? 3 : 1;
       const statusAnchor = chilled ? 1.5 : 1;
       const walkingSquat = a.kind === 'squat' && !a.planted && !a.boss;
@@ -1435,9 +1458,11 @@ export class CrowdSim {
 
       if (a.mode === 'boarder' && ctx.boardingActive) {
         // Funnel through a side doorway (−X → +X), then settle deep in the car.
+        // A breeze makes them change their mind and head the other way.
+        const fleeing = a.fleeUntil > ctx.time && !a.boss;
         const inside = b.x > ctx.doorWallX + 0.25;
-        const wx = inside ? a.goalX : ctx.doorWallX + 0.55;
-        const wz = inside ? a.goalZ : a.doorX;
+        const wx = fleeing ? a.fleeX : (inside ? a.goalX : ctx.doorWallX + 0.55);
+        const wz = fleeing ? a.fleeZ : (inside ? a.goalZ : a.doorX);
         const dx = wx - b.x;
         const dz = wz - b.z;
         const dist = Math.hypot(dx, dz) || 1e-6;
@@ -1500,7 +1525,14 @@ export class CrowdSim {
         }
       } else {
         // Rider (or boarder still waiting): spring to standing spot.
-        const lured = a.lureUntil > ctx.time && a.kind === 'brat';
+        // Flee eases the spot itself, except a planted squat — moving his home would uproot him.
+        const fleeing = a.fleeUntil > ctx.time && !a.boss && !rootedSquat && a.kind !== 'squat';
+        if (fleeing) {
+          const r = Math.min(1, 2.2 * dt);
+          a.homeX += (a.fleeX - a.homeX) * r;
+          a.homeZ += (a.fleeZ - a.homeZ) * r;
+        }
+        const lured = !fleeing && a.lureUntil > ctx.time && a.kind === 'brat';
         const dx = (lured ? a.lureX : a.homeX) - b.x;
         const dz = (lured ? a.lureZ : a.homeZ) - b.z;
         const bossYield = !!a.boss && a.boss.yieldUntil > ctx.time;
@@ -1559,7 +1591,12 @@ export class CrowdSim {
         fz += Math.cos(a.phase * 0.9 + a.id * 1.7) * C.wander * m * ai;
       }
 
-      if (def.zigzag && a.dazedUntil <= ctx.time && !chilled) {
+      if (a.heavyUntil > ctx.time) {
+        fx += -b.vx * m * 7;
+        fz += -b.vz * m * 7;
+      }
+
+      if (def.zigzag && a.dazedUntil <= ctx.time && !chilled && a.heavyUntil <= ctx.time && a.coldUntil <= ctx.time) {
         a.zig += dt * T.brat.zigFreq;
         fx += Math.sin(a.zig) * T.brat.zigForce * m * ai;
         a.dartT -= dt * ai;
@@ -1583,7 +1620,7 @@ export class CrowdSim {
   }
 
   private updateAngry(a: Agent, dt: number, ctx: CrowdCtx): void {
-    if (a.chillWindupUntil > ctx.time || a.chillUntil > ctx.time || a.freezeUntil > ctx.time) {
+    if (a.chillWindupUntil > ctx.time || a.chillUntil > ctx.time || a.coldUntil > ctx.time || a.freezeUntil > ctx.time) {
       a.windup = -1;
       return;
     }

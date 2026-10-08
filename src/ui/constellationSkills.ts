@@ -1,4 +1,5 @@
-import { SPELL_NODES, SPELL_ULT_DEFS, defaultSpellBar } from '../game/SpellTree';
+import { SPELL_NODES, SPELL_SCHOOLS, canLearn, defaultSpellBar, learnSpell, spellById, type SpellSchool } from '../game/SpellTree';
+import { spentOf } from '../game/storage';
 import { t, getLang, fmt } from '../i18n';
 import type { Game } from '../game/Game';
 import { icon } from './icons';
@@ -36,25 +37,15 @@ function screenBar(title: string, iconName: string, right = ''): string {
     </div>`;
 }
 
-/** One glyph per node. Ult ids are shared by hero and mage, so those depend on who is open. */
+/** One glyph per hero node. 凱婷's book draws school icons itself. */
 const NODE_ICON: Record<string, string> = {
   str_t1: 'str', str_t2a: 'shove', str_t2b: 'sk_charge', str_t3a: 'sk_split', str_t3b: 'sk_pound', str_t3c: 'sk_firm',
   spd_t1: 'spd', spd_t2a: 'sk_lane', spd_t2b: 'sk_squeeze', spd_t3a: 'sk_hurdle', spd_t3b: 'sk_leap', spd_t3c: 'sk_thread',
   sta_t1: 'stamina', sta_t2a: 'sk_regen', sta_t2b: 'sk_tank', sta_t3a: 'sk_breath', sta_t3b: 'sk_revive', sta_t3c: 'sk_calm',
-  fire_t1: 'fire', fire_t2a: 'sk_hot', fire_t2b: 'sk_urgent', fire_t3a: 'sk_cleanse', fire_t3b: 'sk_fburst', fire_t3c: 'sk_unhand',
-  ice_t1: 'sk_cone', ice_t2a: 'sk_cool', ice_t2b: 'sk_ishield', ice_t3a: 'sk_chill', ice_t3b: 'sk_freeze', ice_t3c: 'sk_glide',
-  volt_t1: 'volt', volt_t2a: 'sk_static', volt_t2b: 'sk_conduct', volt_t3a: 'sk_dropcall', volt_t3b: 'sk_clap', volt_t3c: 'sk_tstep',
 };
-const ULT_ICON: Record<string, { hero: string; mage: string }> = {
-  str: { hero: 'sk_bull', mage: 'sk_phoenix' },
-  spd: { hero: 'sk_dash', mage: 'sk_blink' },
-  sta: { hero: 'sk_stance', mage: 'sk_age' },
-};
-function skillIcon(id: string, mage: boolean): string {
-  if (id.startsWith('ult-')) {
-    const b = id.slice(4);
-    return (ULT_ICON[b]?.[mage ? 'mage' : 'hero']) ?? 'star';
-  }
+const HERO_ULT_ICON: Record<string, string> = { str: 'sk_bull', spd: 'sk_dash', sta: 'sk_stance' };
+function skillIcon(id: string): string {
+  if (id.startsWith('ult-')) return HERO_ULT_ICON[id.slice(4)] ?? 'star';
   return NODE_ICON[id] ?? 'star';
 }
 
@@ -65,37 +56,158 @@ const pointsChip = (game: Game): string => {
   return `<span class="chip points-chip" title="${t().skillPoints}" aria-label="${t().skillPoints}: ${pts}">${icon('star', 'sm')}<b>${pts}</b></span>`;
 };
 
-export function renderSkills(game: Game, rerender: (game: Game) => void): HTMLElement {
+const SCHOOL_ICON: Record<SpellSchool, string> = { wind: 'wind', ice: 'ice', grav: 'grav' };
+
+/** Witcher-style columns. Bottom node is the start. Tap a skill to spend 1 point. */
+function renderMageBook(game: Game, rerender: (game: Game) => void): HTMLElement {
   const dict = t();
-  const isMage = game.save.character === 'mage';
-  const s = isMage
-    ? (game.save.mage.loadouts[game.save.mage.active] ?? game.save.mage.loadouts[0])
-    : game.save.skills;
+  const en = getLang() === 'en';
+  const active = game.save.mage.active;
+  const s = game.save.mage.loadouts[active] ?? game.save.mage.loadouts[0];
+  const known = new Set(s.known ?? []);
   const overRun = game.skillsOverRun;
-  const branchLabel = (b: Branch) => {
-    if (isMage) return b === 'str' ? dict.fire : b === 'spd' ? dict.volt : dict.ice;
-    return b === 'str' ? dict.strength : b === 'spd' ? dict.speed : dict.staminaBranch;
+  const schoolName = (school: SpellSchool) => (school === 'wind' ? dict.wind : school === 'ice' ? dict.ice : dict.grav);
+
+  const nodeBtn = (id: string) => {
+    const n = spellById(id)!;
+    const on = known.has(id);
+    const ready = canLearn(s, id);
+    const req = n.requires ? spellById(n.requires) : undefined;
+    const blockedCap = !!n.capstone && !on && [...known].some((k) => spellById(k)?.capstone);
+    let why = '';
+    if (!on && req && !known.has(req.id)) why = fmt(dict.spellNeed, { name: en ? req.nameEn : req.nameZh });
+    else if (blockedCap) why = dict.spellOneEnd;
+    const tip = en ? n.tipEn : n.tipZh;
+    const kind = n.capstone ? dict.ultShort : n.kind === 'active' ? dict.skillNodeActive : dict.skillNodePassive;
+    const title = `${n.nameEn} / ${n.nameZh} — ${tip}${why ? ` (${why})` : ''}`;
+    return `<button type="button" class="spell-node ${on ? 'on' : ''} ${ready ? 'ready' : ''} ${n.capstone ? 'cap' : ''} ${!on && !ready ? 'locked' : ''}" data-spell="${id}" data-tip="${tip.replace(/"/g, '&quot;')}" data-why="${why.replace(/"/g, '&quot;')}" data-kind="${kind}" data-en="${n.nameEn}" data-zh="${n.nameZh}" title="${title.replace(/"/g, '&quot;')}" aria-label="${title.replace(/"/g, '&quot;')}">
+      <span class="spell-dot">${icon(SCHOOL_ICON[n.school])}${n.capstone ? '<i class="spell-star">★</i>' : ''}</span>
+      <span class="spell-name"><b>${n.nameZh}</b><small>${n.nameEn}</small></span>
+    </button>`;
   };
-  const branchIco = (b: Branch) => {
-    if (isMage) return b === 'str' ? 'fire' : b === 'spd' ? 'volt' : 'ice';
-    return b === 'sta' ? 'sta' : b;
+
+  const column = (school: SpellSchool) => {
+    const chain = SPELL_NODES.filter((n) => n.school === school).slice().reverse();
+    const got = chain.filter((n) => known.has(n.id)).length;
+    return `<section class="spell-col school-${school}">
+      <header class="spell-col-head"><span class="skill-ico">${icon(SCHOOL_ICON[school])}</span><strong>${schoolName(school)}</strong><em>${got}/4</em></header>
+      <div class="spell-chain">${chain.map((n) => nodeBtn(n.id)).join('<i class="spell-link" aria-hidden="true"></i>')}</div>
+    </section>`;
   };
-  const nodeList = (branch: Branch) => {
-    if (isMage) {
-      const el = branch === 'str' ? 'fire' : branch === 'spd' ? 'volt' : 'ice';
-      return SPELL_NODES.filter((n) => n.branch === el).map((n) => ({
-        id: n.id, branch, tier: n.tier, at: n.at, kind: n.kind, counters: n.counters,
-        nameEn: n.nameEn, nameZh: n.nameZh, tipEn: n.tipEn, tipZh: n.tipZh,
-      }));
-    }
-    return nodesFor(branch);
+
+  const panel = el(`
+    <div class="${overRun ? 'panel skills-panel' : 'sub-screen skills-screen'}" data-ui="1">
+      ${overRun ? `<h2 class="panel-title">${icon('skills', 'sm')}${dict.spells}</h2>` : screenBar(dict.spells, 'skills', pointsChip(game))}
+      <div class="${overRun ? 'skills-body' : 'sub-body skills-body'}">
+        ${overRun ? `<p class="points">${pointsChip(game)}</p>` : ''}
+        <p class="howto skill-howto">${dict.spellHowto}</p>
+        ${loadoutStrip(game, { reset: true, cls: 'in-tree' })}
+        ${overRun ? `<p class="howto">${dict.skillsApplyNext}</p>` : ''}
+        <div class="spellbook" role="group" aria-label="${dict.spells}">
+          ${SPELL_SCHOOLS.map((school) => column(school)).join('')}
+        </div>
+        <div class="cst-detail spell-detail" id="cst-detail" aria-live="polite">
+          <div class="cst-detail-names"><span class="cst-detail-ico"></span><b class="cst-detail-en"></b><span class="cst-detail-zh"></span></div>
+          <p class="cst-detail-tip"></p>
+          <div class="cst-detail-foot"><span class="cst-detail-kind"></span><span class="cst-detail-why"></span></div>
+        </div>
+        ${overRun ? `<button type="button" class="primary" id="btn-back">${icon('back', 'sm')}<span>${dict.back}</span></button>` : ''}
+      </div>
+    </div>
+  `);
+
+  const detail = panel.querySelector('#cst-detail') as HTMLElement | null;
+  const showDetail = (btn: HTMLElement) => {
+    panel.querySelectorAll('.spell-node.selected').forEach((n) => n.classList.remove('selected'));
+    btn.classList.add('selected');
+    if (!detail) return;
+    detail.classList.add('on');
+    const glyph = btn.querySelector('.spell-dot > .ico');
+    const slot = detail.querySelector('.cst-detail-ico');
+    if (slot) slot.innerHTML = glyph ? glyph.outerHTML : '';
+    detail.querySelector('.cst-detail-en')!.textContent = btn.dataset.en ?? '';
+    detail.querySelector('.cst-detail-zh')!.textContent = btn.dataset.zh ?? '';
+    detail.querySelector('.cst-detail-tip')!.textContent = btn.dataset.tip ?? '';
+    detail.querySelector('.cst-detail-kind')!.textContent = btn.dataset.kind ?? '';
+    const why = detail.querySelector('.cst-detail-why') as HTMLElement;
+    why.textContent = btn.dataset.why ?? '';
   };
-  const ultDefs = isMage ? SPELL_ULT_DEFS : ULT_DEFS;
+
+  panel.querySelectorAll<HTMLElement>('.spell-node[data-spell]').forEach((btn) => {
+    btn.addEventListener('click', () => {
+      const id = btn.dataset.spell ?? '';
+      const next = learnSpell(s, id);
+      if (next) {
+        game.save.mage.loadouts[active] = next;
+        const want = defaultSpellBar(next);
+        const prev = (game.save.mage.spellBars[active] ?? []).filter((x) => want.includes(x));
+        for (const spellId of want) if (!prev.includes(spellId)) prev.push(spellId);
+        game.save.mage.spellBars[active] = prev.slice(0, 3);
+        game.persist();
+        game.audio.ui();
+        rerender(game);
+        return;
+      }
+      showDetail(btn);
+      game.audio.ui();
+    });
+  });
+
+  wireLoadoutStrip(panel, game);
+  panel.querySelector('[data-lo-reset]')?.addEventListener('click', () => {
+    game.audio.ui();
+    const spent = spentOf(s);
+    const slot = fmt(dict.loadoutN, { n: active + 1 });
+    const veil = el(`
+      <div class="confirm-veil" role="dialog" aria-modal="true" aria-labelledby="cf-title">
+        <div class="confirm-card">
+          <div class="confirm-ico">${icon('restart')}</div>
+          <h3 id="cf-title">${dict.resetTitle}</h3>
+          <p>${fmt(dict.resetBody, { n: spent, slot })}</p>
+          <div class="confirm-row">
+            <button type="button" class="ghost" data-cf="no">${icon('close', 'xs')}<span>${dict.cancel}</span></button>
+            <button type="button" class="primary" data-cf="yes" ${spent ? '' : 'disabled'}>${icon('restart', 'xs')}<span>${dict.resetYes}</span></button>
+          </div>
+        </div>
+      </div>`);
+    const close = () => veil.remove();
+    veil.addEventListener('click', (e) => { if (e.target === veil) close(); });
+    veil.querySelector('[data-cf="no"]')!.addEventListener('click', () => { game.audio.ui(); close(); });
+    veil.querySelector('[data-cf="yes"]')!.addEventListener('click', () => { close(); game.resetSkills(); });
+    panel.appendChild(veil);
+    (veil.querySelector('[data-cf="no"]') as HTMLElement).focus();
+  });
+
+  const prefer = panel.querySelector<HTMLElement>('.spell-node.ready')
+    ?? panel.querySelector<HTMLElement>('.spell-node.on')
+    ?? panel.querySelector<HTMLElement>('.spell-node');
+  if (prefer) showDetail(prefer);
+  const back = () => {
+    game.audio.ui();
+    game.closeSkills();
+  };
+  panel.querySelector('#btn-back')?.addEventListener('click', back);
+  const barBack = panel.querySelector('[data-act="menu-back"]');
+  if (barBack) {
+    barBack.removeAttribute('data-act');
+    barBack.addEventListener('click', back);
+  }
+  return panel;
+}
+
+export function renderSkills(game: Game, rerender: (game: Game) => void): HTMLElement {
+  if (game.save.character === 'mage') return renderMageBook(game, rerender);
+  const dict = t();
+  const s = game.save.skills;
+  const overRun = game.skillsOverRun;
+  const branchLabel = (b: Branch) => (b === 'str' ? dict.strength : b === 'spd' ? dict.speed : dict.staminaBranch);
+  const branchIco = (b: Branch) => (b === 'sta' ? 'sta' : b);
+  const ultDefs = ULT_DEFS;
 
   /** Portrait constellation arm: vertical stack, bilingual major labels always on. */
   const arm = (branch: Branch) => {
     const filled = s[branch];
-    const nodes = nodeList(branch);
+    const nodes = nodesFor(branch);
     const ult = ultUnlocked(s, branch);
     const can = canSpend(s, branch);
     const ultNext = filled >= BRANCH_FILL && !ult;
@@ -120,7 +232,7 @@ export function renderSkills(game: Game, rerender: (game: Game) => void): HTMLEl
         const major = true;
         const compact = n.kind === 'passive' && n.at < 30;
         return `<button type="button" class="cst-node major ${compact ? 'compact' : ''} ${on ? 'on' : ''} ${upcoming ? 'next' : ''} ${counters.length ? 'counter' : ''} t${n.tier}" style="--i:${i}" title="${title}" aria-label="${title}" data-node="${n.id}" data-tip="${tip.replace(/"/g, '&quot;')}" data-kind="${kind}" data-en="${n.nameEn}" data-zh="${n.nameZh}" data-counters="${counters.join(',')}" data-ctr-names="${ctrNames}">
-          <span class="cst-dot">${icon(skillIcon(n.id, isMage))}${counters.length ? `<span class="cst-ctr" aria-hidden="true">${icon(`kind_${counters[0]}`, 'xs')}</span>` : ''}</span>
+          <span class="cst-dot">${icon(skillIcon(n.id))}${counters.length ? `<span class="cst-ctr" aria-hidden="true">${icon(`kind_${counters[0]}`, 'xs')}</span>` : ''}</span>
           <span class="cst-label">
             <span class="cst-en">${n.nameEn}</span>
             <span class="cst-zh">${n.nameZh}</span>
@@ -143,7 +255,7 @@ export function renderSkills(game: Game, rerender: (game: Game) => void): HTMLEl
         <div class="cst-arm-line" aria-hidden="true"></div>
         <div class="cst-nodes">${nodeHtml}
           <button type="button" class="cst-node major ult ${ult ? 'on' : ''} ${ultNext ? 'next' : ''}" title="${ultTitle}" aria-label="${ultTitle}" data-node="ult-${branch}" data-tip="${ultTip.replace(/"/g, '&quot;')}" data-kind="${dict.ultShort}" data-en="${ultDef.nameEn}" data-zh="${ultDef.nameZh}">
-            <span class="cst-dot">${icon(skillIcon(`ult-${branch}`, isMage))}</span>
+            <span class="cst-dot">${icon(skillIcon(`ult-${branch}`))}</span>
             <span class="cst-label">
               <span class="cst-en">${ultDef.nameEn}</span>
               <span class="cst-zh">${ultDef.nameZh}</span>
@@ -156,13 +268,13 @@ export function renderSkills(game: Game, rerender: (game: Game) => void): HTMLEl
 
   const panel = el(`
     <div class="${overRun ? 'panel skills-panel' : 'sub-screen skills-screen'}" data-ui="1">
-      ${overRun ? `<h2 class="panel-title">${icon('skills', 'sm')}${dict.skills}</h2>` : screenBar(isMage ? dict.spells : dict.skills, 'skills', pointsChip(game))}
+      ${overRun ? `<h2 class="panel-title">${icon('skills', 'sm')}${dict.skills}</h2>` : screenBar(dict.skills, 'skills', pointsChip(game))}
       <div class="${overRun ? 'skills-body' : 'sub-body skills-body'}">
         ${overRun ? `<p class="points">${pointsChip(game)}</p>` : ''}
         <p class="howto skill-howto">${dict.skillHowto}</p>
         ${loadoutStrip(game, { reset: true, cls: 'in-tree' })}
         ${overRun ? `<p class="howto">${dict.skillsApplyNext}</p>` : ''}
-        <div class="constellation ${game.save.character === 'mage' ? 'mage' : 'hero'}" role="group" aria-label="${dict.skills}">
+        <div class="constellation hero" role="group" aria-label="${dict.skills}">
           <div class="cst-core" title="${dict.skillPoints}">${icon('skills')}<b>${s.points}</b></div>
           <div class="cst-detail" id="cst-detail" aria-live="polite">
             <div class="cst-detail-names"><span class="cst-detail-ico"></span><b class="cst-detail-en"></b><span class="cst-detail-zh"></span></div>
@@ -183,16 +295,7 @@ export function renderSkills(game: Game, rerender: (game: Game) => void): HTMLEl
   panel.querySelectorAll('[data-spend]').forEach((btn) => {
     btn.addEventListener('click', () => {
       const branch = (btn as HTMLElement).dataset.spend as Branch;
-      if (isMage) {
-        const slot = spendPoint(s, branch);
-        game.save.mage.loadouts[game.save.mage.active] = slot;
-        // Keep bar in sync with unlocked actives.
-        const bar = game.save.mage.spellBars[game.save.mage.active] ?? [];
-        const unlocked = defaultSpellBar(slot);
-        game.save.mage.spellBars[game.save.mage.active] = bar.length ? bar.filter((id) => unlocked.includes(id) || SPELL_NODES.some((n) => n.id === id && slot[n.skillBranch] >= n.at)).concat(unlocked.filter((id) => !bar.includes(id))).slice(0, 3) : unlocked;
-      } else {
-        game.save.skills = spendPoint(game.save.skills, branch);
-      }
+      game.save.skills = spendPoint(game.save.skills, branch);
       game.persist();
       game.audio.ui();
       rerender(game);

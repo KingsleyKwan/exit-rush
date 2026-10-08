@@ -28,6 +28,8 @@ const P: Record<string, string> = {
   lock: `<path d="M15 21v-6a9 9 0 0 1 18 0v6" stroke="currentColor" ${S(5)}/><rect x="9" y="20" width="30" height="23" rx="5.5" fill="currentColor"/><circle cx="24" cy="30" r="3.5" class="k"/><path d="M24 31v5" class="ks" ${S(3.4)}/>`,
   fire: `<path d="M24 42c-8 0-14-6.5-14-14 0-6 3.5-10 7-14 1.5 4 4 6 7 6 0-5 3-10 7-14 2 5 4 9 4 14 0 7.5-6 14-11 14z" fill="currentColor"/>`,
   ice: `<path d="M24 5v38M10 12l28 24M38 12L10 36M8 24h32" stroke="currentColor" ${S(4)}/><circle cx="24" cy="24" r="5" fill="currentColor"/>`,
+  wind: `<path d="M6 16c8-6 14-6 22 0s12 6 14 0" stroke="currentColor" ${S(4)}/><path d="M6 26c8-6 14-6 22 0s12 6 14 0" stroke="currentColor" ${S(4)} opacity=".75"/><path d="M8 36c7-5 12-5 18 0s10 5 14 0" stroke="currentColor" ${S(3.5)} opacity=".55"/>`,
+  grav: `<path d="M24 6v20" stroke="currentColor" ${S(5)}/><path d="M13 20l11 14 11-14" fill="currentColor"/><path d="M8 42h32" stroke="currentColor" ${S(5)}/>`,
   volt: `<path d="M28 4L14 26h10L20 44l18-26H28z" fill="currentColor"/>`,
   shop: `<path d="M8 16h32l-2 24H10z" fill="currentColor"/><path d="M16 16V12a8 8 0 0 1 16 0v4" stroke="currentColor" ${S(4)}/>`,
   bag: `<path d="M12 18h24v22H12z" fill="currentColor"/><path d="M18 18V14a6 6 0 0 1 12 0v4" stroke="currentColor" ${S(4)}/>`,

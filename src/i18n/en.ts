@@ -53,6 +53,11 @@ export interface Dict {
   levelsTeaser: string;
   /** How skill points are earned and spent. No placeholders. */
   skillHowto: string;
+  /** Mage book only. Three chains, one last skill. */
+  spellHowto: string;
+  /** {name} = the skill that has to come first. */
+  spellNeed: string;
+  spellOneEnd: string;
   ultShort: string;
   skillsApplyNext: string;
   examTag: string;
@@ -175,6 +180,8 @@ export interface Dict {
   fire: string;
   ice: string;
   volt: string;
+  wind: string;
+  grav: string;
   chars: string;
   charSwitch: string;
   charPickTitle: string;
@@ -274,7 +281,7 @@ export const en: Dict = {
   level: 'Level',
   density: 'Crowd',
   howTo: 'Drag anywhere to steer · hold ✊ to shove · get out before the doors close.',
-  howToMage: 'Drag anywhere to steer · cast a spell to clear the way · get out before the doors close.',
+  howToMage: 'Drag anywhere to steer. Wind blows people aside. Cold and weight make them leave the door.',
   howToTech: 'Drag anywhere to steer · use your gear to clear the way · get out before the doors close.',
   language: 'Language',
   clearBonus: '+1 skill point',
@@ -284,6 +291,9 @@ export const en: Dict = {
   back: 'Back',
   levelsTeaser: 'All 100 levels · clear 99 to unlock the Lv100 finale',
   skillHowto: 'Every 10 levels earns 1 point. Each skill costs 1.',
+  spellHowto: 'Three starts: wind, ice, gravity. Some skills need the one below. Only one last skill.',
+  spellNeed: 'Learn {name} first.',
+  spellOneEnd: 'Only one last skill.',
   ultShort: 'Ult',
   skillsApplyNext: 'Changes apply from your next run.',
   examTag: 'Exam',
@@ -354,7 +364,7 @@ export const en: Dict = {
   off: 'Off',
   hintDrag: 'Drag',
   hintShove: 'Hold',
-  hintCast: 'Cast',
+  hintCast: 'Blow',
   hintGear: 'Gear',
   hintExit: 'Get off',
   finale: 'Finale',
@@ -402,6 +412,8 @@ export const en: Dict = {
   fire: 'Fire',
   ice: 'Ice',
   volt: 'Lightning',
+  wind: 'Wind',
+  grav: 'Gravity',
   chars: 'Characters',
   charSwitch: 'Change character',
   charPickTitle: 'Pick a character',

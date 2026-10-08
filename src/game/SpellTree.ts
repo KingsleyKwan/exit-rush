@@ -1,183 +1,205 @@
 /**
- * Mage 「凱婷」 Bad Girl spellbook (v0.8).
- * SkillState fields map: str=fire, spd=volt, sta=ice (shared spend/reconcile).
- * See docs/CHARACTERS.md §3.
+ * Mage 「凱婷」 spellbook. Not the hero constellation.
+ * Three chains — wind, ice, gravity — read bottom to top.
+ * A skill needs the one below it. Only one of the three last skills can be learned.
+ * Schools mix: wind blows; wind + ice sends people another way; ice + gravity holds them still.
+ * SkillState.known is the book. str/spd/sta stay the hero's power fields and are not read here.
  */
-import type { PassengerKind } from './PassengerTypes';
-import type { SkillModifiers, SkillNodeDef, Branch } from './SkillTree';
-import { BRANCH_FILL, NODE_THRESHOLDS, nodeUnlocked } from './SkillTree';
+import type { SkillModifiers } from './SkillTree';
+import type { Branch } from './SkillTree';
 import type { SkillState } from './storage';
 import { TUNING } from './sim/tuning';
 
-export type SpellBranch = 'fire' | 'ice' | 'volt';
+export type SpellSchool = 'wind' | 'ice' | 'grav';
+/** Old name. The book is wind / ice / gravity, not fire / lightning. */
+export type SpellBranch = SpellSchool;
 
 export interface SpellNodeDef {
   id: string;
-  branch: SpellBranch;
-  skillBranch: Branch;
-  tier: 1 | 2 | 3;
-  at: number;
+  school: SpellSchool;
+  /** Skill that must already be learned. Starts have none. */
+  requires?: string;
+  /** Last skill of a chain. Only one capstone may be known. */
+  capstone?: boolean;
   kind: 'passive' | 'active';
-  counters?: PassengerKind[];
   nameEn: string;
   nameZh: string;
   tipEn: string;
   tipZh: string;
-  /** Mana cost for actives (0 = passive / ult). */
+  /** Shown on the node. Casts read TUNING.weather. */
   mana?: number;
   cd?: number;
 }
 
+export const SPELL_SCHOOLS: readonly SpellSchool[] = ['wind', 'ice', 'grav'];
+
 export const SPELL_NODES: SpellNodeDef[] = [
-  // ---- 🔥 Fire (str)
   {
-    id: 'fire_t1', branch: 'fire', skillBranch: 'str', tier: 1, at: 10, kind: 'active',
-    nameEn: 'Fire Bolt', nameZh: '火球',
-    tipEn: 'Line blast that shoves bodies sideways', tipZh: '直線火球，側推開路',
-    mana: 25, cd: 3.5,
+    id: 'wind_1', school: 'wind', kind: 'active', mana: 18, cd: 3.4,
+    nameEn: 'Breeze', nameZh: '微風',
+    tipEn: 'Blows people aside. Not a hit. With ice, they feel cold and take another way.',
+    tipZh: '吹開身邊嘅人，唔係打。加冰就覺得凍，想行第二條路。',
   },
   {
-    id: 'fire_t2a', branch: 'fire', skillBranch: 'str', tier: 2, at: 20, kind: 'passive',
-    nameEn: 'Hot Blood', nameZh: '熱血',
-    tipEn: 'Push force ×1.1', tipZh: '推力 ×1.1',
+    id: 'wind_2', school: 'wind', requires: 'wind_1', kind: 'passive',
+    nameEn: 'Tailwind', nameZh: '順風',
+    tipEn: 'She walks a little lighter.',
+    tipZh: '行路輕少少。',
   },
   {
-    id: 'fire_t2b', branch: 'fire', skillBranch: 'str', tier: 2, at: 30, kind: 'passive',
-    nameEn: 'Burning Urgency', nameZh: '火燒眉毛',
-    tipEn: 'Last 5 s: speed ×1.1, mana regen ×2', tipZh: '最後5秒：速度×1.1、魔力回×2',
+    id: 'wind_3', school: 'wind', requires: 'wind_2', kind: 'passive',
+    nameEn: 'Crosswind', nameZh: '橫風',
+    tipEn: 'The breeze is wider, and people keep drifting.',
+    tipZh: '風闊啲，人會繼續飄開。',
   },
   {
-    id: 'fire_t3a', branch: 'fire', skillBranch: 'str', tier: 3, at: 50, kind: 'passive',
-    counters: ['stench'],
-    nameEn: 'Cleansing Flame', nameZh: '淨化之火',
-    tipEn: 'Fire hits burn off stench aura 6 s; aura slow −30 %', tipZh: '火系擊中燒走臭氣6秒；臭氣減速−30%',
+    id: 'wind_4', school: 'wind', requires: 'wind_3', capstone: true, kind: 'active',
+    nameEn: 'Headwind', nameZh: '逆風',
+    tipEn: 'A headwind down the aisle. Nobody wants to stand in the door. Only one last skill.',
+    tipZh: '成條通道都係逆風，冇人想企喺門口。最後嗰招只可以揀一條路。',
   },
   {
-    id: 'fire_t3b', branch: 'fire', skillBranch: 'str', tier: 3, at: 35, kind: 'active',
-    counters: ['luggage'],
-    nameEn: 'Flame Burst', nameZh: '爆炎',
-    tipEn: 'Radial burst; suitcases ×2.6', tipZh: '範圍爆炎，行李喼特效×2.6',
-    mana: 40, cd: 8,
+    id: 'ice_1', school: 'ice', kind: 'passive',
+    nameEn: 'Cool Air', nameZh: '涼氣',
+    tipEn: 'She does not get winded as fast.',
+    tipZh: '佢自己冇咁易喘。',
   },
   {
-    id: 'fire_t3c', branch: 'fire', skillBranch: 'str', tier: 3, at: 60, kind: 'passive',
-    counters: ['couple'],
-    nameEn: 'Too Hot to Hold', nameZh: '熱到放手',
-    tipEn: 'Fire hit breaks couple hand-hold 5 s', tipZh: '火系擊中拆情侶拖手5秒',
-  },
-  // ---- ❄️ Ice (sta)
-  {
-    id: 'ice_t1', branch: 'ice', skillBranch: 'sta', tier: 1, at: 10, kind: 'active',
-    nameEn: 'Frost Breath', nameZh: '冰霜吐息',
-    tipEn: 'Cone chill: boarders stop pushing', tipZh: '扇形冰息，上車客停推',
-    mana: 25, cd: 4,
+    id: 'ice_2', school: 'ice', requires: 'ice_1', kind: 'passive',
+    nameEn: 'Cold Air', nameZh: '冷空氣',
+    tipEn: 'The smell bothers her less. The car starts to feel cold.',
+    tipZh: '臭味冇咁入。車廂開始凍。',
   },
   {
-    id: 'ice_t2a', branch: 'ice', skillBranch: 'sta', tier: 2, at: 20, kind: 'passive',
-    nameEn: 'Cool Head', nameZh: '冷靜',
-    tipEn: 'Stamina ×1.1', tipZh: '體力 ×1.1',
+    id: 'ice_3', school: 'ice', requires: 'ice_2', kind: 'active', mana: 22, cd: 4.6,
+    nameEn: 'Turn Aside', nameZh: '轉彎',
+    tipEn: 'People feel the cold. With wind they take another way. With gravity they cannot move.',
+    tipZh: '人覺得凍。加風就轉去第二條路。加重就郁唔到。',
   },
   {
-    id: 'ice_t2b', branch: 'ice', skillBranch: 'sta', tier: 2, at: 30, kind: 'passive',
-    nameEn: 'Frost Shield', nameZh: '冰晶護盾',
-    tipEn: '+25 stamina buffer; mana max +20', tipZh: '+25體力緩衝；魔力上限+20',
+    id: 'ice_4', school: 'ice', requires: 'ice_3', capstone: true, kind: 'active',
+    nameEn: 'Whiteout', nameZh: '白茫茫',
+    tipEn: 'The aisle goes white and cold. Only one last skill.',
+    tipZh: '成條通道白茫茫咁凍。最後嗰招只可以揀一條路。',
   },
   {
-    id: 'ice_t3a', branch: 'ice', skillBranch: 'sta', tier: 3, at: 50, kind: 'passive',
-    counters: ['angry'],
-    nameEn: 'Chill Out', nameZh: '冷靜一下',
-    tipEn: 'Chilled angry can\'t wind up 4 s; angry shove ×0.5', tipZh: '冰凍暴躁男唔蓄力4秒；佢推你×0.5',
+    id: 'grav_1', school: 'grav', kind: 'passive',
+    nameEn: 'Heavy Feet', nameZh: '腳重',
+    tipEn: 'Shoves do not move her as much.',
+    tipZh: '人推佢冇咁郁。',
   },
   {
-    id: 'ice_t3b', branch: 'ice', skillBranch: 'sta', tier: 3, at: 35, kind: 'active',
-    counters: ['family', 'brat'],
-    nameEn: 'Flash Freeze', nameZh: '急凍',
-    tipEn: 'Radial freeze 2.5 s', tipZh: '範圍急凍2.5秒',
-    mana: 40, cd: 9,
+    id: 'grav_2', school: 'grav', requires: 'grav_1', kind: 'passive',
+    nameEn: 'Sink', nameZh: '沉落',
+    tipEn: 'A squatter\'s feet do not drag her.',
+    tipZh: '踎低客嘅腳步拖唔住佢。',
   },
   {
-    id: 'ice_t3c', branch: 'ice', skillBranch: 'sta', tier: 3, at: 60, kind: 'passive',
-    counters: ['squat'],
-    nameEn: 'Ice Glide', nameZh: '冰面滑行',
-    tipEn: 'Squatters shove normally; slip ×3 vs frozen', tipZh: '踎低客可正常推；對急凍身滑行×3',
-  },
-  // ---- ⚡ Volt (spd)
-  {
-    id: 'volt_t1', branch: 'volt', skillBranch: 'spd', tier: 1, at: 10, kind: 'active',
-    nameEn: 'Zap', nameZh: '電一電',
-    tipEn: 'Chain-daze nearest 3 bodies', tipZh: '連鎖電暈最近3人',
-    mana: 20, cd: 3,
+    id: 'grav_3', school: 'grav', requires: 'grav_2', kind: 'active', mana: 22, cd: 4.6,
+    nameEn: 'Held Down', nameZh: '撳住',
+    tipEn: 'People feel heavy and stop darting. With ice, the cold holds them still. With wind, a breeze moves them, then they stay.',
+    tipZh: '人覺得重，唔再左穿右插。加冰就凍到郁唔到。加風就吹完再停低。',
   },
   {
-    id: 'volt_t2a', branch: 'volt', skillBranch: 'spd', tier: 2, at: 20, kind: 'passive',
-    nameEn: 'Static Step', nameZh: '靜電步',
-    tipEn: 'Speed ×1.1', tipZh: '速度 ×1.1',
-  },
-  {
-    id: 'volt_t2b', branch: 'volt', skillBranch: 'spd', tier: 2, at: 30, kind: 'passive',
-    nameEn: 'Conductor', nameZh: '導電體',
-    tipEn: 'Spell CD −20 %, mana regen +3/s', tipZh: '法術冷卻−20%，魔力回+3/秒',
-  },
-  {
-    id: 'volt_t3a', branch: 'volt', skillBranch: 'spd', tier: 3, at: 50, kind: 'passive',
-    counters: ['loud'],
-    nameEn: 'Dropped Call', nameZh: '斷線',
-    tipEn: 'Lightning cuts loudmouth call 6 s; noise −30 %', tipZh: '雷系斷電話6秒；噪音−30%',
-  },
-  {
-    id: 'volt_t3b', branch: 'volt', skillBranch: 'spd', tier: 3, at: 35, kind: 'active',
-    counters: ['brat'],
-    nameEn: 'Thunderclap', nameZh: '雷鳴',
-    tipEn: 'Radial: brats knocked + dazed 3.5 s', tipZh: '範圍：百厭仔彈開並暈3.5秒',
-    mana: 35, cd: 8,
-  },
-  {
-    id: 'volt_t3c', branch: 'volt', skillBranch: 'spd', tier: 3, at: 60, kind: 'passive',
-    counters: ['squat', 'family'],
-    nameEn: 'Thunder Step', nameZh: '雷步',
-    tipEn: '1.5 s after cast: phase past squatters + kids', tipZh: '施法後1.5秒可穿踎低客同細路',
+    id: 'grav_4', school: 'grav', requires: 'grav_3', capstone: true, kind: 'active',
+    nameEn: 'Still', nameZh: '定住',
+    tipEn: 'The aisle goes still. Only one last skill.',
+    tipZh: '成條通道靜止。最後嗰招只可以揀一條路。',
   },
 ];
 
+/** Capstones occupy the existing ult slots: wind → str, ice → sta, gravity → spd. */
 export const SPELL_ULT_DEFS: Record<
   Branch,
-  { nameEn: string; nameZh: string; tipEn: string; tipZh: string; element: SpellBranch }
+  { nameEn: string; nameZh: string; tipEn: string; tipZh: string; element: SpellSchool }
 > = {
   str: {
-    nameEn: 'Phoenix Blaze', nameZh: '火鳳燎原',
-    tipEn: 'Shockwave + blazing charge', tipZh: '震波 + 火熱衝撞',
-    element: 'fire',
-  },
-  spd: {
-    nameEn: 'Thunder Blink', nameZh: '雷霆閃落',
-    tipEn: 'Blink toward the door, then speed burst', tipZh: '閃身近門口，再加速',
-    element: 'volt',
+    nameEn: 'Headwind', nameZh: '逆風',
+    tipEn: 'A headwind down the aisle. Nobody wants to stand in the door.',
+    tipZh: '成條通道都係逆風，冇人想企喺門口。',
+    element: 'wind',
   },
   sta: {
-    nameEn: 'Ice Age', nameZh: '冰河時代',
-    tipEn: 'Freeze nearby + burst stamina & mana regen', tipZh: '急凍周圍 + 體力魔力爆發回',
+    nameEn: 'Whiteout', nameZh: '白茫茫',
+    tipEn: 'The aisle goes white and cold.',
+    tipZh: '成條通道白茫茫咁凍。',
     element: 'ice',
+  },
+  spd: {
+    nameEn: 'Still', nameZh: '定住',
+    tipEn: 'The aisle goes still.',
+    tipZh: '成條通道靜止。',
+    element: 'grav',
   },
 };
 
-function hasSpell(s: SkillState, id: string): boolean {
-  const n = SPELL_NODES.find((x) => x.id === id);
-  if (!n) return false;
-  return s[n.skillBranch] >= n.at;
+const CAPSTONES = ['wind_4', 'ice_4', 'grav_4'] as const;
+
+export function spellById(id: string): SpellNodeDef | undefined {
+  return SPELL_NODES.find((n) => n.id === id);
 }
 
-export function spellNodeAsSkill(n: SpellNodeDef): SkillNodeDef {
+export function knows(s: SkillState, id: string): boolean {
+  return !!s.known?.includes(id);
+}
+
+export function schoolKnown(s: SkillState, school: SpellSchool): boolean {
+  return SPELL_NODES.some((n) => n.school === school && knows(s, n.id));
+}
+
+export function capstoneOwned(s: SkillState): string | null {
+  return CAPSTONES.find((id) => knows(s, id)) ?? null;
+}
+
+/** True when this skill can be learned with the point she is holding. */
+export function canLearn(s: SkillState, id: string): boolean {
+  const n = spellById(id);
+  if (!n || knows(s, id)) return false;
+  if ((s.points ?? 0) < 1) return false;
+  if ((s.known?.length ?? 0) >= 10) return false;
+  if (n.requires && !knows(s, n.requires)) return false;
+  if (n.capstone && capstoneOwned(s)) return false;
+  return true;
+}
+
+/** Spend 1 point on a spell. Returns null if it cannot be learned. Does not touch hero power. */
+export function learnSpell(s: SkillState, id: string): SkillState | null {
+  if (!canLearn(s, id)) return null;
+  const known = [...(s.known ?? []), id];
   return {
-    id: n.id,
-    branch: n.skillBranch,
-    tier: n.tier,
-    at: n.at,
-    kind: n.kind,
-    counters: n.counters,
-    nameEn: n.nameEn,
-    nameZh: n.nameZh,
-    tipEn: n.tipEn,
-    tipZh: n.tipZh,
+    ...s,
+    str: 0,
+    spd: 0,
+    sta: 0,
+    known,
+    points: Math.max(0, s.points - 1),
+    ultStr: known.includes('wind_4'),
+    ultSta: known.includes('ice_4'),
+    ultSpd: known.includes('grav_4'),
+  };
+}
+
+/** One active button per school, in wind / ice / gravity order. */
+export function defaultSpellBar(s: SkillState): string[] {
+  return (['wind_1', 'ice_3', 'grav_3'] as const).filter((id) => knows(s, id));
+}
+
+export function unlockedSpellActives(s: SkillState): SpellNodeDef[] {
+  const bar = new Set(defaultSpellBar(s));
+  return SPELL_NODES.filter((n) => bar.has(n.id));
+}
+
+/**
+ * Trial car only. Not written to the save.
+ * The three actives, so wind, cold, and weight can mix. No last skill.
+ */
+export function trialSpellState(): SkillState {
+  const known = ['wind_1', 'wind_2', 'ice_1', 'ice_2', 'ice_3', 'grav_1', 'grav_2', 'grav_3'];
+  return {
+    str: 0, spd: 0, sta: 0,
+    ultStr: false, ultSpd: false, ultSta: false,
+    points: 0,
+    known,
   };
 }
 
@@ -199,84 +221,69 @@ export interface SpellModResult {
   conductor: boolean;
   droppedCall: boolean;
   thunderStep: boolean;
+  hasWind: boolean;
+  hasIce: boolean;
+  hasGrav: boolean;
+  crosswind: boolean;
 }
 
-/** Continuous fill at 60 pts mirrors Hero STR/STA/SPD (docs §3.3). */
+/** Passives from the book. Does not read str/spd/sta. */
 export function modifiersFromSpells(s: SkillState): SpellModResult {
   const M = TUNING.mage;
-  const Sp = TUNING.spells;
-  const fireT = Math.min(1, s.str / BRANCH_FILL);
-  const voltT = Math.min(1, s.spd / BRANCH_FILL);
-  const iceT = Math.min(1, s.sta / BRANCH_FILL);
-
-  const hotBlood = hasSpell(s, 'fire_t2a');
-  const coolHead = hasSpell(s, 'ice_t2a');
-  const staticStep = hasSpell(s, 'volt_t2a');
-  const conductor = hasSpell(s, 'volt_t2b');
-  const frostShield = hasSpell(s, 'ice_t2b');
+  const W = TUNING.weather;
+  const coolHead = knows(s, 'ice_1');
+  const coldAir = knows(s, 'ice_2');
+  const staticStep = knows(s, 'wind_2');
+  const crosswind = knows(s, 'wind_3');
+  const heavyFeet = knows(s, 'grav_1');
+  const sink = knows(s, 'grav_2');
 
   const skillMods: SkillModifiers = {
-    pushForce: 1 + fireT * (Sp?.fillPush ?? 0.45),
-    moveSpeed: 1 + voltT * (Sp?.fillSpeed ?? 0.35),
-    staminaMax: (M?.staminaMax ?? 90) * (coolHead ? 1.1 : 1) + iceT * (Sp?.fillStamina ?? 40),
+    pushForce: 1,
+    moveSpeed: 1,
+    staminaMax: (M?.staminaMax ?? 90) * (coolHead ? 1.1 : 1),
     staminaRegen: M?.staminaRegen ?? 12,
-    staminaBuffer: frostShield ? (Sp?.frostBuffer ?? 25) : 0,
-    resist: fireT * 0.25,
-    auraResist: iceT * (Sp?.fillAura ?? 0.45) + (hasSpell(s, 'fire_t3a') ? 0.3 : 0),
-    gapSense: voltT * (Sp?.fillGap ?? 0.3),
+    staminaBuffer: 0,
+    resist: heavyFeet ? (W?.resist ?? 0.22) : 0,
+    auraResist: coldAir ? (W?.aura ?? 0.45) : 0,
+    gapSense: 0,
     frontPush: 0,
     chargeShoveMul: 1,
     clearSpeed: 1,
     blockedDragCut: 0,
     hasChargedShove: false,
-    splitCouples: hasSpell(s, 'fire_t3c'),
-    hasGroundPound: hasSpell(s, 'fire_t3b'),
-    standFirm: hasSpell(s, 'ice_t3a'),
+    splitCouples: false,
+    hasGroundPound: false,
+    standFirm: false,
     hurdle: false,
     hasLeap: false,
     threadCouples: false,
-    holdBreath: hasSpell(s, 'fire_t3a'),
+    holdBreath: false,
     hasSecondWind: false,
     unbothered: false,
   };
 
-  const cdr = (1 - voltT * (Sp?.fillCdr ?? 0.15)) * (conductor ? 0.8 : 1);
-
   return {
     skillMods,
-    manaMaxBonus: iceT * (Sp?.fillMana ?? 40) + (frostShield ? 20 : 0),
-    manaRegenBonus: conductor ? 3 : 0,
-    spellPower: 1 + fireT * (Sp?.fillSpellPower ?? 0.3),
-    cdr: Math.max(0.5, cdr),
-    hotBlood,
-    burningUrgency: hasSpell(s, 'fire_t2b'),
-    cleansingFlame: hasSpell(s, 'fire_t3a'),
-    tooHotToHold: hasSpell(s, 'fire_t3c'),
+    manaMaxBonus: 0,
+    manaRegenBonus: 0,
+    spellPower: crosswind ? (W?.crossPower ?? 1.12) : 1,
+    cdr: 1,
+    hotBlood: false,
+    burningUrgency: false,
+    cleansingFlame: false,
+    tooHotToHold: false,
     coolHead,
-    frostShield,
-    chillOut: hasSpell(s, 'ice_t3a'),
-    iceGlide: hasSpell(s, 'ice_t3c'),
+    frostShield: false,
+    chillOut: false,
+    iceGlide: sink,
     staticStep,
-    conductor,
-    droppedCall: hasSpell(s, 'volt_t3a'),
-    thunderStep: hasSpell(s, 'volt_t3c'),
+    conductor: false,
+    droppedCall: false,
+    thunderStep: false,
+    hasWind: schoolKnown(s, 'wind'),
+    hasIce: schoolKnown(s, 'ice'),
+    hasGrav: schoolKnown(s, 'grav'),
+    crosswind,
   };
 }
-
-export function unlockedSpellActives(s: SkillState): SpellNodeDef[] {
-  return SPELL_NODES.filter((n) => n.kind === 'active' && hasSpell(s, n.id));
-}
-
-/** Default spell bar: up to 3 most recent unlocked actives (highest `at`, then id). */
-export function defaultSpellBar(s: SkillState): string[] {
-  return unlockedSpellActives(s)
-    .sort((a, b) => b.at - a.at || a.id.localeCompare(b.id))
-    .slice(0, 3)
-    .map((n) => n.id);
-}
-
-export function spellById(id: string): SpellNodeDef | undefined {
-  return SPELL_NODES.find((n) => n.id === id);
-}
-
-export { NODE_THRESHOLDS, nodeUnlocked, BRANCH_FILL };

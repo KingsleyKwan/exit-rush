@@ -93,11 +93,19 @@ export function loadoutStrip(game: Game, opts: { edit?: boolean; reset?: boolean
       const sk = on ? (live ?? s) : s;
       const name = dict.loadoutN.replace('{n}', String(i + 1));
       const u = (sk.ultStr ? 1 : 0) + (sk.ultSpd ? 1 : 0) + (sk.ultSta ? 1 : 0);
-      const l1 = isMage ? dict.fire : dict.strength;
-      const l2 = isMage ? dict.volt : dict.speed;
-      const l3 = isMage ? dict.ice : dict.staminaBranch;
-      return `<button type="button" class="lo-slot ${on ? 'on' : ''}" data-slot="${i}" aria-pressed="${on}" aria-label="${name}: ${l1} ${sk.str}, ${l2} ${sk.spd}, ${l3} ${sk.sta}">
-        <b>${name}</b><small>${sk.str}·${sk.spd}·${sk.sta}${u ? `<i class="lo-ult">${'★'.repeat(u)}</i>` : ''}</small>
+      const known = sk.known ?? [];
+      const counts = isMage
+        ? [
+            known.filter((id) => id.startsWith('wind_')).length,
+            known.filter((id) => id.startsWith('ice_')).length,
+            known.filter((id) => id.startsWith('grav_')).length,
+          ]
+        : [sk.str, sk.spd, sk.sta];
+      const l1 = isMage ? dict.wind : dict.strength;
+      const l2 = isMage ? dict.ice : dict.speed;
+      const l3 = isMage ? dict.grav : dict.staminaBranch;
+      return `<button type="button" class="lo-slot ${on ? 'on' : ''}" data-slot="${i}" aria-pressed="${on}" aria-label="${name}: ${l1} ${counts[0]}, ${l2} ${counts[1]}, ${l3} ${counts[2]}">
+        <b>${name}</b><small>${counts[0]}·${counts[1]}·${counts[2]}${u ? `<i class="lo-ult">${'★'.repeat(u)}</i>` : ''}</small>
       </button>`;
     })
     .join('');

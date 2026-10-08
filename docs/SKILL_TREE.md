@@ -95,4 +95,4 @@ Tune numbers in `TUNING.skills` (`src/game/sim/tuning.ts`). Node copy lives in `
 
 
 ## v0.8 Mage spellbook
-The Mage 「凱婷」 / Bad Girl reuses the constellation UI with Fire/Ice/Lightning branches mapped onto the SkillState fields (`str`/`sta`/`spd`). Full node list: `docs/CHARACTERS.md` §3 and `src/game/SpellTree.ts`.
+凱婷 does not use the hero constellation. Her book is three chains — wind, ice, gravity — read from the bottom. A skill needs the one below it. Only one of the three last skills can be learned. The schools mix: wind blows, wind + ice sends people another way, ice + gravity holds them still. The list is `docs/CHARACTERS.md` §3 and `src/game/SpellTree.ts`. `str` / `spd` / `sta` stay the hero's power fields.

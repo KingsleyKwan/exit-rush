@@ -277,248 +277,208 @@ function techAbility(id: string, mods: PlayerMods): AbilityDef | null {
   return null;
 }
 
-function spellAbility(node: SpellNodeDef, mods: PlayerMods): AbilityDef | null {
-  const Sp = TUNING.spells;
-  const cdr = mods.cdr || 1;
-  const power = mods.spellPower || 1;
+function clampCar(x: number, z: number): { x: number; z: number } {
+  const h = TUNING.car.halfWidth - 0.4;
+  return {
+    x: Math.max(-h, Math.min(h, x)),
+    z: Math.max(-3.8, Math.min(3.8, z)),
+  };
+}
 
-  if (node.id === 'fire_t1') {
-    const T = Sp.fireBolt;
+/** Away from her, and deeper into the car so the doorway clears. */
+function blowVector(px: number, pz: number, ax: number, az: number): { x: number; z: number } {
+  const dx = ax - px;
+  const dz = az - pz;
+  const d = Math.hypot(dx, dz) || 1;
+  let kx = (dx / d) * 0.55 + 0.75;
+  let kz = (dz / d) * 0.85;
+  const kl = Math.hypot(kx, kz) || 1;
+  kx /= kl;
+  kz /= kl;
+  return { x: kx, z: kz };
+}
+
+function markCold(a: Agent, until: number, emit: Emit): void {
+  a.coldUntil = Math.max(a.coldUntil, until);
+  if (a.kind === 'loud') a.callOffUntil = Math.max(a.callOffUntil, until);
+  if (a.kind === 'stench') a.auraOffUntil = Math.max(a.auraOffUntil, until);
+  emit({ t: 'status', agentId: a.id, kind: 'cold', until });
+}
+
+function markHeavy(a: Agent, until: number, emit: Emit): void {
+  a.heavyUntil = Math.max(a.heavyUntil, until);
+  emit({ t: 'status', agentId: a.id, kind: 'heavy', until });
+}
+
+function markFlee(a: Agent, until: number, x: number, z: number, emit: Emit): void {
+  if (a.boss) return;
+  const spot = clampCar(x, z);
+  a.fleeUntil = Math.max(a.fleeUntil, until);
+  a.fleeX = spot.x;
+  a.fleeZ = spot.z;
+  emit({ t: 'status', agentId: a.id, kind: 'flee', until });
+}
+
+/** Weather wears a boss down. It does not strike them. */
+function weatherWear(a: Agent, school: 'wind' | 'ice' | 'grav', mods: PlayerMods): void {
+  if (!a.boss) return;
+  const base = (TUNING.weather?.wear ?? 0.08) * (mods.spellPower || 1);
+  a.boss.stub = Math.max(0, a.boss.stub - base);
+  const match: Record<'wind' | 'ice' | 'grav', PassengerKind[]> = {
+    wind: ['luggage', 'couple'],
+    ice: ['stench', 'angry', 'loud'],
+    grav: ['squat', 'brat', 'family'],
+  };
+  drainBoss(a, match[school], mods);
+}
+
+function blowBody(a: Agent, px: number, pz: number, impulse: number, mods: PlayerMods): void {
+  const dir = blowVector(px, pz, a.body.x, a.body.z);
+  const scale = a.boss ? (TUNING.weather?.bossImpulse ?? 0.35) : 1;
+  const push = impulse * (mods.spellPower || 1) * scale;
+  applyImpulse(a.body, dir.x * push, dir.z * push);
+  if (a.caseBody) {
+    const mul = TUNING.weather?.caseMul ?? 1.45;
+    applyImpulse(a.caseBody, dir.x * push * mul, dir.z * push * mul);
+  }
+}
+
+/**
+ * Wind always blows. It never freezes and never dazes.
+ * Ice on the wind: cold, and they head somewhere else.
+ * Gravity on the wind, without ice: the blow lands, then they feel heavy and stay.
+ */
+function applyWind(a: Agent, ctx: AbilityCtx, impulse: number, flee: number, cold: number, heavy: number): void {
+  const px = ctx.player.body.x;
+  const pz = ctx.player.body.z;
+  blowBody(a, px, pz, impulse, ctx.mods);
+  weatherWear(a, 'wind', ctx.mods);
+  const ice = !!ctx.mods.hasIce;
+  const grav = !!ctx.mods.hasGrav;
+  if (ice) {
+    markCold(a, ctx.time + cold, ctx.emit);
+    const dir = blowVector(px, pz, a.body.x, a.body.z);
+    markFlee(a, ctx.time + flee, a.body.x + dir.x * 1.35, a.body.z + dir.z * 1.35, ctx.emit);
+  } else if (grav) {
+    markHeavy(a, ctx.time + heavy, ctx.emit);
+  }
+}
+
+/** Ice + gravity: cold and cannot move. Ice + wind: cold and another way. Ice alone: just cold. */
+function applyIce(a: Agent, ctx: AbilityCtx, cold: number, freeze: number, impulse: number): void {
+  weatherWear(a, 'ice', ctx.mods);
+  const grav = !!ctx.mods.hasGrav;
+  const wind = !!ctx.mods.hasWind;
+  if (grav) {
+    markCold(a, ctx.time + freeze, ctx.emit);
+    const dur = disableDur(freeze, isBossAgent(a));
+    applyStatus(a, 'freeze', ctx.time + dur, ctx.emit);
+    a.freezeGhostUntil = Math.max(a.freezeGhostUntil, ctx.time + (a.boss ? 0.35 : 0.55));
+    return;
+  }
+  if (wind) {
+    const px = ctx.player.body.x;
+    const pz = ctx.player.body.z;
+    markCold(a, ctx.time + cold, ctx.emit);
+    blowBody(a, px, pz, impulse * 0.85, ctx.mods);
+    const dir = blowVector(px, pz, a.body.x, a.body.z);
+    markFlee(a, ctx.time + cold, a.body.x + dir.x * 1.35, a.body.z + dir.z * 1.35, ctx.emit);
+    return;
+  }
+  markCold(a, ctx.time + cold, ctx.emit);
+}
+
+/** Gravity + ice: cold and cannot move. Gravity + wind: a blow, then they stay. Gravity alone: heavy, no hit. */
+function applyGrav(a: Agent, ctx: AbilityCtx, heavy: number, freeze: number, impulse: number): void {
+  weatherWear(a, 'grav', ctx.mods);
+  const ice = !!ctx.mods.hasIce;
+  const wind = !!ctx.mods.hasWind;
+  if (ice) {
+    markCold(a, ctx.time + freeze, ctx.emit);
+    const dur = disableDur(freeze, isBossAgent(a));
+    applyStatus(a, 'freeze', ctx.time + dur, ctx.emit);
+    a.freezeGhostUntil = Math.max(a.freezeGhostUntil, ctx.time + (a.boss ? 0.35 : 0.55));
+    return;
+  }
+  if (wind) {
+    const px = ctx.player.body.x;
+    const pz = ctx.player.body.z;
+    blowBody(a, px, pz, impulse * 0.7, ctx.mods);
+    markHeavy(a, ctx.time + heavy, ctx.emit);
+    return;
+  }
+  markHeavy(a, ctx.time + heavy, ctx.emit);
+}
+
+function spellAbility(node: SpellNodeDef, mods: PlayerMods): AbilityDef | null {
+  const W = TUNING.weather;
+  const cdr = mods.cdr || 1;
+
+  if (node.id === 'wind_1') {
+    const wide = !!mods.crosswind;
+    const range = wide ? W.cross.range : W.blow.range;
+    const width = wide ? W.cross.width : W.blow.width;
+    const impulse = wide ? W.cross.impulse : W.blow.impulse;
+    const flee = wide ? W.cross.flee : W.blow.flee;
     return {
       id: node.id,
       resource: 'mana',
-      cost: T.mana,
-      cd: T.cd * cdr,
+      cost: W.blow.mana,
+      cd: W.blow.cd * cdr,
       cast(ctx) {
         const { dx, dz } = aimDir(ctx);
         const px = ctx.player.body.x;
         const pz = ctx.player.body.z;
-        ctx.emit({ t: 'cast', ability: node.id, x: px, z: pz, dx, dz, el: 'fire' });
-        // Wide forward wedge (not a thin ray) — shove bodies forward + aside.
-        const halfW = Math.max(T.width, 0.85);
+        ctx.emit({ t: 'cast', ability: node.id, x: px, z: pz, dx, dz, el: 'wind' });
         for (const a of ctx.crowd.agents) {
           const vx = a.body.x - px;
           const vz = a.body.z - pz;
           const dist = Math.hypot(vx, vz);
-          if (dist < 0.05 || dist > T.range) continue;
+          if (dist < 0.05 || dist > range) continue;
           const along = (vx * dx + vz * dz) / dist;
-          if (along < 0.15) continue; // behind / steeply beside
+          if (along < 0.05) continue;
           const lat = Math.abs(vx * -dz + vz * dx);
-          if (lat > halfW + dist * 0.45) continue;
-          const imp = T.impulse * power * (1.15 - dist / T.range * 0.35);
-          // Blend: mostly away from caster, with a forward bias.
-          let kx = vx / dist * 0.65 + dx * 0.55;
-          let kz = vz / dist * 0.65 + dz * 0.55;
-          const kl = Math.hypot(kx, kz) || 1;
-          kx /= kl; kz /= kl;
-          const lug = (a.kind === 'luggage' || a.caseBody) ? 2.4 : 1;
-          applyImpulse(a.body, kx * imp * lug, kz * imp * lug);
-          if (a.caseBody) applyImpulse(a.caseBody, kx * imp * 1.9, kz * imp * 1.9);
-          applyStatus(a, 'daze', ctx.time + disableDur(0.35, !!a.boss), ctx.emit);
-          if (a.kind === 'stench') {
-            const dur = mods.cleansingFlame ? Sp.cleanseAura : Sp.cleanseAura * 0.25;
-            applyStatus(a, 'auraOff', ctx.time + dur, ctx.emit);
-          }
-          if (mods.tooHotToHold && a.kind === 'couple') {
-            applyStatus(a, 'linkOff', ctx.time + Sp.hotHold, ctx.emit);
-          }
-          drainBoss(a, a.kind === 'stench' || a.kind === 'luggage' ? [a.kind] : undefined, mods);
+          if (lat > width + dist * 0.55) continue;
+          applyWind(a, ctx, impulse * (1.1 - dist / range * 0.25), flee, W.blow.cold, W.blow.heavy);
         }
-        if (mods.thunderStep) ctx.player.phaseUntil = ctx.time + Sp.thunderStep;
         return true;
       },
     };
   }
 
-  if (node.id === 'fire_t3b') {
-    const T = Sp.flameBurst;
+  if (node.id === 'ice_3') {
     return {
       id: node.id,
       resource: 'mana',
-      cost: T.mana,
-      cd: T.cd * cdr,
-      counters: ['luggage', 'couple'],
+      cost: W.turn.mana,
+      cd: W.turn.cd * cdr,
       cast(ctx) {
         const px = ctx.player.body.x;
         const pz = ctx.player.body.z;
-        ctx.emit({ t: 'cast', ability: node.id, x: px, z: pz, dx: 0, dz: 0, el: 'fire' });
-        for (const a of hitAgents(ctx.crowd, px, pz, T.radius)) {
-          const lug = a.kind === 'luggage' || !!a.caseBody ? T.luggageMul : 1;
-          radialImpulse(a.body, px, pz, T.impulse * power, lug);
-          if (a.caseBody) radialImpulse(a.caseBody, px, pz, T.impulse * power, T.luggageMul);
-          if (mods.cleansingFlame && a.kind === 'stench') {
-            applyStatus(a, 'auraOff', ctx.time + Sp.cleanseAura, ctx.emit);
-          }
-          if (mods.tooHotToHold && a.kind === 'couple') {
-            applyStatus(a, 'linkOff', ctx.time + Sp.hotHold, ctx.emit);
-          }
-          drainBoss(a, a.kind === 'couple' ? ['couple'] : ['luggage'], mods);
-          if (a.kind === 'couple' && a.boss) a.boss.stub = Math.max(0, a.boss.stub - 0.28 * (mods.spellPower || 1));
+        const hold = !!ctx.mods.hasGrav;
+        ctx.emit({ t: 'cast', ability: node.id, x: px, z: pz, dx: 0, dz: 0, el: 'ice', hold });
+        for (const a of hitAgents(ctx.crowd, px, pz, W.turn.radius)) {
+          applyIce(a, ctx, W.turn.cold, W.turn.freeze, W.blow.impulse);
         }
-        const hitLug = ctx.crowd.agents.some(
-          (a) => (a.kind === 'luggage' || a.caseBody) && Math.hypot(a.body.x - px, a.body.z - pz) <= T.radius,
-        );
-        ctx.player.phaseUntil = Math.max(ctx.player.phaseUntil, ctx.time + (hitLug ? 1.45 : 0.85));
-        if (mods.thunderStep) ctx.player.phaseUntil = Math.max(ctx.player.phaseUntil, ctx.time + Sp.thunderStep);
         return true;
       },
     };
   }
 
-  if (node.id === 'ice_t1') {
-    const T = Sp.frostBreath;
-    const cosMin = Math.cos((T.halfAngleDeg * Math.PI) / 180);
+  if (node.id === 'grav_3') {
     return {
       id: node.id,
       resource: 'mana',
-      cost: T.mana,
-      cd: T.cd * cdr,
-      cast(ctx) {
-        const { dx, dz } = aimDir(ctx);
-        const px = ctx.player.body.x;
-        const pz = ctx.player.body.z;
-        ctx.emit({ t: 'cast', ability: node.id, x: px, z: pz, dx, dz, el: 'ice' });
-        for (const a of ctx.crowd.agents) {
-          const vx = a.body.x - px;
-          const vz = a.body.z - pz;
-          const d = Math.hypot(vx, vz);
-          if (d > T.range || d < 1e-4) continue;
-          const dot = (vx * dx + vz * dz) / d;
-          if (dot < cosMin) continue;
-          const dur = disableDur(T.chill, isBossAgent(a));
-          applyStatus(a, 'chill', ctx.time + dur, ctx.emit);
-          radialImpulse(a.body, px, pz, 1.35 * power, 1);
-          if (mods.chillOut && a.kind === 'angry') {
-            a.windup = -1;
-            a.chillWindupUntil = ctx.time + Sp.chillOutWindup;
-          }
-          if (a.kind === 'angry' && a.boss) {
-            a.boss.stub = Math.max(0, a.boss.stub - 0.12 * (mods.spellPower || 1));
-          }
-          drainBoss(a, a.kind === 'squat' || a.kind === 'angry' ? [a.kind] : undefined, mods);
-        }
-        ctx.player.phaseUntil = Math.max(ctx.player.phaseUntil, ctx.time + 0.7);
-        if (mods.thunderStep) ctx.player.phaseUntil = Math.max(ctx.player.phaseUntil, ctx.time + Sp.thunderStep);
-        return true;
-      },
-    };
-  }
-
-  if (node.id === 'ice_t3b') {
-    const T = Sp.flashFreeze;
-    return {
-      id: node.id,
-      resource: 'mana',
-      cost: T.mana,
-      cd: T.cd * cdr,
-      counters: ['family', 'brat', 'squat', 'angry'],
+      cost: W.hold.mana,
+      cd: W.hold.cd * cdr,
       cast(ctx) {
         const px = ctx.player.body.x;
         const pz = ctx.player.body.z;
-        ctx.emit({ t: 'cast', ability: node.id, x: px, z: pz, dx: 0, dz: 0, el: 'ice' });
-        const angryNear = ctx.crowd.agents.some(
-          (a) => a.kind === 'angry' && a.boss && Math.hypot(a.body.x - px, a.body.z - pz) < 4.0,
-        );
-        const rad = angryNear ? T.radius + 0.85 : T.radius;
-        for (const a of hitAgents(ctx.crowd, px, pz, rad)) {
-          let dur = disableDur(T.freeze, isBossAgent(a));
-          if (a.kind === 'angry') dur *= 1.15;
-          if (a.kind === 'family') dur *= 1.12;
-          applyStatus(a, 'freeze', ctx.time + dur, ctx.emit);
-          const ghostT = a.kind === 'angry' ? 1.15 : a.kind === 'family' ? 1.2 : a.kind === 'squat' ? 0.85 : 0.9;
-          a.freezeGhostUntil = Math.max(a.freezeGhostUntil, ctx.time + ghostT);
-          if (a.kind === 'angry' && a.boss) {
-            // Flash Freeze is the Hog King counter — heavy stub chip; finish the yield if close.
-            a.boss.stub = Math.max(0, a.boss.stub - 0.28 * (mods.spellPower || 1));
-          }
-          const impulseMul = a.kind === 'family' ? 1.75 : a.kind === 'angry' ? 2.4 : a.kind === 'squat' ? 1.15 : 1.2;
-          radialImpulse(a.body, px, pz, 3.3 * power, impulseMul);
-          // Shove angry king sideways off the exit line.
-          if (a.kind === 'angry') {
-            const { dx: fdx, dz: fdz } = facing(ctx.player);
-            sideImpulse(a.body, fdx, fdz, 1.8 * power);
-          }
-          if (a.caseBody) radialImpulse(a.caseBody, px, pz, 1.8 * power, 1);
-          if (mods.chillOut && a.kind === 'angry') {
-            a.windup = -1;
-            a.chillWindupUntil = ctx.time + Sp.chillOutWindup;
-          }
-          drainBoss(a, ['family', 'brat', 'squat', 'angry'], mods);
+        const hold = !!ctx.mods.hasIce;
+        ctx.emit({ t: 'cast', ability: node.id, x: px, z: pz, dx: 0, dz: -1, el: 'grav', hold });
+        for (const a of hitAgents(ctx.crowd, px, pz, W.hold.radius)) {
+          applyGrav(a, ctx, W.hold.heavy, W.hold.freeze, W.blow.impulse);
         }
-        // Slip through the frozen statues for a beat.
-        ctx.player.phaseUntil = Math.max(ctx.player.phaseUntil, ctx.time + 1.15);
-        if (mods.thunderStep) ctx.player.phaseUntil = Math.max(ctx.player.phaseUntil, ctx.time + Sp.thunderStep);
-        return true;
-      },
-    };
-  }
-
-  if (node.id === 'volt_t1') {
-    const T = Sp.zap;
-    return {
-      id: node.id,
-      resource: 'mana',
-      cost: T.mana,
-      cd: T.cd * cdr,
-      cast(ctx) {
-        const { dx, dz } = facing(ctx.player);
-        const px = ctx.player.body.x;
-        const pz = ctx.player.body.z;
-        const candidates = ctx.crowd.agents
-          .map((a) => {
-            const vx = a.body.x - px;
-            const vz = a.body.z - pz;
-            const d = Math.hypot(vx, vz);
-            const along = vx * dx + vz * dz;
-            const frontBias = along > 0 ? 0 : 0.6;
-            return { a, d: d + frontBias, along };
-          })
-          .filter((c) => c.d <= T.range)
-          .sort((u, v) => u.d - v.d || u.a.id - v.a.id)
-          .slice(0, T.count);
-        const pts = [{ x: px, z: pz }, ...candidates.map((c) => ({ x: c.a.body.x, z: c.a.body.z }))];
-        ctx.emit({ t: 'cast', ability: node.id, x: px, z: pz, dx, dz, el: 'volt' });
-        ctx.emit({ t: 'chain', pts });
-        for (const { a } of candidates) {
-          const dur = disableDur(T.daze, isBossAgent(a));
-          applyStatus(a, 'daze', ctx.time + dur, ctx.emit);
-          if (mods.droppedCall && a.kind === 'loud') {
-            applyStatus(a, 'callOff', ctx.time + Sp.droppedCall, ctx.emit);
-          }
-          drainBoss(a, undefined, mods);
-        }
-        if (mods.thunderStep) ctx.player.phaseUntil = ctx.time + Sp.thunderStep;
-        return true;
-      },
-    };
-  }
-
-  if (node.id === 'volt_t3b') {
-    const T = Sp.thunderclap;
-    return {
-      id: node.id,
-      resource: 'mana',
-      cost: T.mana,
-      cd: T.cd * cdr,
-      counters: ['brat', 'loud'],
-      cast(ctx) {
-        const px = ctx.player.body.x;
-        const pz = ctx.player.body.z;
-        ctx.emit({ t: 'cast', ability: node.id, x: px, z: pz, dx: 0, dz: 0, el: 'volt' });
-        for (const a of hitAgents(ctx.crowd, px, pz, T.radius)) {
-          const brat = a.kind === 'brat' || (a.isKid && a.kind === 'family');
-          const daze = brat ? T.bratDaze : T.otherDaze;
-          const dur = disableDur(daze, isBossAgent(a));
-          applyStatus(a, 'daze', ctx.time + dur, ctx.emit);
-          radialImpulse(a.body, px, pz, (brat ? T.bratImpulse : T.bratImpulse * 0.5) * power, 1);
-          if (mods.droppedCall && a.kind === 'loud') {
-            applyStatus(a, 'callOff', ctx.time + Sp.droppedCall, ctx.emit);
-          }
-          drainBoss(a, ['brat', 'loud'], mods);
-        }
-        // Player-only phase — do NOT ghost the crowd (that overbuffed L60/L90).
-        ctx.player.phaseUntil = Math.max(ctx.player.phaseUntil, ctx.time + 1.05);
-        if (mods.thunderStep) ctx.player.phaseUntil = Math.max(ctx.player.phaseUntil, ctx.time + Sp.thunderStep);
         return true;
       },
     };
@@ -527,69 +487,48 @@ function spellAbility(node: SpellNodeDef, mods: PlayerMods): AbilityDef | null {
   return null;
 }
 
-/** Cast a mage ultimate (maps to SkillState ult flags). */
+/**
+ * Last skill of one chain. Wind → str, ice → sta, gravity → spd.
+ * Same mix rules as the actives. No blink, no shockwave, no phase.
+ */
 export function castMageUlt(kind: 'str' | 'spd' | 'sta', ctx: AbilityCtx): boolean {
   const p = ctx.player;
   const mods = ctx.mods;
-  const Sp = TUNING.spells;
-  const U = TUNING.ult;
+  const W = TUNING.weather;
+  const cd = TUNING.ult.cooldown;
+  const px = p.body.x;
+  const pz = p.body.z;
   if (kind === 'str' && mods.ultFire) {
     if (p.ultCd.str > 0) return false;
-    const px = p.body.x;
-    const pz = p.body.z;
     const { dx, dz } = facing(p);
     ctx.emit({ t: 'ult', kind: 'str', x: px, z: pz, dx, dz });
-    ctx.emit({ t: 'cast', ability: 'ultFire', x: px, z: pz, dx, dz, el: 'fire' });
-    for (const a of hitAgents(ctx.crowd, px, pz, U.str.radius)) {
-      radialImpulse(a.body, px, pz, U.str.impulse, 1);
+    ctx.emit({ t: 'cast', ability: 'wind_4', x: px, z: pz, dx, dz, el: 'wind' });
+    for (const a of hitAgents(ctx.crowd, px, pz, W.headwind.radius)) {
+      applyWind(a, ctx, W.headwind.impulse, W.headwind.flee, W.headwind.flee, W.blow.heavy);
     }
-    p.chargeUntil = ctx.time + U.str.duration;
-    p.ultCd.str = U.cooldown;
-    if (mods.thunderStep) p.phaseUntil = ctx.time + Sp.thunderStep;
+    p.ultCd.str = cd;
     return true;
   }
   if (kind === 'sta' && mods.ultIce) {
     if (p.ultCd.sta > 0) return false;
-    const px = p.body.x;
-    const pz = p.body.z;
+    const hold = !!mods.hasGrav;
     ctx.emit({ t: 'ult', kind: 'sta', x: px, z: pz, dx: 0, dz: -1 });
-    ctx.emit({ t: 'cast', ability: 'ultIce', x: px, z: pz, dx: 0, dz: -1, el: 'ice' });
-    for (const a of hitAgents(ctx.crowd, px, pz, Sp.iceAge.radius)) {
-      const dur = disableDur(Sp.iceAge.freeze, isBossAgent(a));
-      applyStatus(a, 'freeze', ctx.time + dur, ctx.emit);
+    ctx.emit({ t: 'cast', ability: 'ice_4', x: px, z: pz, dx: 0, dz: -1, el: 'ice', hold });
+    for (const a of hitAgents(ctx.crowd, px, pz, W.whiteout.radius)) {
+      applyIce(a, ctx, W.whiteout.cold, W.whiteout.freeze, W.blow.impulse);
     }
-    p.ironUntil = ctx.time + Sp.iceAge.regenDur;
-    p.manaRegenBurstUntil = ctx.time + Sp.iceAge.regenDur;
-    p.manaRegenBurstMul = Sp.iceAge.regenMul;
-    p.ultCd.sta = U.cooldown;
-    if (mods.thunderStep) p.phaseUntil = ctx.time + Sp.thunderStep;
+    p.ultCd.sta = cd;
     return true;
   }
   if (kind === 'spd' && mods.ultVolt) {
     if (p.ultCd.spd > 0) return false;
-    const { dx, dz } = facing(p);
-    // Prefer toward door (−X).
-    const doorDx = -1;
-    const doorDz = 0;
-    let bx = doorDx * 0.7 + dx * 0.3;
-    let bz = doorDz * 0.7 + dz * 0.3;
-    const bl = Math.hypot(bx, bz) || 1;
-    bx /= bl;
-    bz /= bl;
-    const range = Sp.thunderBlink.range;
-    const px = p.body.x + bx * range;
-    const pz = p.body.z + bz * range;
-    // Simple blink: move if free-ish.
-    p.body.x = px;
-    p.body.z = pz;
-    p.body.vx = bx * 2;
-    p.body.vz = bz * 2;
-    ctx.emit({ t: 'ult', kind: 'spd', x: p.body.x, z: p.body.z, dx: bx, dz: bz });
-    ctx.emit({ t: 'cast', ability: 'ultVolt', x: p.body.x, z: p.body.z, dx: bx, dz: bz, el: 'volt' });
-    p.dashUntil = ctx.time + Sp.thunderBlink.speedDur;
-    p.blinkSpeedMul = Sp.thunderBlink.speedMul;
-    p.ultCd.spd = U.cooldown;
-    if (mods.thunderStep) p.phaseUntil = ctx.time + Sp.thunderStep;
+    const hold = !!mods.hasIce;
+    ctx.emit({ t: 'ult', kind: 'spd', x: px, z: pz, dx: 0, dz: -1 });
+    ctx.emit({ t: 'cast', ability: 'grav_4', x: px, z: pz, dx: 0, dz: -1, el: 'grav', hold });
+    for (const a of hitAgents(ctx.crowd, px, pz, W.still.radius)) {
+      applyGrav(a, ctx, W.still.heavy, W.still.freeze, W.blow.impulse);
+    }
+    p.ultCd.spd = cd;
     return true;
   }
   return false;
