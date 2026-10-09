@@ -1,10 +1,11 @@
 /**
  * Mage 「凱婷」 spellbook. Not the hero constellation.
- * Six rays on a wheel. The centre is the start. Ice is at 10 o'clock, wind at 2, gravity at 6.
+ * Three lines leave the centre. Ice is at 10 o'clock, wind at 2, gravity at 6.
  * A mix sits between the two schools it needs. Farther from the centre is the stronger rank.
- * Wind w1–w4, ice i1–i4, gravity g1–g4.
- * A mix starts only when both pure starts are already learned: iw1 needs i1 and w1,
- * ig1 needs i1 and g1, wg1 needs w1 and g1. The next mix rank needs only the mix rank before it.
+ * Wind w1–w4, ice i1–i4, gravity g1–g4. A new book can learn only i1, w1, and g1.
+ * A line is a requirement. A mix of ranks 1–3 needs both schools at that same rank:
+ * iw3 needs i3 and w3, not iw1 or iw2. The last mix needs only the mix before it:
+ * iw4 needs iw3, not i4 or w4. Same shape for ig and wg.
  * Two last ranks (rank 4) lock each other when they share wind, ice, or gravity.
  * i4 and g4 can both be learned. i4 blocks ig4 and iw4. ig4 blocks i4 and g4, and not w4.
  * SkillState.known is the book. str/spd/sta stay the hero's power fields and are not read here.
@@ -105,41 +106,41 @@ export const SPELL_NODES: SpellNodeDef[] = [
   node('iw1', 'iw', 1, ['i1', 'w1'], 'Cool Breeze', '涼風',
     'Needs Cool Air and Breeze. A blow that is also cold, so they take another way. Not a hit.',
     '要先學涼氣同微風。吹開，同時覺得凍，想行第二條路。唔係打。'),
-  node('iw2', 'iw', 2, ['iw1'], 'Cold Wind', '冷風',
-    'A colder, stronger Cool Breeze.',
-    '比涼風更凍、更勁。'),
-  node('iw3', 'iw', 3, ['iw2'], 'Hard Wind', '寒風',
-    'Harder than Cold Wind. Same cold blow.',
-    '比冷風更寒。都係凍風。'),
+  node('iw2', 'iw', 2, ['i2', 'w2'], 'Cold Wind', '冷風',
+    'Needs Cold Air and Tailwind. A colder, stronger Cool Breeze.',
+    '要先學冷氣同順風。比涼風更凍、更勁。'),
+  node('iw3', 'iw', 3, ['i3', 'w3'], 'Hard Wind', '寒風',
+    'Needs Hard Cold and Strong Wind. Harder than Cold Wind. Same cold blow.',
+    '要先學寒氣同勁風。比冷風更寒。都係凍風。'),
   node('iw4', 'iw', 4, ['iw3'], 'Bitter Wind', '極寒風',
-    'The strongest cold wind. A last skill that shares wind or ice cannot also be learned.',
-    '呢條凍風最勁。最後一級如果同屬風或者冰，就唔可以再學。'),
+    'Needs Hard Wind. The strongest cold wind. A last skill that shares wind or ice cannot also be learned.',
+    '要先學寒風。呢條凍風最勁。最後一級如果同屬風或者冰，就唔可以再學。'),
 
   node('ig1', 'ig', 1, ['i1', 'g1'], 'Cold Hold', '凍住',
     'Needs Cool Air and Heavy Feet. Cold, and they cannot move for a short while. Not a hit.',
     '要先學涼氣同腳重。覺得凍，而且會停低一陣。唔係打。'),
-  node('ig2', 'ig', 2, ['ig1'], 'Colder Hold', '再凍住',
-    'A longer, colder hold than Cold Hold.',
-    '比凍住更凍、停得更耐。'),
-  node('ig3', 'ig', 3, ['ig2'], 'Still Cold', '凍到企定',
-    'Longer than Colder Hold. They stand still.',
-    '比再凍住停得更耐。人企定。'),
+  node('ig2', 'ig', 2, ['i2', 'g2'], 'Colder Hold', '再凍住',
+    'Needs Cold Air and Heavy Body. A longer, colder hold than Cold Hold.',
+    '要先學冷氣同身重。比凍住更凍、停得更耐。'),
+  node('ig3', 'ig', 3, ['i3', 'g3'], 'Still Cold', '凍到企定',
+    'Needs Hard Cold and Held Down. Longer than Colder Hold. They stand still.',
+    '要先學寒氣同撳住。比再凍住停得更耐。人企定。'),
   node('ig4', 'ig', 4, ['ig3'], 'Cannot Move', '凍到郁唔到',
-    'The longest cold hold. They cannot move. A last skill that shares ice or gravity cannot also be learned.',
-    '呢條線最耐。凍到郁唔到。最後一級如果同屬冰或者重力，就唔可以再學。'),
+    'Needs Still Cold. The longest cold hold. They cannot move. A last skill that shares ice or gravity cannot also be learned.',
+    '要先學凍到企定。呢條線最耐。凍到郁唔到。最後一級如果同屬冰或者重力，就唔可以再學。'),
 
   node('wg1', 'wg', 1, ['w1', 'g1'], 'Heavy Wind', '重風',
     'Needs Breeze and Heavy Feet. A blow, then they feel heavy and stay. They do not run off. Not a hit.',
     '要先學微風同腳重。吹完覺得重，停低。唔會走去第二邊。唔係打。'),
-  node('wg2', 'wg', 2, ['wg1'], 'Pressing Wind', '壓風',
-    'A heavier, stronger Heavy Wind.',
-    '比重風更重、更勁。'),
-  node('wg3', 'wg', 3, ['wg2'], 'Blow and Stop', '吹完停',
-    'Stronger than Pressing Wind. The blow ends, then they stop.',
-    '比壓風更勁。吹完再停。'),
+  node('wg2', 'wg', 2, ['w2', 'g2'], 'Pressing Wind', '壓風',
+    'Needs Tailwind and Heavy Body. A heavier, stronger Heavy Wind.',
+    '要先學順風同身重。比重風更重、更勁。'),
+  node('wg3', 'wg', 3, ['w3', 'g3'], 'Blow and Stop', '吹完停',
+    'Needs Strong Wind and Held Down. Stronger than Pressing Wind. The blow ends, then they stop.',
+    '要先學勁風同撳住。比壓風更勁。吹完再停。'),
   node('wg4', 'wg', 4, ['wg3'], 'Blown Still', '吹到企定',
-    'The strongest heavy wind. A last skill that shares wind or gravity cannot also be learned.',
-    '呢條重風最勁。最後一級如果同屬風或者重力，就唔可以再學。'),
+    'Needs Blow and Stop. The strongest heavy wind. A last skill that shares wind or gravity cannot also be learned.',
+    '要先學吹完停。呢條重風最勁。最後一級如果同屬風或者重力，就唔可以再學。'),
 ];
 
 /** Rank-4 names kept for the tree record. The HUD casts them on the same line button. */

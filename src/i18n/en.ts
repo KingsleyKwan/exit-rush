@@ -297,7 +297,7 @@ export const en: Dict = {
   back: 'Back',
   levelsTeaser: 'All 100 levels · clear 99 to unlock the Lv100 finale',
   skillHowto: 'Every 10 levels earns 1 point. Each skill costs 1.',
-  spellHowto: 'The start is the centre. Farther out is stronger. The skill between two schools needs both starts. Last skills cannot share an element.',
+  spellHowto: 'Three lines leave the centre. A skill between two others needs both of that rank. The last one follows the mix before it.',
   spellNeed: 'Learn {name} first.',
   spellNeedTwo: 'Learn {a} and {b} first.',
   spellMixNeed: 'Start',

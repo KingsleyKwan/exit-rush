@@ -84,31 +84,42 @@ function polar(angleDeg: number, radius: number): { x: number; y: number } {
 
 
 
+const SCHOOL_INK = { w: '#4fc3f7', i: '#1e88e5', g: '#7e57c2' } as const;
+
+/** A stroke is a requirement. Three spokes leave the hub. Mixes bridge the same rank, then rank 4 continues that mix. */
 function raySvg(): string {
-  const orbits = RAY_R.map((r) =>
-    `<circle cx="50" cy="50" r="${r}" fill="none" stroke="currentColor" stroke-width="0.35" opacity="0.28"/>`,
-  ).join('');
-  const grads = (['iw', 'wg', 'ig'] as const).map((line) => {
-    const ang = RAY_ANGLE[line];
-    const mid = polar(ang, 30);
-    const side = polar(ang + 90, 3);
-    const dx = side.x - 50;
-    const dy = side.y - 50;
-    const colors = line === 'iw' ? ['#1e88e5', '#4fc3f7'] : line === 'wg' ? ['#4fc3f7', '#7e57c2'] : ['#7e57c2', '#1e88e5'];
-    return `<linearGradient id="ray-${line}" gradientUnits="userSpaceOnUse" x1="${(mid.x - dx).toFixed(2)}" y1="${(mid.y - dy).toFixed(2)}" x2="${(mid.x + dx).toFixed(2)}" y2="${(mid.y + dy).toFixed(2)}"><stop offset="0" stop-color="${colors[0]}"/><stop offset="1" stop-color="${colors[1]}"/></linearGradient>`;
-  }).join('');
-  const rays = RAY_ORDER.map((line) => {
-    const ang = RAY_ANGLE[line];
-    const inner = polar(ang, 8);
-    const outer = polar(ang, RAY_R[3]);
-    const pure = line.length === 1;
-    const stroke = pure ? (line === 'w' ? '#4fc3f7' : line === 'i' ? '#1e88e5' : '#7e57c2') : `url(#ray-${line})`;
-    return `<line x1="${inner.x.toFixed(2)}" y1="${inner.y.toFixed(2)}" x2="${outer.x.toFixed(2)}" y2="${outer.y.toFixed(2)}" stroke="${stroke}" stroke-width="${pure ? 1.6 : 2.3}" stroke-linecap="round"/>`;
-  }).join('');
-  return `<svg class="spell-spokes" viewBox="0 0 100 100" aria-hidden="true"><defs>${grads}</defs>${orbits}${rays}</svg>`;
+  const stroke = (a: { x: number; y: number }, b: { x: number; y: number }, color: string, width: number) =>
+    `<line x1="${a.x.toFixed(2)}" y1="${a.y.toFixed(2)}" x2="${b.x.toFixed(2)}" y2="${b.y.toFixed(2)}" stroke="${color}" stroke-width="${width}" stroke-linecap="round"/>`;
+  const parts: string[] = [];
+  const grads: string[] = [];
+  for (const school of ['i', 'w', 'g'] as const) {
+    let prev = polar(RAY_ANGLE[school], 7.2);
+    for (const r of RAY_R) {
+      const at = polar(RAY_ANGLE[school], r);
+      parts.push(stroke(prev, at, SCHOOL_INK[school], 1.6));
+      prev = at;
+    }
+  }
+  const bridges: ReadonlyArray<readonly ['iw' | 'wg' | 'ig', 'i' | 'w' | 'g', 'i' | 'w' | 'g']> = [
+    ['iw', 'i', 'w'],
+    ['wg', 'w', 'g'],
+    ['ig', 'i', 'g'],
+  ];
+  for (const [mix, a, b] of bridges) {
+    for (let rank = 0; rank < 3; rank++) {
+      const mid = polar(RAY_ANGLE[mix], RAY_R[rank]);
+      parts.push(stroke(polar(RAY_ANGLE[a], RAY_R[rank]), mid, SCHOOL_INK[a], 1.45));
+      parts.push(stroke(polar(RAY_ANGLE[b], RAY_R[rank]), mid, SCHOOL_INK[b], 1.45));
+    }
+    const inner = polar(RAY_ANGLE[mix], RAY_R[2]);
+    const outer = polar(RAY_ANGLE[mix], RAY_R[3]);
+    grads.push(`<linearGradient id="mix-${mix}" gradientUnits="userSpaceOnUse" x1="${inner.x.toFixed(2)}" y1="${inner.y.toFixed(2)}" x2="${outer.x.toFixed(2)}" y2="${outer.y.toFixed(2)}"><stop offset="0" stop-color="${SCHOOL_INK[a]}"/><stop offset="1" stop-color="${SCHOOL_INK[b]}"/></linearGradient>`);
+    parts.push(stroke(inner, outer, `url(#mix-${mix})`, 1.7));
+  }
+  return `<svg class="spell-spokes" viewBox="0 0 100 100" aria-hidden="true"><defs>${grads.join('')}</defs>${parts.join('')}</svg>`;
 }
 
-/** Wheel. The centre is the start. Farther out is the stronger rank of that same skill. */
+/** Wheel. Three lines leave the start. A line is who you must learn first. */
 function renderMageBook(game: Game, rerender: (game: Game) => void): HTMLElement {
   const dict = t();
   const en = getLang() === 'en';

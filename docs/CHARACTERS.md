@@ -79,7 +79,7 @@ Same point budget as the Hero, different shape. **1 point per 10 first clears, 1
 
 The book is a wheel. The centre is the start, not a skill. Ice (`i1`) sits at 10 o'clock, wind (`w1`) at 2 o'clock, gravity (`g1`) at 6 o'clock. Each next node on that ray is a stronger version of the same skill, not a different verb. Each skill costs 1 point. She can hold 10. There are 24 nodes, so a book is a choice.
 
-The mix sits in the wedge between its two schools: `iw` between ice and wind, `wg` between wind and gravity, `ig` between ice and gravity. `iw1` needs `i1` and `w1`, `ig1` needs `i1` and `g1`, `wg1` needs `w1` and `g1`. The next mix rank needs only the mix rank before it. It does not need the matching pure rank.
+Only three lines leave the centre, so a new book can learn only `i1`, `w1`, and `g1`. A line is a requirement. The mix sits in the wedge between its two schools: `iw` between ice and wind, `wg` between wind and gravity, `ig` between ice and gravity. A mix of ranks 1–3 needs both schools at that same rank: `iw3` needs `i3` and `w3`, and it does not need `iw1` or `iw2`. The last mix follows only the mix before it: `iw4` needs `iw3`, not `i4` or `w4`. Same shape for `ig` and `wg`.
 
 Two rank-4 skills lock each other when they share an element. `i4` and `g4` can both be learned. `i4` blocks `ig4` and `iw4`. `ig4` blocks `i4` and `g4`, and also `iw4` and `wg4`, but not `w4`. Lower ranks do not lock. The HUD shows one button per learned line and casts the highest rank. There is no second button for the last rank. Mana and cooldown stay the same along a line, so the higher rank is strictly better.
 
@@ -135,7 +135,7 @@ A planted squat is still the hardest body to move. Wind does not rewrite his spo
 
 ### 3.7 What to learn first · 點配
 
-Each pure start is already a cast. A mix does nothing until that mix row is learned. `i4` and `g4` can sit in the same book. `ig4` cannot sit next to either of them.
+Each pure start is already a cast. A mix of ranks 1–3 needs both schools at that same rank, and it does nothing until that mix is learned. The last mix follows the mix before it. `i4` and `g4` can sit in the same book. `ig4` cannot sit next to either of them.
 
 ---
 
@@ -407,7 +407,7 @@ General rules: icon-first, EN + 粵 (zh-HK default, colloquial). Every string go
 | Character | Bottom-nav label | Screen |
 |---|---|---|
 | Hero | 🌟 技能 Skills | Existing constellation (`constellationSkills.ts`) |
-| Mage | 📖 魔法 Spells | Her own book, not the hero constellation. A wheel: the start is the centre, ice at 10 o'clock, wind at 2, gravity at 6. Mixes sit between the two schools. Farther out is the stronger version. A mix needs both starts. More than one last skill is allowed unless they share an element. Tap a ready node to spend 1 point. The HUD shows one button per learned line and casts the highest rank. |
+| Mage | 📖 魔法 Spells | Her own book, not the hero constellation. A wheel: the start is the centre, ice at 10 o'clock, wind at 2, gravity at 6. Only those three lines leave the centre. A mix of a rank needs both schools of that rank, and the last mix follows the mix before it. Farther out is the stronger version. More than one last skill is allowed unless they share an element. Tap a ready node to spend 1 point. The HUD shows one button per learned line and casts the highest rank. |
 | Tech | 🛒 裝備 Gear | **Workshop 工作室**: tabs **裝備 Equip (backpack grid + tray, §5.4.6) / 商店 Shop / 套裝 Sets 1-2-3**; coin balance + 「4/6 格」 top-right; each item card shows icon, 平/中價/名貴 pills with footprints, effect, counters chip, price, 買/升級/賣. Expand stops after 2×3 |
 
 The hero constellation is unchanged. 凱婷 does not share those node positions or the fire / lightning schools.

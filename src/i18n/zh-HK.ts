@@ -51,7 +51,7 @@ export const zhHK: Dict = {
   back: '返回',
   levelsTeaser: '全部 100 關 · 通關第 99 關解鎖第 100 關',
   skillHowto: '每 10 關得 1 點。每個技能用 1 點。',
-  spellHowto: '起點喺中間，越出越勁。中間嗰條要兩邊起點都學咗。最後一級唔可以同屬一種。',
+  spellHowto: '起點出三條線。中間嗰粒要兩頭同一級都學咗。最後一粒跟住之前嗰粒。',
   spellNeed: '要先學{name}。',
   spellNeedTwo: '要先學{a}同{b}。',
   spellMixNeed: '起點',

@@ -18,7 +18,7 @@ Mobile-first 3D crowd-exit game set on the fictional **香城鐵路 / Hong City 
 - **Separate level progress per character** (D12): clears, unlocks, boss cutscenes, and SP/coins derive from that character's own first clears. A newly selected character starts at L1.
 - **Save migration**: all pre-0.8.1 clears belong to 上班族 (Hero). Mage keeps spent spell points only if backed by Mage clears; otherwise refund + one-time notice.
 - **UI**: character select shows each card's cleared count / highest station + progress bar; level select shows whose progress it is (portrait/name chip).
-- **凱婷's book**: a wheel. The start is the centre. Ice sits at 10 o'clock, wind at 2, gravity at 6. A mix sits between the two schools and has to be learned. Farther out is stronger. Last skills lock only when they share an element.
+- **凱婷's book**: a wheel. The start is the centre. Ice sits at 10 o'clock, wind at 2, gravity at 6. Only those three lines leave the centre. A mix of a rank needs both schools of that rank, and the last mix follows the mix before it. Farther out is stronger. Last skills lock only when they share an element.
 - **Skill points:** every 10 first clears earn 1 point. On the hero, one tap learns the next skill (or the ultimate). 100 levels = 10 points: a full branch + ultimate + 3 more skills. The power at each node is unchanged. 凱婷 spends the same 10 points on her own book.
 
 ## v0.8.0 — Mage 「凱婷」 Bad Girl + character select (Gear L coming soon)

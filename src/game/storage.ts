@@ -140,15 +140,16 @@ const OLD_WEATHER: Record<string, string> = {
 };
 /**
  * Same graph as SpellTree.ts. This file must not import it.
- * A mix rank 1 needs both pure starts. A later rank needs only the one before it.
+ * Three lines leave the start. A mix of ranks 1–3 needs both schools at that rank.
+ * The last mix needs only the mix before it.
  */
 const WEATHER_NEED: Record<string, readonly string[]> = {
   w1: [], w2: ['w1'], w3: ['w2'], w4: ['w3'],
   i1: [], i2: ['i1'], i3: ['i2'], i4: ['i3'],
   g1: [], g2: ['g1'], g3: ['g2'], g4: ['g3'],
-  iw1: ['i1', 'w1'], iw2: ['iw1'], iw3: ['iw2'], iw4: ['iw3'],
-  ig1: ['i1', 'g1'], ig2: ['ig1'], ig3: ['ig2'], ig4: ['ig3'],
-  wg1: ['w1', 'g1'], wg2: ['wg1'], wg3: ['wg2'], wg4: ['wg3'],
+  iw1: ['i1', 'w1'], iw2: ['i2', 'w2'], iw3: ['i3', 'w3'], iw4: ['iw3'],
+  ig1: ['i1', 'g1'], ig2: ['i2', 'g2'], ig3: ['i3', 'g3'], ig4: ['ig3'],
+  wg1: ['w1', 'g1'], wg2: ['w2', 'g2'], wg3: ['w3', 'g3'], wg4: ['wg3'],
 };
 
 function mapWeatherId(id: string): string | null {

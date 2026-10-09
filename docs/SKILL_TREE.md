@@ -95,4 +95,4 @@ Tune numbers in `TUNING.skills` (`src/game/sim/tuning.ts`). Node copy lives in `
 
 
 ## v0.8 Mage spellbook
-凱婷 does not use the hero constellation. Her book is a wheel. The centre is the start. Ice is at 10 o'clock, wind at 2, gravity at 6, and each mix sits between the two schools it needs. Farther from the centre is a stronger version of the same skill. A mix needs both pure starts. Two last ranks lock each other only when they share an element. The list is `docs/CHARACTERS.md` §3 and `src/game/SpellTree.ts`. `str` / `spd` / `sta` stay the hero's power fields.
+凱婷 does not use the hero constellation. Her book is a wheel. The centre is the start. Ice is at 10 o'clock, wind at 2, gravity at 6, and each mix sits between the two schools it needs. Only three lines leave the centre. A mix of ranks 1–3 needs both schools at that same rank. The last mix follows the mix before it. Farther from the centre is a stronger version of the same skill. Two last ranks lock each other only when they share an element. The list is `docs/CHARACTERS.md` §3 and `src/game/SpellTree.ts`. `str` / `spd` / `sta` stay the hero's power fields.

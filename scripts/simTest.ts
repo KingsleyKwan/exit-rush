@@ -122,18 +122,18 @@ function ultBuild(b: 'str' | 'spd' | 'sta'): SkillState {
 const earnedPts = (id: number): number => (id === 100 ? 99 : id - 1);
 
 /**
- * Bot book, not a full unlock. Ten legal points.
- * Freeze levels take the ice+gravity line to the end.
- * Cold levels take bitter cold, so the freeze line stops at rank 3.
- * Everything else takes the gale, and the cold wind stops at rank 3.
+ * Bot book, not a full unlock. Ten legal points, in an order learnSpell accepts.
+ * Freeze levels take ice and gravity to rank 3, then the hold to the end. No wind, and no i4 or g4.
+ * Cold levels take bitter cold, so the hold stops at rank 3. That needs g3 as well as i4.
+ * Everything else takes the gale. Hard Wind needs Strong Wind and Hard Cold, not the cooler mixes.
  * Raw hero power spreads stay in `earned` / `ultBuild` and are not reused here.
  */
 function mageEarned(id: number): SkillState {
   const ids = (id === 40 || id === 60)
-    ? ['g1', 'g2', 'g3', 'i1', 'i2', 'ig1', 'ig2', 'ig3', 'ig4', 'w1']
+    ? ['i1', 'i2', 'i3', 'g1', 'g2', 'g3', 'ig1', 'ig2', 'ig3', 'ig4']
     : (id === 30 || id === 50 || id === 80 || id === 90)
-      ? ['i1', 'i2', 'i3', 'i4', 'g1', 'g2', 'ig1', 'ig2', 'ig3', 'w1']
-      : ['w1', 'w2', 'w3', 'w4', 'i1', 'iw1', 'iw2', 'iw3', 'g1', 'wg1'];
+      ? ['i1', 'i2', 'i3', 'i4', 'g1', 'g2', 'g3', 'ig1', 'ig2', 'ig3']
+      : ['w1', 'w2', 'w3', 'w4', 'i1', 'i2', 'i3', 'iw3', 'g1', 'wg1'];
   let book: SkillState = { ...defaultSkills(), points: ids.length, known: [] };
   for (const spellId of ids) {
     const next = learnSpell(book, spellId);
@@ -1169,20 +1169,35 @@ async function main(): Promise<void> {
       console.error('i4 and g4 can both be learned, and neither is an ult button', bothCaps);
       process.exit(1);
     }
-    const iced = ['i1', 'i2', 'i3', 'i4', 'g1', 'ig1', 'ig2', 'ig3'].reduce(
-      (s, id) => learnSpell(s, id)!,
-      { ...defaultSkills(), points: 9, known: [] as string[] },
+    const learnAll = (ids: string[], points = ids.length + 1) => ids.reduce(
+      (s, id) => {
+        const next = learnSpell(s, id);
+        if (!next) { console.error('learn failed', id, s.known); process.exit(1); }
+        return next;
+      },
+      { ...defaultSkills(), points, known: [] as string[] },
     );
+    const bridge = learnAll(['i1', 'i2', 'i3', 'w1', 'w2', 'w3'], 8);
+    if (!canLearn(bridge, 'iw2')) { console.error('iw2 opens from i2 and w2, not from iw1'); process.exit(1); }
+    if (!canLearn(bridge, 'iw3')) { console.error('iw3 opens after i3 and w3'); process.exit(1); }
+    if (canLearn(bridge, 'iw4')) { console.error('iw4 needs iw3'); process.exit(1); }
+    const coldWind = learnSpell(bridge, 'iw3')!;
+    if (!canLearn(coldWind, 'iw4')) { console.error('iw4 opens after iw3'); process.exit(1); }
+    const onlyMix = learnAll(['i1', 'w1', 'iw1']);
+    if (canLearn(onlyMix, 'iw2')) { console.error('iw2 does not open from iw1 alone'); process.exit(1); }
+    const capsNoMix = learnAll(['i1', 'i2', 'i3', 'i4', 'w1', 'w2', 'w3', 'w4']);
+    if (canLearn(capsNoMix, 'iw4')) { console.error('iw4 does not open from i4 and w4'); process.exit(1); }
+    const iced = learnAll(['i1', 'i2', 'i3', 'i4', 'g1', 'g2', 'g3', 'ig3']);
     if (canLearn(iced, 'ig4') || canLearn(iced, 'iw4')) {
       console.error('i4 blocks ig4 and iw4'); process.exit(1);
     }
-    if (!canLearn(iced, 'g2')) { console.error('a lower rank is not locked by i4'); process.exit(1); }
-    const heldCap = ['i1', 'g1', 'ig1', 'ig2', 'ig3', 'ig4', 'w1', 'w2', 'w3'].reduce(
-      (s, id) => learnSpell(s, id)!,
-      { ...defaultSkills(), points: 10, known: [] as string[] },
-    );
-    if (!canLearn(heldCap, 'w4')) { console.error('ig4 does not block w4'); process.exit(1); }
-    if (canLearn(heldCap, 'i4')) { console.error('ig4 blocks i4'); process.exit(1); }
+    if (!canLearn(iced, 'w1')) { console.error('a lower rank is not locked by i4'); process.exit(1); }
+    const clashWind = learnAll(['i1', 'i2', 'i3', 'i4', 'w1', 'w2', 'w3', 'iw3']);
+    if (canLearn(clashWind, 'iw4')) { console.error('i4 blocks iw4 even after iw3'); process.exit(1); }
+    // w3 is already in the book, so the only question on w4 is the element lock.
+    const beside = { ...defaultSkills(), points: 1, known: ['i1', 'i2', 'i3', 'g1', 'g2', 'g3', 'ig3', 'ig4', 'w3'] };
+    if (!canLearn(beside, 'w4')) { console.error('ig4 does not block w4'); process.exit(1); }
+    if (canLearn(beside, 'i4')) { console.error('ig4 blocks i4'); process.exit(1); }
     console.log('weather book ok');
 
     const held = { x: 0, z: 0, mag: 0, shoveHeld: true };
@@ -1317,7 +1332,7 @@ async function main(): Promise<void> {
         mage: {
           loadouts: [{
             ...defaultSkills(),
-            known: ['wind_1', 'i1', 'i2', 'i3', 'i4', 'g1', 'ig1', 'ig2', 'ig3', 'ig4'],
+            known: ['wind_1', 'i1', 'i2', 'i3', 'i4', 'g1', 'g2', 'g3', 'ig3', 'ig4'],
           }],
           active: 0,
           spellBars: [['wind_1', 'ice_3']],
@@ -1325,7 +1340,7 @@ async function main(): Promise<void> {
       } as unknown as SaveData);
       const chainSlot = chain.mage.loadouts[0];
       const chainKnown = chainSlot.known ?? [];
-      if (!chainKnown.includes('w1') || !chainKnown.includes('i4') || chainKnown.includes('ig4')) {
+      if (!chainKnown.includes('w1') || !chainKnown.includes('i4') || !chainKnown.includes('ig3') || chainKnown.includes('ig4')) {
         console.error('old ids migrate, and i4 blocks ig4', chainKnown);
         process.exit(1);
       }
