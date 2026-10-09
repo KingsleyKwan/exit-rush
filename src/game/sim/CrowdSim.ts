@@ -67,6 +67,10 @@ export interface Agent {
   coldUntil: number;
   /** Weather: heavy feet. Slows darting. Not a statue. */
   heavyUntil: number;
+  /** Weather: walks slower until this time. Still walks. */
+  slowUntil: number;
+  /** Drive scale while slowed. 1 means no extra slow. */
+  slowMul: number;
   /** Weather: would rather stand somewhere else until this time. Does not rewrite a planted home. */
   fleeUntil: number;
   fleeX: number;
@@ -277,6 +281,8 @@ export class CrowdSim {
       chillWindupUntil: -1,
       coldUntil: -1,
       heavyUntil: -1,
+      slowUntil: -1,
+      slowMul: 1,
       fleeUntil: -1,
       fleeX: 0,
       fleeZ: 0,
@@ -1449,7 +1455,8 @@ export class CrowdSim {
       this.syncSquat(a, dt, ctx, chilled || dazed);
       const m = b.mass;
       let statusDrive = chilled || dazed ? 0 : 1;
-      if (a.coldUntil > ctx.time) statusDrive *= 0.35;
+      if (a.slowUntil > ctx.time) statusDrive *= a.slowMul;
+      else if (a.coldUntil > ctx.time) statusDrive *= 0.35;
       if (a.heavyUntil > ctx.time && a.fleeUntil <= ctx.time) statusDrive *= 0.22;
       const statusYield = dazed ? 3 : 1;
       const statusAnchor = chilled ? 1.5 : 1;
@@ -1594,6 +1601,9 @@ export class CrowdSim {
       if (a.heavyUntil > ctx.time) {
         fx += -b.vx * m * 7;
         fz += -b.vz * m * 7;
+      } else if (a.slowUntil > ctx.time) {
+        fx += -b.vx * m * 2.4;
+        fz += -b.vz * m * 2.4;
       }
 
       if (def.zigzag && a.dazedUntil <= ctx.time && !chilled && a.heavyUntil <= ctx.time && a.coldUntil <= ctx.time) {

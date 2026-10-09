@@ -57,13 +57,18 @@ export interface Dict {
   spellHowto: string;
   /** {name} = the skill that has to come first. */
   spellNeed: string;
-  /** {a} and {b} = the two starts a mix needs. */
+  /** {a} and {b} = two skills that have to come first. */
   spellNeedTwo: string;
+  /** {a}, {b}, and {c} = three skills that have to come first. */
+  spellNeedThree: string;
   /** Word in the centre of the mage wheel. */
   spellMixNeed: string;
   /** Rank 4 of a line. Not a separate ultimate button. */
   spellLast: string;
-  spellOneEnd: string;
+  /** Confirm button after the player has read the skill. */
+  spellLearn: string;
+  /** Shown on a skill she already has. */
+  spellLearned: string;
   ultShort: string;
   skillsApplyNext: string;
   examTag: string;
@@ -334,7 +339,7 @@ export const en: Dict = {
   level: 'Level',
   density: 'Crowd',
   howTo: 'Drag anywhere to steer · hold ✊ to shove · get out before the doors close.',
-  howToMage: 'Drag anywhere to steer. Wind blows people aside. Cold and weight mix only after that mix is learned.',
+  howToMage: 'Drag anywhere to steer. Wind blows people aside. Cold, her weight, and the mixes are each their own skill.',
   howToTech: 'Drag anywhere to steer · use your gear to clear the way · get out before the doors close.',
   language: 'Language',
   clearBonus: '+1 skill point',
@@ -344,12 +349,14 @@ export const en: Dict = {
   back: 'Back',
   levelsTeaser: 'All 100 levels · clear 99 to unlock the Lv100 finale',
   skillHowto: 'Every 10 levels earns 1 point. Each skill costs 1.',
-  spellHowto: 'Three lines leave the centre. A skill between two others needs both of that rank. The last one follows the mix before it.',
+  spellHowto: 'Three lines leave the centre. A skill between two others needs both of that rank, and the mix before it.',
   spellNeed: 'Learn {name} first.',
   spellNeedTwo: 'Learn {a} and {b} first.',
+  spellNeedThree: 'Learn {a}, {b}, and {c} first.',
   spellMixNeed: 'Start',
   spellLast: 'Strongest of this line.',
-  spellOneEnd: 'A last skill that shares an element is already learned.',
+  spellLearn: 'Learn',
+  spellLearned: 'Learned',
   ultShort: 'Ult',
   skillsApplyNext: 'Changes apply from your next run.',
   examTag: 'Exam',

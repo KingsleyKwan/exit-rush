@@ -404,7 +404,7 @@ export class Sim {
           ? 1 - TUNING.skills.standFirmMul
           : (pl.mods as PlayerMods).chillOut
             ? 1 - TUNING.spells.angryShoveMul
-            : Math.min(0.85, pl.mods.resist * 1.2);
+            : Math.min(0.85, (pl.mods.resist + pl.braceResist(now)) * 1.2);
       })(),
       threadCouples: pl.mods.threadCouples,
       passBossLuggage: (pl.mods as PlayerMods).techPassBossCase !== false,
@@ -416,7 +416,7 @@ export class Sim {
         this.lastAngryHit = now;
         pl.stunT =
           TUNING.player.stunTime *
-          (1 - pl.mods.resist) *
+          (1 - Math.min(0.85, pl.mods.resist + pl.braceResist(now))) *
           (pl.mods.standFirm ? TUNING.skills.standFirmMul : heavy ? TUNING.boss.angry.heavyStun : 1);
       },
     });

@@ -50,6 +50,10 @@ export class PlayerSim {
   blinkSpeedMul = 1;
   /** Last cast failed for mana (HUD buzz). */
   manaDeniedT = 0;
+  /** Gravity cast: she is heavier until this time. */
+  weightUntil = 0;
+  weightMul = 1;
+  weightResist = 0;
   /** Set by Sim when mage Burning Urgency window is active. */
   burningUrgencyActive = false;
   /** SPD 50 Leap airtime ends at this sim time. */
@@ -112,6 +116,10 @@ export class PlayerSim {
   }
   isIronStance(now: number): boolean {
     return now < this.ironUntil;
+  }
+  /** Extra resist from her own weight. Zero once the brace has worn off. */
+  braceResist(now: number): number {
+    return now < this.weightUntil ? this.weightResist : 0;
   }
   isLeaping(now: number): boolean {
     return now < this.leapUntil;
@@ -179,8 +187,13 @@ export class PlayerSim {
       this.stats.hops++;
     }
 
-    // Mass: STR resist + ult buffs.
+    if (now >= this.weightUntil) {
+      this.weightMul = 1;
+      this.weightResist = 0;
+    }
+    // Mass: STR resist + ult buffs. A gravity cast adds her own weight on top.
     let mass = this.baseMass();
+    if (now < this.weightUntil) mass *= this.weightMul;
     if (charging) mass *= U.str.massMul;
     if (dashing) mass *= U.spd.massMul;
     if (iron) mass *= U.sta.massMul;

@@ -125,9 +125,9 @@ export function countersFor(kind: BossKind, char: CharacterId = 'hero'): { zh: s
     const mage: Record<BossKind, { zh: string; en: string }> = {
       luggage: { zh: '✦ 微風', en: '✦ Breeze' },
       stench: { zh: '✦ 冷氣', en: '✦ Cold Air' },
-      squat: { zh: '✦ 凍住', en: '✦ Cold Hold' },
-      family: { zh: '✦ 凍住', en: '✦ Cold Hold' },
-      brat: { zh: '✦ 撳住', en: '✦ Held Down' },
+      squat: { zh: '✦ 慢凍', en: '✦ Slow Cold' },
+      family: { zh: '✦ 慢凍', en: '✦ Slow Cold' },
+      brat: { zh: '✦ 企實', en: '✦ Dug In' },
       couple: { zh: '✦ 涼風', en: '✦ Cool Breeze' },
       angry: { zh: '✦ 極凍', en: '✦ Bitter Cold' },
       loud: { zh: '✦ 極凍', en: '✦ Bitter Cold' },

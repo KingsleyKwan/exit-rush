@@ -398,10 +398,12 @@ export const TUNING = {
   },
 
   /**
-   * 凱婷's weather. A blow, not a hit.
+   * 凱婷's weather.
    * Each line is the same effect, stronger at the next rank. Mana and cooldown stay put,
    * so the higher rank is always the better cast. Mixes are their own lines.
-   * Wind never freezes. Ice never freezes. Only the ice+gravity line holds people still.
+   * Wind blows. Ice is a cold patch and people still walk. Gravity is her own weight.
+   * Ice+wind is a cold patch people leave. Ice+gravity slows the patch. They still walk.
+   * Wind+gravity is a thinner cone than wind, and the push is harder.
    */
   weather: {
     /** Same cost for every rank of a line. */
@@ -421,33 +423,36 @@ export const TUNING = {
       { radius: 2.7, cold: 3.2 },
       { radius: 3.15, cold: 3.8 },
     ],
-    /** Heavy only. Not a hold. */
+    /** Her own weight for a short while. Radius is the ring around her, not a crowd patch. */
     g: [
-      { radius: 2.05, heavy: 2.2 },
-      { radius: 2.35, heavy: 2.7 },
-      { radius: 2.7, heavy: 3.2 },
-      { radius: 3.15, heavy: 3.8 },
+      { radius: 1.15, brace: 2.2, mul: 1.25, extra: 0.12 },
+      { radius: 1.28, brace: 2.7, mul: 1.45, extra: 0.18 },
+      { radius: 1.42, brace: 3.2, mul: 1.7, extra: 0.25 },
+      { radius: 1.55, brace: 3.8, mul: 2.0, extra: 0.32 },
     ],
-    /** Blow, plus cold, plus they take another way. */
+    /** A cold patch. People leave it. Not a blow. */
     iw: [
-      { range: 2.35, width: 0.95, impulse: 1.45, cold: 2.2, flee: 2.4 },
-      { range: 2.7, width: 1.08, impulse: 1.65, cold: 2.7, flee: 2.9 },
-      { range: 3.05, width: 1.22, impulse: 1.9, cold: 3.2, flee: 3.4 },
-      { range: 3.5, width: 1.4, impulse: 2.2, cold: 3.8, flee: 4.0 },
+      { radius: 2.05, cold: 2.2, flee: 2.4 },
+      { radius: 2.35, cold: 2.7, flee: 2.9 },
+      { radius: 2.7, cold: 3.2, flee: 3.4 },
+      { radius: 3.05, cold: 3.8, flee: 4.0 },
     ],
-    /** Cold, and they cannot move. */
+    /** People in the patch walk slower. They still walk. */
     ig: [
-      { radius: 2.1, cold: 2.2, freeze: 1.5 },
-      { radius: 2.4, cold: 2.6, freeze: 1.9 },
-      { radius: 2.75, cold: 3.1, freeze: 2.3 },
-      { radius: 3.3, cold: 3.6, freeze: 2.8 },
+      { radius: 2.1, cold: 2.2, slow: 1.5, mul: 0.28 },
+      { radius: 2.4, cold: 2.6, slow: 1.9, mul: 0.22 },
+      { radius: 2.75, cold: 3.1, slow: 2.3, mul: 0.18 },
+      { radius: 3.3, cold: 3.6, slow: 2.8, mul: 0.14 },
     ],
-    /** A blow, then they feel heavy and stay. No flee. */
+    /**
+     * Thinner and shorter than the same rank of wind, and the push is harder.
+     * Wind ranks: 2.4/0.95/1.7, 2.75/1.08/1.95, 3.15/1.22/2.25, 3.6/1.4/2.6.
+     */
     wg: [
-      { range: 2.3, width: 0.95, impulse: 1.35, heavy: 2.2 },
-      { range: 2.65, width: 1.08, impulse: 1.55, heavy: 2.7 },
-      { range: 3.0, width: 1.22, impulse: 1.8, heavy: 3.2 },
-      { range: 3.45, width: 1.4, impulse: 2.1, heavy: 3.8 },
+      { range: 1.65, width: 0.52, impulse: 2.45 },
+      { range: 1.9, width: 0.58, impulse: 2.8 },
+      { range: 2.15, width: 0.66, impulse: 3.2 },
+      { range: 2.45, width: 0.76, impulse: 3.7 },
     ],
     /** Extra stubbornness a boss loses just for standing in the weather. Once per cast. */
     wear: 0.08,

@@ -17,7 +17,7 @@ export type SimEvent =
   | { t: 'win' }
   | { t: 'lose' }
   // v0.8 mage
-  | { t: 'cast'; ability: string; x: number; z: number; dx: number; dz: number; el: SpellElement; hold?: boolean }
+  | { t: 'cast'; ability: string; x: number; z: number; dx: number; dz: number; el: SpellElement; hold?: boolean; r?: number; w?: number }
   | { t: 'status'; agentId: number; kind: string; until: number }
   | { t: 'chain'; pts: { x: number; z: number }[] }
   | { t: 'gadget'; id: string; x: number; z: number }

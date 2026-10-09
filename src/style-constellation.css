@@ -412,7 +412,7 @@
 /* Mage book: a wheel. Centre is the start. Farther out is the stronger rank. */
 .spell-wheel {
   position: relative;
-  width: min(100%, 520px, 68vh);
+  width: min(100%, 500px, 58vh);
   aspect-ratio: 1;
   margin: 6px auto;
   flex: none;
@@ -516,6 +516,26 @@
   color: #fff;
 }
 .cst-detail-why { font-size: 12px; font-weight: 800; color: #ffe082; }
+.spell-learn {
+  margin-top: 6px;
+  align-self: flex-start;
+  min-height: 36px;
+  padding: 6px 18px;
+  border: 0;
+  border-radius: 999px;
+  background: #ffd54f;
+  color: #1b2230;
+  font-weight: 900;
+  font-size: 14px;
+}
+.spell-learn:disabled {
+  background: rgba(255, 255, 255, 0.16);
+  color: rgba(255, 255, 255, 0.55);
+}
+.skills-panel .spell-learn:disabled {
+  background: #eceff3;
+  color: #8b93a0;
+}
 .skills-panel .spell-wheel { color: #18202e; }
 .skills-panel .spell-hub {
   background: radial-gradient(circle at 40% 35%, #fff, #e7ebf2 70%);

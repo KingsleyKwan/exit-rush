@@ -310,6 +310,57 @@ export class Effects {
     }
   }
 
+  /**
+   * A directional blow. Motes stay small enough that she and the aisle stay visible.
+   * A narrower `width` (wind+weight) packs the same motes into a thinner lane.
+   */
+  gust(x: number, z: number, dx: number, dz: number, range: number, width: number, color = 0x81d4fa): void {
+    const speed = Math.max(2.8, range / 0.55);
+    for (let i = 0; i < 22; i++) {
+      const p = this.free.pop();
+      if (!p) break;
+      const along = 0.08 + Math.random() * 0.84;
+      const lat = (Math.random() - 0.5) * 2 * width * Math.max(0.4, along);
+      const ox = -dz * lat;
+      const oz = dx * lat;
+      p.x = x + dx * range * along + ox;
+      p.y = 0.45 + Math.random() * 0.65;
+      p.z = z + dz * range * along + oz;
+      p.vx = dx * speed * (0.45 + Math.random() * 0.4);
+      p.vz = dz * speed * (0.45 + Math.random() * 0.4);
+      p.vy = (Math.random() - 0.45) * 0.3;
+      p.life = p.max = 0.55 + Math.random() * 0.2;
+      p.size = 1.15 + Math.random() * 0.7;
+      p.grav = -0.2;
+      p.drag = 0.6;
+      p.mat.color.setHex(color);
+      p.mat.opacity = 0.92;
+      p.mat.blending = THREE.NormalBlending;
+      p.mesh.visible = true;
+      this.parts.push(p);
+    }
+    const ring = Math.max(0.45, width * 1.25);
+    this.shockwave(x + dx * range * 0.3, z + dz * range * 0.3, ring, color, 0.55);
+    this.shockwave(x + dx * range * 0.62, z + dz * range * 0.62, ring * 0.8, color, 0.45);
+  }
+
+  /** A cold patch on the floor. People can still be seen inside it. */
+  coldPool(x: number, z: number, radius: number, leaving = false): void {
+    const R = Math.max(radius, 1.4);
+    this.shockwave(x, z, R, 0x1e88e5, 0.95);
+    this.shockwave(x, z, R * 0.62, 0xbbdefb, 0.8);
+    this.puff(x, 0.3, z, 26, 0xbbdefb, 0.85, 1.9, 0.95, 0.2, -0.12);
+    this.puff(x, 0.18, z, 14, 0xffffff, 0.45, 1.5, 0.85, 0.1, -0.04, false);
+    if (leaving) this.puff(x, 0.45, z, 18, 0xe1f5fe, 2.1, 1.15, 0.7, 0.25, -0.1);
+  }
+
+  /** Her own weight. Dust falls onto a ring at her feet. */
+  weightRing(x: number, z: number, radius: number): void {
+    this.shockwave(x, z, Math.max(radius, 0.9), 0x7e57c2, 0.7);
+    this.shockwave(x, z, Math.max(radius * 0.55, 0.5), 0x4527a0, 0.55);
+    this.puff(x, 1.2, z, 22, 0x9575cd, 0.4, 1.5, 0.65, -0.15, -9, false);
+  }
+
   spray(x: number, z: number, dx: number, dz: number, count: number, color: number, speed = 3): void {
     for (let i = 0; i < count; i++) {
       const p = this.free.pop();

@@ -305,9 +305,14 @@ function markCold(a: Agent, until: number, emit: Emit): void {
   emit({ t: 'status', agentId: a.id, kind: 'cold', until });
 }
 
-function markHeavy(a: Agent, until: number, emit: Emit): void {
-  a.heavyUntil = Math.max(a.heavyUntil, until);
-  emit({ t: 'status', agentId: a.id, kind: 'heavy', until });
+function markSlow(a: Agent, until: number, mul: number, emit: Emit): void {
+  if (until >= a.slowUntil) {
+    a.slowUntil = until;
+    a.slowMul = mul;
+  } else if (mul < a.slowMul) {
+    a.slowMul = mul;
+  }
+  emit({ t: 'status', agentId: a.id, kind: 'slow', until });
 }
 
 function markFlee(a: Agent, until: number, x: number, z: number, emit: Emit): void {
@@ -387,7 +392,7 @@ function coneAbility(
       const { dx, dz } = aimDir(ctx);
       const px = ctx.player.body.x;
       const pz = ctx.player.body.z;
-      ctx.emit({ t: 'cast', ability: node.id, x: px, z: pz, dx, dz, el: 'wind' });
+      ctx.emit({ t: 'cast', ability: node.id, x: px, z: pz, dx, dz, el: 'wind', r: row.range, w: row.width });
       for (const a of ctx.crowd.agents) {
         const dist = inCone(a, px, pz, dx, dz, row.range, row.width);
         if (dist < 0) continue;
@@ -418,7 +423,7 @@ function auraAbility(
     cast(ctx) {
       const px = ctx.player.body.x;
       const pz = ctx.player.body.z;
-      ctx.emit({ t: 'cast', ability: node.id, x: px, z: pz, dx: 0, dz: el === 'grav' ? -1 : 0, el, hold });
+      ctx.emit({ t: 'cast', ability: node.id, x: px, z: pz, dx: 0, dz: el === 'grav' ? -1 : 0, el, hold, r: radius });
       for (const a of hitAgents(ctx.crowd, px, pz, radius)) {
         weatherTouch(a, schools, ctx.mods);
         after(a, ctx);
@@ -430,8 +435,8 @@ function auraAbility(
 
 /**
  * The cast is the line she pressed. Knowing another line does not mix in.
- * Wind blows. Ice is cold. Gravity is heavy. iw is a cold blow that sends them off.
- * ig is cold and they cannot move. wg is a blow, then they stay.
+ * Wind blows. Ice is a cold patch. Gravity is her own weight.
+ * iw is a cold patch people leave. ig slows the patch. wg is a thin hard push.
  */
 function spellAbility(node: SpellNodeDef, mods: PlayerMods): AbilityDef | null {
   const W = TUNING.weather;
@@ -444,17 +449,18 @@ function spellAbility(node: SpellNodeDef, mods: PlayerMods): AbilityDef | null {
   }
   if (node.line === 'iw') {
     const row = W.iw[rank];
-    return coneAbility(node, cost, cd, row, ['wind', 'ice'], (a, ctx) => {
+    return auraAbility(node, cost, cd, row.radius, 'ice', false, ['wind', 'ice'], (a, ctx) => {
       markCold(a, ctx.time + row.cold, ctx.emit);
-      const dir = blowVector(ctx.player.body.x, ctx.player.body.z, a.body.x, a.body.z);
-      markFlee(a, ctx.time + row.flee, a.body.x + dir.x * 1.35, a.body.z + dir.z * 1.35, ctx.emit);
+      const px = ctx.player.body.x;
+      const pz = ctx.player.body.z;
+      const dir = blowVector(px, pz, a.body.x, a.body.z);
+      const dist = Math.hypot(a.body.x - px, a.body.z - pz);
+      const step = Math.max(0.8, row.radius - dist + 0.9);
+      markFlee(a, ctx.time + row.flee, a.body.x + dir.x * step, a.body.z + dir.z * step, ctx.emit);
     });
   }
   if (node.line === 'wg') {
-    const row = W.wg[rank];
-    return coneAbility(node, cost, cd, row, ['wind', 'grav'], (a, ctx) => {
-      markHeavy(a, ctx.time + row.heavy, ctx.emit);
-    });
+    return coneAbility(node, cost, cd, W.wg[rank], ['wind', 'grav'], () => {});
   }
   if (node.line === 'i') {
     const row = W.i[rank];
@@ -464,17 +470,33 @@ function spellAbility(node: SpellNodeDef, mods: PlayerMods): AbilityDef | null {
   }
   if (node.line === 'g') {
     const row = W.g[rank];
-    return auraAbility(node, cost, cd, row.radius, 'grav', false, ['grav'], (a, ctx) => {
-      markHeavy(a, ctx.time + row.heavy, ctx.emit);
-    });
+    return {
+      id: node.id,
+      resource: 'mana',
+      cost,
+      cd,
+      cast(ctx) {
+        const p = ctx.player;
+        const until = ctx.time + row.brace;
+        if (until >= p.weightUntil) {
+          p.weightUntil = until;
+          p.weightMul = row.mul;
+          p.weightResist = row.extra;
+        }
+        ctx.emit({
+          t: 'cast', ability: node.id,
+          x: p.body.x, z: p.body.z, dx: 0, dz: -1, el: 'grav', r: row.radius,
+        });
+        return true;
+      },
+    };
   }
   if (node.line === 'ig') {
     const row = W.ig[rank];
-    return auraAbility(node, cost, cd, row.radius, 'ice', true, ['ice', 'grav'], (a, ctx) => {
+    return auraAbility(node, cost, cd, row.radius, 'ice', false, ['ice', 'grav'], (a, ctx) => {
       markCold(a, ctx.time + row.cold, ctx.emit);
-      const dur = disableDur(row.freeze, isBossAgent(a));
-      applyStatus(a, 'freeze', ctx.time + dur, ctx.emit);
-      a.freezeGhostUntil = Math.max(a.freezeGhostUntil, ctx.time + (a.boss ? 0.35 : 0.55));
+      const dur = disableDur(row.slow, isBossAgent(a));
+      markSlow(a, ctx.time + dur, row.mul, ctx.emit);
     });
   }
   return null;

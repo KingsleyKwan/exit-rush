@@ -1,4 +1,4 @@
-import { barAfterLearn, canLearn, learnSpell, lineElements, rank4Blocked, spellById, type SpellLine } from '../game/SpellTree';
+import { barAfterLearn, canLearn, learnSpell, lineElements, spellById, type SpellLine } from '../game/SpellTree';
 import { spentOf } from '../game/storage';
 import { t, getLang, fmt } from '../i18n';
 import type { Game } from '../game/Game';
@@ -86,7 +86,7 @@ function polar(angleDeg: number, radius: number): { x: number; y: number } {
 
 const SCHOOL_INK = { w: '#4fc3f7', i: '#1e88e5', g: '#7e57c2' } as const;
 
-/** A stroke is a requirement. Three spokes leave the hub. Mixes bridge the same rank, then rank 4 continues that mix. */
+/** A stroke is a requirement. Three spokes leave the hub. Mixes bridge the same rank, and the mix itself runs from rank 1 to rank 4. */
 function raySvg(): string {
   const stroke = (a: { x: number; y: number }, b: { x: number; y: number }, color: string, width: number) =>
     `<line x1="${a.x.toFixed(2)}" y1="${a.y.toFixed(2)}" x2="${b.x.toFixed(2)}" y2="${b.y.toFixed(2)}" stroke="${color}" stroke-width="${width}" stroke-linecap="round"/>`;
@@ -111,13 +111,16 @@ function raySvg(): string {
       parts.push(stroke(polar(RAY_ANGLE[a], RAY_R[rank]), mid, SCHOOL_INK[a], 1.45));
       parts.push(stroke(polar(RAY_ANGLE[b], RAY_R[rank]), mid, SCHOOL_INK[b], 1.45));
     }
-    const inner = polar(RAY_ANGLE[mix], RAY_R[2]);
+    const inner = polar(RAY_ANGLE[mix], RAY_R[0]);
     const outer = polar(RAY_ANGLE[mix], RAY_R[3]);
     grads.push(`<linearGradient id="mix-${mix}" gradientUnits="userSpaceOnUse" x1="${inner.x.toFixed(2)}" y1="${inner.y.toFixed(2)}" x2="${outer.x.toFixed(2)}" y2="${outer.y.toFixed(2)}"><stop offset="0" stop-color="${SCHOOL_INK[a]}"/><stop offset="1" stop-color="${SCHOOL_INK[b]}"/></linearGradient>`);
     parts.push(stroke(inner, outer, `url(#mix-${mix})`, 1.7));
   }
   return `<svg class="spell-spokes" viewBox="0 0 100 100" aria-hidden="true"><defs>${grads.join('')}</defs>${parts.join('')}</svg>`;
 }
+
+/** The node the player was reading, kept across a learn so the text stays put. */
+let mageFocus = '';
 
 /** Wheel. Three lines leave the start. A line is who you must learn first. */
 function renderMageBook(game: Game, rerender: (game: Game) => void): HTMLElement {
@@ -137,11 +140,17 @@ function renderMageBook(game: Game, rerender: (game: Game) => void): HTMLElement
     if (!on && missing.length === 1) {
       const req = spellById(missing[0]);
       if (req) why = fmt(dict.spellNeed, { name: en ? req.nameEn : req.nameZh });
-    } else if (!on && missing.length >= 2) {
+    } else if (!on && missing.length === 2) {
       const a = spellById(missing[0]);
       const b = spellById(missing[1]);
       if (a && b) why = fmt(dict.spellNeedTwo, { a: en ? a.nameEn : a.nameZh, b: en ? b.nameEn : b.nameZh });
-    } else if (!on && rank4Blocked(s, id)) why = dict.spellOneEnd;
+    } else if (!on && missing.length >= 3) {
+      const names = missing.slice(0, 3).map((req) => {
+        const n = spellById(req);
+        return n ? (en ? n.nameEn : n.nameZh) : '';
+      });
+      if (names[0] && names[1] && names[2]) why = fmt(dict.spellNeedThree, { a: names[0], b: names[1], c: names[2] });
+    }
     const tip = en ? n.tipEn : n.tipZh;
     const kind = n.rank === 4 ? dict.spellLast : dict.skillNodeActive;
     const title = `${n.nameEn} / ${n.nameZh} — ${tip}${why ? ` (${why})` : ''}`;
@@ -179,6 +188,7 @@ function renderMageBook(game: Game, rerender: (game: Game) => void): HTMLElement
           <div class="cst-detail-names"><span class="cst-detail-ico"></span><b class="cst-detail-en"></b><span class="cst-detail-zh"></span></div>
           <p class="cst-detail-tip"></p>
           <div class="cst-detail-foot"><span class="cst-detail-kind"></span><span class="cst-detail-why"></span></div>
+          <button type="button" class="spell-learn" id="spell-learn"></button>
         </div>
         ${overRun ? `<button type="button" class="primary" id="btn-back">${icon('back', 'sm')}<span>${dict.back}</span></button>` : ''}
       </div>
@@ -200,20 +210,31 @@ function renderMageBook(game: Game, rerender: (game: Game) => void): HTMLElement
     detail.querySelector('.cst-detail-kind')!.textContent = btn.dataset.kind ?? '';
     const why = detail.querySelector('.cst-detail-why') as HTMLElement;
     why.textContent = btn.dataset.why ?? '';
+    const learn = detail.querySelector('#spell-learn') as HTMLButtonElement | null;
+    if (learn) {
+      const id = btn.dataset.spell ?? '';
+      const on = btn.classList.contains('on');
+      learn.dataset.spell = id;
+      learn.disabled = !btn.classList.contains('ready');
+      learn.textContent = on ? dict.spellLearned : dict.spellLearn;
+    }
   };
+
+  panel.querySelector('#spell-learn')?.addEventListener('click', () => {
+    const id = (panel.querySelector('#spell-learn') as HTMLElement | null)?.dataset.spell ?? '';
+    const next = learnSpell(s, id);
+    if (!next) return;
+    mageFocus = id;
+    game.save.mage.loadouts[active] = next;
+    game.save.mage.spellBars[active] = barAfterLearn(next, game.save.mage.spellBars[active] ?? []);
+    game.persist();
+    game.audio.ui();
+    rerender(game);
+  });
 
   panel.querySelectorAll<HTMLElement>('.spell-node[data-spell]').forEach((btn) => {
     btn.addEventListener('click', () => {
-      const id = btn.dataset.spell ?? '';
-      const next = learnSpell(s, id);
-      if (next) {
-        game.save.mage.loadouts[active] = next;
-        game.save.mage.spellBars[active] = barAfterLearn(next, game.save.mage.spellBars[active] ?? []);
-        game.persist();
-        game.audio.ui();
-        rerender(game);
-        return;
-      }
+      mageFocus = btn.dataset.spell ?? '';
       showDetail(btn);
       game.audio.ui();
     });
@@ -244,7 +265,8 @@ function renderMageBook(game: Game, rerender: (game: Game) => void): HTMLElement
     (veil.querySelector('[data-cf="no"]') as HTMLElement).focus();
   });
 
-  const prefer = panel.querySelector<HTMLElement>('.spell-node.ready')
+  const prefer = (mageFocus ? panel.querySelector<HTMLElement>(`.spell-node[data-spell="${mageFocus}"]`) : null)
+    ?? panel.querySelector<HTMLElement>('.spell-node.ready')
     ?? panel.querySelector<HTMLElement>('.spell-node.on')
     ?? panel.querySelector<HTMLElement>('.spell-node');
   if (prefer) showDetail(prefer);

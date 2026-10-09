@@ -1152,21 +1152,21 @@ export class Game {
         const len = Math.hypot(e.dx, e.dz) || 1;
         const dx = e.dx / len;
         const dz = e.dz / len;
-        const big = /4$/.test(e.ability);
-        if (e.el === 'wind') {
-          fx.spray(e.x, e.z, dx, dz, big ? 18 : 12, 0xe1f5fe, big ? 2.6 : 2.1);
-          fx.puff(e.x, 0.8, e.z, big ? 12 : 8, 0xb3e5fc, 1.2, 0.7, 0.3);
-          cam.addTrauma(0.04);
+        const line = e.ability.startsWith('iw') || e.ability.startsWith('ig') || e.ability.startsWith('wg')
+          ? e.ability.slice(0, 2)
+          : e.ability.slice(0, 1);
+        if (line === 'w' || line === 'wg') {
+          fx.gust(e.x, e.z, dx, dz, e.r ?? 2.6, e.w ?? 0.9, line === 'wg' ? 0xb39ddb : 0x4fc3f7);
+          cam.addTrauma(line === 'wg' ? 0.07 : 0.05);
+          cam.kickCamera(dx, dz, line === 'wg' ? 0.7 : 0.45);
           this.audio.dash();
-        } else if (e.el === 'ice') {
-          const rad = big ? 3.15 : 2.35;
-          fx.puff(e.x, 0.7, e.z, big ? 16 : 12, 0xbbdefb, 1.1, 0.7, 0.4);
-          fx.spray(e.x, e.z, dx, dz, big ? 12 : 8, 0xe3f2fd, 1.3);
-          if (e.hold) this.paintFreezeShells(e.x, e.z, rad);
-          cam.addTrauma(0.04);
+        } else if (line === 'i' || line === 'iw' || line === 'ig') {
+          fx.coldPool(e.x, e.z, e.r ?? 2.2, line === 'iw');
+          if (e.hold) this.paintFreezeShells(e.x, e.z, e.r ?? 2.2);
+          cam.addTrauma(0.03);
           this.audio.sense();
-        } else if (e.el === 'grav') {
-          fx.puff(e.x, 0.35, e.z, big ? 16 : 12, 0x7e57c2, 0.9, 0.55, 0.4);
+        } else if (line === 'g' || e.el === 'grav') {
+          fx.weightRing(e.x, e.z, e.r ?? 1.2);
           cam.addTrauma(0.04);
           this.audio.sense();
         } else {

@@ -34,7 +34,7 @@ import { BRANCH_FILL, modifiersFromSkills } from '../src/game/SkillTree';
 import { CHARACTERS, modsFor, type CharacterId, type PlayerMods } from '../src/game/charactersDef';
 import { kitForBot, resolveKit, techKitSelfTest } from '../src/game/techKit';
 import { grantsForProductIds } from '../src/game/entitlements';
-import { canLearn, defaultSpellBar, learnSpell } from '../src/game/SpellTree';
+import { canLearn, defaultSpellBar, learnSpell, rank4Blocked } from '../src/game/SpellTree';
 import { defaultSkills, earnedFrom, migrateLegacyKeys, normalizeSave, progressOf, recordClear, SAVE_KEY, spentOf, type KeyValueStore, type SaveData, type SkillState } from '../src/game/storage';
 import { earnedPoints, resetActiveLoadout, spendPoint, spentPoints, switchLoadout } from '../src/game/SkillTree';
 import type { PlayerInput } from '../src/game/sim/PlayerSim';
@@ -123,9 +123,10 @@ const earnedPts = (id: number): number => (id === 100 ? 99 : id - 1);
 
 /**
  * Bot book, not a full unlock. Ten legal points, in an order learnSpell accepts.
- * Freeze levels take ice and gravity to rank 3, then the hold to the end. No wind, and no i4 or g4.
- * Cold levels take bitter cold, so the hold stops at rank 3. That needs g3 as well as i4.
- * Everything else takes the gale. Hard Wind needs Strong Wind and Hard Cold, not the cooler mixes.
+ * Freeze levels take ice and gravity to rank 3, then the slow to the end. No wind, and no i4 or g4.
+ * Cold levels take bitter cold, so the slow stops at rank 3. That needs the earlier slow ranks too.
+ * Everything else takes the gale and Hard Wind. The cold-wind line costs iw1 and iw2 as well,
+ * so those ten points no longer fit a gravity mix.
  * Raw hero power spreads stay in `earned` / `ultBuild` and are not reused here.
  */
 function mageEarned(id: number): SkillState {
@@ -133,7 +134,7 @@ function mageEarned(id: number): SkillState {
     ? ['i1', 'i2', 'i3', 'g1', 'g2', 'g3', 'ig1', 'ig2', 'ig3', 'ig4']
     : (id === 30 || id === 50 || id === 80 || id === 90)
       ? ['i1', 'i2', 'i3', 'i4', 'g1', 'g2', 'g3', 'ig1', 'ig2', 'ig3']
-      : ['w1', 'w2', 'w3', 'w4', 'i1', 'i2', 'i3', 'iw3', 'g1', 'wg1'];
+      : ['w1', 'w2', 'w3', 'w4', 'i1', 'i2', 'i3', 'iw1', 'iw2', 'iw3'];
   let book: SkillState = { ...defaultSkills(), points: ids.length, known: [] };
   for (const spellId of ids) {
     const next = learnSpell(book, spellId);
@@ -1121,14 +1122,14 @@ async function main(): Promise<void> {
     }
     const turned = place(coldSim);
     if (!coldSim.tryAbility('iw1')) { console.error('iw1 cast failed'); process.exit(1); }
-    if (!(turned.coldUntil > 0) || !(turned.fleeUntil > 0) || turned.freezeUntil > 0) {
-      console.error('iw1 should feel cold and turn, not freeze', turned.coldUntil, turned.fleeUntil, turned.freezeUntil);
+    if (!(turned.coldUntil > 0) || !(turned.fleeUntil > 0) || turned.freezeUntil > 0 || Math.abs(turned.body.vx) > 0.2) {
+      console.error('iw1 should be a cold patch people leave, not a blow', turned.coldUntil, turned.fleeUntil, turned.freezeUntil, turned.body.vx);
       process.exit(1);
     }
     const heldA = place(coldSim);
     if (!coldSim.tryAbility('ig1')) { console.error('ig1 cast failed'); process.exit(1); }
-    if (!(heldA.freezeUntil > coldSim.time) || !(heldA.coldUntil > 0) || heldA.dazedUntil > 0) {
-      console.error('ig1 should freeze, not daze', heldA.freezeUntil, heldA.coldUntil, heldA.dazedUntil);
+    if (!(heldA.slowUntil > coldSim.time) || !(heldA.slowMul > 0 && heldA.slowMul < 0.5) || heldA.freezeUntil > 0 || heldA.dazedUntil > 0) {
+      console.error('ig1 should slow, not freeze', heldA.slowUntil, heldA.slowMul, heldA.freezeUntil, heldA.dazedUntil);
       process.exit(1);
     }
     const onlyCold = place(coldSim);
@@ -1145,6 +1146,48 @@ async function main(): Promise<void> {
     if (galeA.body.vx <= breezeVx) { console.error('w4 should blow harder than w1', galeA.body.vx, breezeVx); process.exit(1); }
     if (Math.abs((galeMana - galeSim.player.mana) - (manaBefore - sim.player.mana)) > 0.01) {
       console.error('w4 should cost the same mana as w1');
+      process.exit(1);
+    }
+    const wind1 = { ...defaultSkills(), points: 0, known: ['w1'] };
+    const press = { ...defaultSkills(), points: 0, known: ['w1', 'g1', 'wg1'] };
+    const windSim = new Sim(LEVELS.find((l) => l.id === 1)!, modsFor(CHARACTERS.mage, wind1, ['w1']), mulberry32(11));
+    const pressSim = new Sim(LEVELS.find((l) => l.id === 1)!, modsFor(CHARACTERS.mage, press, ['wg1']), mulberry32(11));
+    const windA = place(windSim);
+    const pressA = place(pressSim);
+    if (!windSim.tryAbility('w1') || !pressSim.tryAbility('wg1')) {
+      console.error('w1 or wg1 cast failed'); process.exit(1);
+    }
+    if (pressA.body.vx <= windA.body.vx) {
+      console.error('wg1 should push harder than w1', pressA.body.vx, windA.body.vx);
+      process.exit(1);
+    }
+    if (pressA.heavyUntil > 0 || pressA.fleeUntil > 0) {
+      console.error('wg1 is a push, not a stay or a redirect', pressA.heavyUntil, pressA.fleeUntil);
+      process.exit(1);
+    }
+    const edge = (run: Sim) => {
+      const person = place(run);
+      person.body.z = run.player.body.z + 1.5;
+      person.homeZ = person.body.z;
+      return person;
+    };
+    const windEdge = new Sim(LEVELS.find((l) => l.id === 1)!, modsFor(CHARACTERS.mage, wind1, ['w1']), mulberry32(12));
+    const pressEdge = new Sim(LEVELS.find((l) => l.id === 1)!, modsFor(CHARACTERS.mage, press, ['wg1']), mulberry32(12));
+    const wide = edge(windEdge);
+    const thin = edge(pressEdge);
+    if (!windEdge.tryAbility('w1') || !pressEdge.tryAbility('wg1')) {
+      console.error('edge cast failed'); process.exit(1);
+    }
+    if (wide.body.vx <= 0.15 || Math.abs(thin.body.vx) > 0.15) {
+      console.error('wg1 should miss the spot w1 still reaches', wide.body.vx, thin.body.vx);
+      process.exit(1);
+    }
+    const planted = { ...defaultSkills(), points: 0, known: ['g1'] };
+    const plantSim = new Sim(LEVELS.find((l) => l.id === 1)!, modsFor(CHARACTERS.mage, planted, ['g1']), mulberry32(13));
+    const bystander = place(plantSim);
+    if (!plantSim.tryAbility('g1')) { console.error('g1 cast failed'); process.exit(1); }
+    if (!(plantSim.player.weightUntil > plantSim.time) || plantSim.player.weightMul <= 1 || bystander.heavyUntil > 0) {
+      console.error('g1 should weigh her down, not the crowd', plantSim.player.weightUntil, plantSim.player.weightMul, bystander.heavyUntil);
       process.exit(1);
     }
     let book = { ...defaultSkills(), points: 4, known: [] as string[] };
@@ -1177,27 +1220,37 @@ async function main(): Promise<void> {
       },
       { ...defaultSkills(), points, known: [] as string[] },
     );
-    const bridge = learnAll(['i1', 'i2', 'i3', 'w1', 'w2', 'w3'], 8);
-    if (!canLearn(bridge, 'iw2')) { console.error('iw2 opens from i2 and w2, not from iw1'); process.exit(1); }
-    if (!canLearn(bridge, 'iw3')) { console.error('iw3 opens after i3 and w3'); process.exit(1); }
-    if (canLearn(bridge, 'iw4')) { console.error('iw4 needs iw3'); process.exit(1); }
-    const coldWind = learnSpell(bridge, 'iw3')!;
+    const bridge = learnAll(['i1', 'i2', 'i3', 'w1', 'w2', 'w3'], 10);
+    if (!canLearn(bridge, 'iw1')) { console.error('iw1 should open after i1 and w1'); process.exit(1); }
+    if (canLearn(bridge, 'iw2') || canLearn(bridge, 'iw3')) {
+      console.error('iw2 needs iw1 as well as i2 and w2'); process.exit(1);
+    }
+    const withIw1 = learnSpell(bridge, 'iw1')!;
+    if (!canLearn(withIw1, 'iw2')) { console.error('iw2 opens from i2, w2, and iw1'); process.exit(1); }
+    if (canLearn(withIw1, 'iw3')) { console.error('iw3 needs iw2'); process.exit(1); }
+    const withIw2 = learnSpell(withIw1, 'iw2')!;
+    if (!canLearn(withIw2, 'iw3')) { console.error('iw3 opens from i3, w3, and iw2'); process.exit(1); }
+    if (canLearn(withIw2, 'iw4')) { console.error('iw4 needs iw3'); process.exit(1); }
+    const coldWind = learnSpell(withIw2, 'iw3')!;
     if (!canLearn(coldWind, 'iw4')) { console.error('iw4 opens after iw3'); process.exit(1); }
     const onlyMix = learnAll(['i1', 'w1', 'iw1']);
     if (canLearn(onlyMix, 'iw2')) { console.error('iw2 does not open from iw1 alone'); process.exit(1); }
     const capsNoMix = learnAll(['i1', 'i2', 'i3', 'i4', 'w1', 'w2', 'w3', 'w4']);
     if (canLearn(capsNoMix, 'iw4')) { console.error('iw4 does not open from i4 and w4'); process.exit(1); }
-    const iced = learnAll(['i1', 'i2', 'i3', 'i4', 'g1', 'g2', 'g3', 'ig3']);
-    if (canLearn(iced, 'ig4') || canLearn(iced, 'iw4')) {
+    const justIce = learnAll(['i1', 'i2', 'i3', 'i4']);
+    if (!canLearn(justIce, 'w1')) { console.error('a lower rank is not locked by i4'); process.exit(1); }
+    const iceCap = { ...defaultSkills(), points: 1, known: ['i4', 'ig3', 'iw3'] };
+    if (!rank4Blocked(iceCap, 'ig4') || !rank4Blocked(iceCap, 'iw4')) {
       console.error('i4 blocks ig4 and iw4'); process.exit(1);
     }
-    if (!canLearn(iced, 'w1')) { console.error('a lower rank is not locked by i4'); process.exit(1); }
-    const clashWind = learnAll(['i1', 'i2', 'i3', 'i4', 'w1', 'w2', 'w3', 'iw3']);
-    if (canLearn(clashWind, 'iw4')) { console.error('i4 blocks iw4 even after iw3'); process.exit(1); }
-    // w3 is already in the book, so the only question on w4 is the element lock.
-    const beside = { ...defaultSkills(), points: 1, known: ['i1', 'i2', 'i3', 'g1', 'g2', 'g3', 'ig3', 'ig4', 'w3'] };
-    if (!canLearn(beside, 'w4')) { console.error('ig4 does not block w4'); process.exit(1); }
-    if (canLearn(beside, 'i4')) { console.error('ig4 blocks i4'); process.exit(1); }
+    if (rank4Blocked(iceCap, 'g4') || rank4Blocked(iceCap, 'w1')) {
+      console.error('i4 does not block gravity or a lower rank'); process.exit(1);
+    }
+    const igCap = { ...defaultSkills(), points: 1, known: ['ig4', 'w3'] };
+    if (rank4Blocked(igCap, 'w4')) { console.error('ig4 does not block w4'); process.exit(1); }
+    if (!rank4Blocked(igCap, 'i4') || !rank4Blocked(igCap, 'g4')) {
+      console.error('ig4 blocks i4 and g4'); process.exit(1);
+    }
     console.log('weather book ok');
 
     const held = { x: 0, z: 0, mag: 0, shoveHeld: true };
@@ -1332,20 +1385,20 @@ async function main(): Promise<void> {
         mage: {
           loadouts: [{
             ...defaultSkills(),
-            known: ['wind_1', 'i1', 'i2', 'i3', 'i4', 'g1', 'g2', 'g3', 'ig3', 'ig4'],
+            known: ['i1', 'i2', 'i3', 'i4', 'g1', 'g2', 'g3', 'ig1', 'ig2', 'ig3', 'ig4'],
           }],
           active: 0,
-          spellBars: [['wind_1', 'ice_3']],
+          spellBars: [['ice_3']],
         },
       } as unknown as SaveData);
       const chainSlot = chain.mage.loadouts[0];
       const chainKnown = chainSlot.known ?? [];
-      if (!chainKnown.includes('w1') || !chainKnown.includes('i4') || !chainKnown.includes('ig3') || chainKnown.includes('ig4')) {
-        console.error('old ids migrate, and i4 blocks ig4', chainKnown);
+      if (!chainKnown.includes('i4') || !chainKnown.includes('ig3') || chainKnown.includes('ig4')) {
+        console.error('i4 is kept and ig4 is dropped', chainKnown);
         process.exit(1);
       }
-      if (!chain.mage.spellBars[0].includes('w1') || !chain.mage.spellBars[0].includes('i4')) {
-        console.error('bar should migrate wind_1 to w1 and ice_3 to i4', chain.mage.spellBars[0]);
+      if (!chain.mage.spellBars[0].includes('i4')) {
+        console.error('bar should migrate ice_3 to i4', chain.mage.spellBars[0]);
         process.exit(1);
       }
       console.log('weather book save kept');
