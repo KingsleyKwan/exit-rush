@@ -354,11 +354,29 @@ export class Effects {
     if (leaving) this.puff(x, 0.45, z, 18, 0xe1f5fe, 2.1, 1.15, 0.7, 0.25, -0.1);
   }
 
-  /** Her own weight. Dust falls onto a ring at her feet. */
-  weightRing(x: number, z: number, radius: number): void {
-    this.shockwave(x, z, Math.max(radius, 0.9), 0x7e57c2, 0.7);
-    this.shockwave(x, z, Math.max(radius * 0.55, 0.5), 0x4527a0, 0.55);
-    this.puff(x, 1.2, z, 22, 0x9575cd, 0.4, 1.5, 0.65, -0.15, -9, false);
+  /** Her own weight. Motes stay on her body. Not a patch on the floor. */
+  weightOn(x: number, z: number): void {
+    for (let i = 0; i < 14; i++) {
+      const p = this.free.pop();
+      if (!p) break;
+      const a = Math.random() * Math.PI * 2;
+      const rad = 0.04 + Math.random() * 0.14;
+      p.x = x + Math.cos(a) * rad;
+      p.z = z + Math.sin(a) * rad;
+      p.y = 0.35 + Math.random() * 0.9;
+      p.vx = Math.cos(a) * 0.12;
+      p.vz = Math.sin(a) * 0.12;
+      p.vy = -0.25 - Math.random() * 0.35;
+      p.life = p.max = 0.4 + Math.random() * 0.25;
+      p.size = 0.45 + Math.random() * 0.3;
+      p.grav = -0.8;
+      p.drag = 2.4;
+      p.mat.color.setHex(i % 2 === 0 ? 0xf3e5f5 : 0xce93d8);
+      p.mat.opacity = 0.95;
+      p.mat.blending = THREE.NormalBlending;
+      p.mesh.visible = true;
+      this.parts.push(p);
+    }
   }
 
   spray(x: number, z: number, dx: number, dz: number, count: number, color: number, speed = 3): void {

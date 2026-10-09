@@ -1166,7 +1166,7 @@ export class Game {
           cam.addTrauma(0.03);
           this.audio.sense();
         } else if (line === 'g' || e.el === 'grav') {
-          fx.weightRing(e.x, e.z, e.r ?? 1.2);
+          fx.weightOn(e.x, e.z);
           cam.addTrauma(0.04);
           this.audio.sense();
         } else {

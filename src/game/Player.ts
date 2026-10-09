@@ -20,6 +20,10 @@ export class Player {
   private ringMat: THREE.MeshBasicMaterial;
   private aim: THREE.Mesh;
   private aimMat: THREE.MeshBasicMaterial;
+  private braceA: THREE.Mesh;
+  private braceB: THREE.Mesh;
+  private braceMatA: THREE.MeshBasicMaterial;
+  private braceMatB: THREE.MeshBasicMaterial;
   private squash = 0;
   private squashV = 0;
   private bob = 0;
@@ -76,6 +80,24 @@ export class Player {
     this.aim.rotation.x = -Math.PI / 2;
     this.aim.position.y = 0.035;
     this.mesh.add(this.aim);
+
+    // Weight buff: two hoops on her body, not a ring on the floor.
+    const hoop = (y: number, color: number) => {
+      const mat = new THREE.MeshBasicMaterial({
+        color, transparent: true, opacity: 0, depthWrite: false, side: THREE.DoubleSide,
+      });
+      const mesh = new THREE.Mesh(new THREE.TorusGeometry(0.3, 0.028, 6, 20), mat);
+      mesh.position.y = y;
+      mesh.visible = false;
+      return { mesh, mat };
+    };
+    const a = hoop(0.58, 0xce93d8);
+    const b = hoop(0.98, 0xf3e5f5);
+    this.braceA = a.mesh;
+    this.braceMatA = a.mat;
+    this.braceB = b.mesh;
+    this.braceMatB = b.mat;
+    this.rig.add(this.braceA, this.braceB);
   }
 
   /** Swap player mesh for the selected character. Glow matches the card ring. */
@@ -109,8 +131,9 @@ export class Player {
     const squeeze = Math.min(0.14, b.pressure * 0.8);
     const charge = p.shoveCharge;
     // Wind up for a shove: crouch + widen.
-    const sy = (1 - this.squash) * (1 - squeeze) * (1 - charge * 0.12);
-    const sxz = (1 + this.squash * 0.5) * (1 + squeeze * 0.7) * (1 + charge * 0.1);
+    const braced = now < p.weightUntil;
+    const sy = (1 - this.squash) * (1 - squeeze) * (1 - charge * 0.12) * (braced ? 0.92 : 1);
+    const sxz = (1 + this.squash * 0.5) * (1 + squeeze * 0.7) * (1 + charge * 0.1) * (braced ? 1.06 : 1);
     this.rig.scale.set(sxz, sy, sxz);
 
     this.bob += dt * (4 + speed * 6);
@@ -145,7 +168,7 @@ export class Player {
     this.ring.scale.setScalar(ringBase + charge * 0.6 + (p.isSensing(now) ? Math.sin(time * 8) * 0.08 : 0));
     this.ringMat.opacity = p.shoveCd > 0 ? 0.45 : 0.95;
 
-    // Ult tints.
+    // Ult tints. Her weight is a buff on her body, after those.
     if (p.isCharging(now)) {
       this.bodyMat.emissive.setRGB(1, 0.45, 0.05);
       this.bodyMat.emissiveIntensity = 0.6 + Math.sin(time * 20) * 0.25;
@@ -155,17 +178,32 @@ export class Player {
     } else if (p.winded) {
       this.bodyMat.emissive.setRGB(0.4, 0, 0);
       this.bodyMat.emissiveIntensity = 0.25 + Math.sin(time * 6) * 0.15;
+    } else if (braced) {
+      this.bodyMat.emissive.setRGB(0.62, 0.35, 0.95);
+      this.bodyMat.emissiveIntensity = 0.45 + Math.sin(time * 5) * 0.12;
     } else {
       this.bodyMat.emissiveIntensity = 0;
     }
-    // Glow: breathes gently; matches ult / winded state.
+    // Glow: breathes gently; matches ult / winded / her weight.
     const g = this.glowMat.color;
     if (p.isCharging(now)) g.setRGB(1, 0.6, 0.15);
     else if (p.isDashing(now)) g.setRGB(0.4, 1, 1);
     else if (p.winded) g.setRGB(1, 0.3, 0.3);
+    else if (braced) g.setRGB(0.86, 0.62, 1);
     else g.setRGB(0.35, 0.82, 1);
     this.glowMat.opacity = (this.skin === 'mage' ? 0.9 : 0.75) + 0.25 * Math.sin(time * 4);
     this.xrayMat.color.copy(g);
+    const braceOp = braced ? 0.95 : 0;
+    for (const mat of [this.braceMatA, this.braceMatB]) {
+      mat.opacity += (braceOp - mat.opacity) * Math.min(1, dt * 10);
+    }
+    const showBrace = this.braceMatA.opacity > 0.04;
+    this.braceA.visible = showBrace;
+    this.braceB.visible = showBrace;
+    this.braceA.rotation.y = time * 2.4;
+    this.braceA.rotation.x = 0.5;
+    this.braceB.rotation.y = -time * 2.8;
+    this.braceB.rotation.z = 0.6;
 
     // Aim chevron in front of the player while steering.
     const show = p.moving > 0.15 ? 0.55 : 0;

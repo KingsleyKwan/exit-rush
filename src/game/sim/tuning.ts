@@ -423,7 +423,7 @@ export const TUNING = {
       { radius: 2.7, cold: 3.2 },
       { radius: 3.15, cold: 3.8 },
     ],
-    /** Her own weight for a short while. Radius is the ring around her, not a crowd patch. */
+    /** Her own weight for a short while. The cast is a buff on her, not a patch. Radius is unused. */
     g: [
       { radius: 1.15, brace: 2.2, mul: 1.25, extra: 0.12 },
       { radius: 1.28, brace: 2.7, mul: 1.45, extra: 0.18 },
