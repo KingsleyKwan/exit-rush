@@ -24,7 +24,7 @@ import {
   type Slot,
   type Tier,
 } from '../game/techKit';
-import { icon, itemIcon } from './icons';
+import { icon, itemIcon, type IconName } from './icons';
 import { el, screenBar } from './uiShared';
 
 type Tab = 'equip' | 'shop' | 'sets';
@@ -169,9 +169,24 @@ function moreBlock(id: string, dict: ReturnType<typeof t>): string {
   return `<div class="gear-more"><p><i class="gear-kind">${kind}</i> ${gearUseOf(id, dict)}</p>${lines ? `<p>${lines}</p>` : ''}</div>`;
 }
 
+/** Icon button. The dict string stays the accessible name, so both languages are the same width. */
+function actBtn(
+  label: string,
+  glyph: IconName,
+  attrs: string,
+  opt: { cls?: string; extra?: string; title?: string; primary?: boolean } = {},
+): string {
+  const tone = opt.primary ? 'primary' : 'ghost';
+  const cls = opt.cls ? ` ${opt.cls}` : '';
+  const title = opt.title ?? label;
+  const tail = opt.extra ? `<b>${opt.extra}</b>` : '';
+  return `<button type="button" class="${tone} icon-act${cls}" ${attrs} aria-label="${label}" title="${title}">${icon(glyph)}${tail}</button>`;
+}
+
 function moreBtn(id: string, dict: ReturnType<typeof t>): string {
   const open = moreId === id;
-  return `<button type="button" class="ghost more-btn${open ? ' on' : ''}" data-more="${id}" aria-expanded="${open}">${open ? dict.lessInfo : dict.moreInfo}</button>`;
+  const label = open ? dict.lessInfo : dict.moreInfo;
+  return `<button type="button" class="ghost icon-act more-btn${open ? ' on' : ''}" data-more="${id}" aria-expanded="${open}" aria-label="${label}" title="${label}">${icon('chev')}</button>`;
 }
 
 function nextUncleared(game: Game): number {
@@ -284,7 +299,7 @@ export function renderWorkshop(game: Game, _rerender: (game: Game) => void): HTM
     const off = wornAt(it.id);
     const wearing = off >= 0 || (selected >= 0 && placements[selected]?.id === it.id);
     const take = off >= 0
-      ? `<button type="button" class="ghost take-off" data-off="${off}">${dict.removeItem}</button>`
+      ? actBtn(dict.removeItem, 'unequip', `data-off="${off}"`, { cls: 'take-off' })
       : '';
     return `<div class="item-line"><button type="button" class="tray-item${pick?.id === it.id || wearing ? ' on' : ''}" data-tray="${it.id}" data-tier="${tier}">${gearIcon(it.id, it.slot)}<span class="name">${name}</span>${tag}</button>${take}</div>`;
   };
@@ -325,8 +340,14 @@ export function renderWorkshop(game: Game, _rerender: (game: Game) => void): HTM
 
   const nextGrid = tech.gridTier + 1 < GRID_TIERS.length ? GRID_TIERS[tech.gridTier + 1] : null;
   const growLocked = nextGrid != null && coins < nextGrid.price;
+  const growLabel = nextGrid ? `${dict.expandBag} · ${nextGrid.price}` : '';
   const growBtn = nextGrid
-    ? `<button type="button" class="primary${growLocked ? ' is-locked' : ''}" data-act="bag-grow" ${growLocked ? 'aria-disabled="true"' : ''}>${dict.expandBag} · ${nextGrid.price}</button>`
+    ? actBtn(growLabel, 'grow', `data-act="bag-grow"${growLocked ? ' aria-disabled="true"' : ''}`, {
+        primary: true,
+        extra: String(nextGrid.price),
+        cls: growLocked ? 'is-locked' : '',
+        title: growLocked ? dict.needCoins : growLabel,
+      })
     : '';
   const shopRows = (slotOn ? ITEMS.filter((it) => it.slot === slotOn) : []).map((it) => {
     const owned = it.slot === 'consumable' ? 0 : (tech.items[it.id] ?? 0);
@@ -334,7 +355,8 @@ export function renderWorkshop(game: Game, _rerender: (game: Game) => void): HTM
     const next = it.slot === 'consumable' ? (stock >= 9 ? -1 : 0) : (owned >= it.price.length ? -1 : owned);
     const price = next >= 0 ? it.price[next] : 0;
     const name = en ? it.nameEn : it.nameZh;
-    const buyLabel = it.slot === 'consumable' || owned === 0 ? dict.buyItem : dict.upgradeItem;
+    const buying = it.slot === 'consumable' || owned === 0;
+    const buyLabel = buying ? dict.buyItem : dict.upgradeItem;
     const buyTier = (next >= 0 ? Math.min(next + 1, it.shape.length, 3) : Math.min(owned, it.shape.length, 3)) as Tier | 0;
     const sizes = isItemId(it.id) ? tierSizesHtml(it.id, dict, 0, buyTier, 'look') : '';
     const lockLine = buyLock(buyBlock(game.save, it.id), dict);
@@ -343,8 +365,8 @@ export function renderWorkshop(game: Game, _rerender: (game: Game) => void): HTM
       <div class="shop-id">${gearIcon(it.id, it.slot)}<b>${name}</b>${have ? `<small>${have}</small>` : ''}</div>
       <div class="size-row">${sizes}</div>
       <div class="shop-buy">
-        ${next >= 0 ? `<button type="button" class="primary${lockLine ? ' is-locked' : ''}" data-buy="${it.id}" title="${lockLine}" ${lockLine ? 'aria-disabled="true"' : ''}>${buyLabel} ${price}</button>` : ''}
-        ${owned > 0 && it.slot !== 'consumable' ? `<button type="button" class="ghost" data-sell="${it.id}">${dict.sellItem}</button>` : ''}
+        ${next >= 0 ? actBtn(`${buyLabel} ${price}`, buying ? 'shop' : 'up', `data-buy="${it.id}"${lockLine ? ' aria-disabled="true"' : ''}`, { primary: true, extra: String(price), title: lockLine || `${buyLabel} ${price}`, cls: lockLine ? 'is-locked' : '' }) : ''}
+        ${owned > 0 && it.slot !== 'consumable' ? actBtn(dict.sellItem, 'coin', `data-sell="${it.id}"`) : ''}
         ${isItemId(it.id) ? moreBtn(it.id, dict) : ''}
       </div>
       ${isItemId(it.id) ? moreBlock(it.id, dict) : ''}
@@ -357,12 +379,11 @@ export function renderWorkshop(game: Game, _rerender: (game: Game) => void): HTM
   }).join('');
 
   const pieceTools = selected >= 0 && !pick
-    ? `<button type="button" class="ghost" data-act="bag-rot">${dict.rotateItem}</button>
-       <button type="button" class="ghost" data-act="bag-off">${dict.removeItem}</button>`
+    ? `${actBtn(dict.rotateItem, 'restart', 'data-act="bag-rot"')}${actBtn(dict.removeItem, 'unequip', 'data-act="bag-off"')}`
     : '';
   const actions = `<div class="bag-actions">${pieceTools}
-      <button type="button" class="ghost" data-act="bag-pack">${dict.autoPack}</button>
-      <button type="button" class="ghost" data-act="bag-rec">${dict.recommendKit}</button>
+      ${actBtn(dict.autoPack, 'pack', 'data-act="bag-pack"')}
+      ${actBtn(dict.recommendKit, 'star', 'data-act="bag-rec"')}
       ${growBtn}
     </div>`;
 

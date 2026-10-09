@@ -2380,6 +2380,31 @@ button.tier-size { border: 0; color: inherit; font: inherit; cursor: pointer; }
 .workshop .bag-actions button,
 .workshop .more-btn,
 .workshop .shop-buy button { min-height: 32px; padding: 2px 8px; font-size: 12px; }
+/* Icon actions stay one size in both languages. The name is the aria-label. */
+.workshop .ghost.icon-act {
+  background: rgba(255, 255, 255, 0.1);
+}
+.workshop .bag-actions .icon-act,
+.workshop .more-btn.icon-act,
+.workshop .shop-buy .icon-act,
+.workshop .item-line .icon-act {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  min-width: 44px;
+  min-height: 44px;
+  padding: 4px;
+  border-radius: 12px;
+  line-height: 1;
+}
+.workshop .icon-act .ico { width: 26px; height: 26px; }
+.workshop .icon-act b { font-size: 14px; font-weight: 800; font-variant-numeric: tabular-nums; }
+.workshop .primary.icon-act { padding: 4px 10px; }
+.workshop .more-btn.on { background: #ffb03a; color: #1b1408; }
+.workshop .more-btn.on .ico { transform: rotate(180deg); }
+.workshop [data-act="bag-rec"],
+.workshop [data-sell] { color: #ffd54f; }
 /* Global .primary is a full-width 52px button. In the workshop it sits in the row. */
 .workshop .primary {
   width: auto;
@@ -2390,6 +2415,7 @@ button.tier-size { border: 0; color: inherit; font: inherit; cursor: pointer; }
   border-radius: 12px;
   box-shadow: 0 2px 0 #5e0e18;
 }
+.workshop .primary.icon-act { min-height: 44px; padding: 4px 10px; }
 .more-btn { align-self: flex-start; }
 .gear-more {
   font-size: 12px;

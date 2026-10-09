@@ -42,6 +42,13 @@ const P: Record<string, string> = {
   next: `<path d="M12 9.5l14 14.5-14 14.5M26 9.5L40 24 26 38.5" stroke="currentColor" ${S(5.4)}/>`,
   back: `<path d="M29.5 9L14.5 24l15 15" stroke="currentColor" ${S(6)}/>`,
   close: `<path d="M12 12l24 24M36 12L12 36" stroke="currentColor" ${S(6)}/>`,
+  // Workshop actions. One picture per action, so the button does not grow with the language.
+  unequip: `<path d="M5 20h22v20H5z" fill="currentColor"/><path d="M11 20v-4a5 5 0 0 1 10 0V20" stroke="currentColor" ${S(3.4)}/><circle cx="35" cy="33" r="11" class="a"/><path d="M29 33h12" class="ws" ${S(3.8)}/>`,
+  chev: `<path d="M9 16.5L24 32l15-15.5" stroke="currentColor" ${S(6.2)}/>`,
+  pack: `<rect x="5" y="5" width="16" height="16" rx="3.5" fill="currentColor"/><rect x="27" y="5" width="16" height="16" rx="3.5" fill="currentColor"/><rect x="5" y="27" width="16" height="16" rx="3.5" fill="currentColor"/><rect x="27" y="27" width="16" height="16" rx="3.5" fill="currentColor"/>`,
+  grow: `<path d="M2 22h15v18H2z" fill="currentColor"/><path d="M5.5 22v-3a4 4 0 0 1 8 0V22" stroke="currentColor" ${S(3)}/><path d="M33 14v22M22 25h22" stroke="currentColor" ${S(5.2)}/>`,
+  up: `<path d="M24 44V20" stroke="currentColor" ${S(6)}/><path d="M8 26L24 6l16 20z" fill="currentColor" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/>`,
+  coin: `<circle cx="24" cy="24" r="16" fill="currentColor"/><circle cx="24" cy="24" r="9.5" class="k"/><circle cx="24" cy="24" r="5" fill="currentColor"/>`,
   tag: `<path d="M5 9a4 4 0 0 1 4-4h14.3a4 4 0 0 1 2.8 1.2l16 16a4 4 0 0 1 0 5.6L27.8 42.1a4 4 0 0 1-5.6 0l-16-16A4 4 0 0 1 5 23.3z" fill="currentColor"/><circle cx="15" cy="15" r="3.6" class="w"/>`,
   volume: `<path d="M4 16.5h8.5L24 7v34L12.5 31.5H4z" fill="currentColor"/><path d="M30 17.5c2.8 2.2 2.8 10.8 0 13M35.5 12.5c5.2 4.2 5.2 19.8 0 24" class="ws" ${S(3.4)}/>`,
   mute: `<path d="M4 16.5h8.5L24 7v34L12.5 31.5H4z" fill="currentColor"/><path d="M31 18l14 14M45 18L31 32" class="as" ${S(4.2)}/>`,
