@@ -371,6 +371,7 @@ interface Fx {
   angryRemain: number;
   front: number;
   resist: number;
+  gloves: boolean;
   core: 'C1' | 'C2' | 'C3' | null;
   coreTier: Tier | null;
   actives: ItemId[];
@@ -383,7 +384,7 @@ function blankFx(): Fx {
     speed: 1, push: 1, stam: 0, regen: 0, gap: 0, clearSpeed: 1, mass: 0,
     hurdle: false, hurdlePace: 1, passBoss: false, leap: false, leapCd: 9,
     pound: false, gpR: 1.2, gpLug: 2, split: false, stench: 0, loud: 0, angryRemain: 1,
-    front: 0, resist: 0,
+    front: 0, resist: 0, gloves: false,
     core: null, coreTier: null, actives: [], consumables: [], tiers: {},
   };
 }
@@ -421,16 +422,19 @@ function applyPiece(fx: Fx, id: ItemId, tier: Tier): void {
       fx.passBoss = tier === 3;
       break;
     case 'G1':
+      fx.gloves = true;
       fx.push *= pick(1.12, 1.25, 1.4);
       applyGloveStats(fx, tier, false);
       break;
     case 'G2':
+      fx.gloves = true;
       fx.pound = true;
       fx.gpR = pick(1.2, 1.4, 1.6);
       fx.gpLug = pick(2, 2.3, 2.6);
       applyGloveStats(fx, tier, true);
       break;
     case 'G3':
+      fx.gloves = true;
       fx.split = true;
       applyGloveStats(fx, tier, true);
       break;
@@ -529,6 +533,7 @@ export function resolveKit(tech: Pick<TechProgress, 'items' | 'gridTier' | 'sets
     techPassBossCase: fx.passBoss,
     techGpRadius: fx.pound ? fx.gpR : undefined,
     techGpLuggage: fx.pound ? fx.gpLug : undefined,
+    techGloves: fx.gloves || undefined,
     techActives: fx.actives.slice(0, 3),
     techCore: fx.core === 'C1' ? 'str' : fx.core === 'C2' ? 'spd' : fx.core === 'C3' ? 'sta' : null,
     techConsumables: fx.consumables.slice(0, 3),
@@ -1126,6 +1131,14 @@ export function techKitSelfTest(): string[] {
   const trial = trialTech();
   const trialKit = resolveKit(trial);
   eq('trial uses the same cap', trial.gridTier === 1 && trialKit.placements.length === 6, String(trialKit.placements.length));
+  eq('trial gloves shove', trialKit.extras.techGloves === true);
+  eq('gloves are a shove', resolveKit(capped.tech).extras.techGloves === true);
+  eq('an empty bag does not shove', resolveKit(emptyTech()).extras.techGloves !== true);
+  const buzz = emptyTech();
+  buzz.items = { G3: 1 };
+  buzz.sets[0].placements = [{ id: 'G3', tier: 1, x: 0, y: 0, rot: 0 }];
+  const buzzKit = resolveKit(buzz);
+  eq('cheap buzzer still shoves', buzzKit.extras.techGloves === true && buzzKit.mods.pushForce === 1, String(buzzKit.mods.pushForce));
   const packedTech = syntheticKit(false);
   const packed = packedTech.sets[0].placements;
   let bits = 0;

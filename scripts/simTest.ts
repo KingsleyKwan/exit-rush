@@ -1268,7 +1268,33 @@ async function main(): Promise<void> {
         process.exit(1);
       }
     }
-    console.log('push is hero-only');
+    const gloveMods = modsFor(CHARACTERS.tech, defaultSkills(), [], resolveKit({
+      items: { G1: 1 },
+      gridTier: 0,
+      sets: [
+        { placements: [{ id: 'G1', tier: 1, x: 0, y: 0, rot: 0 }] },
+        { placements: [] },
+        { placements: [] },
+      ],
+      activeSet: 0,
+      stock: {},
+    }));
+    if (!gloveMods.techGloves) {
+      console.error('G1 should mark gloves');
+      process.exit(1);
+    }
+    const gloveRun = new Sim(LEVELS.find((l) => l.id === 1)!, gloveMods, mulberry32(3));
+    for (let i = 0; i < 30; i++) gloveRun.step(dtShove, held);
+    if (gloveRun.player.shoveCharge < 0.9) {
+      console.error(`gloves should charge a shove, got ${gloveRun.player.shoveCharge.toFixed(2)}`);
+      process.exit(1);
+    }
+    gloveRun.step(dtShove, { x: 0, z: 0, mag: 0, shoveHeld: false });
+    if (!gloveRun.events.some((e) => e.t === 'shove') || gloveRun.player.shoveCd <= 0) {
+      console.error('releasing a gloved shove should fire');
+      process.exit(1);
+    }
+    console.log('push is hero or gloved gear');
 
     const fit = { str: 10, spd: 5, sta: 5, ultStr: false, ultSpd: false, ultSta: false, points: 0 };
     const old = normalizeSave({

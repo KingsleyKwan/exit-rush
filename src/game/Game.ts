@@ -1249,7 +1249,8 @@ export class Game {
     const wx = d.intentX * rx + d.intentZ * fx;
     const wz = d.intentX * rz + d.intentZ * fz;
     const who = this.trial?.character ?? this.save.character;
-    return { x: wx, z: -wz, mag: d.magnitude, shoveHeld: who === 'hero' && (this.shoveBtn || this.input.shoveKey) };
+    const gloves = who === 'tech' && this.runMods.techGloves === true;
+    return { x: wx, z: -wz, mag: d.magnitude, shoveHeld: (who === 'hero' || gloves) && (this.shoveBtn || this.input.shoveKey) };
   }
 
   // -------------------------------------------------------------------- loop

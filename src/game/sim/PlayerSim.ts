@@ -375,10 +375,10 @@ export class PlayerSim {
       this.winded = false;
     }
 
-    // Hold-to-shove is the office worker's exit. Mage casts; Gear L uses kit.
+    // Hold-to-shove is the office worker's exit. Mage casts. Gear L shoves only with gloves on.
     const S = P.shove;
-    const canPush = (this.mods as { characterId?: string }).characterId !== 'mage'
-      && (this.mods as { characterId?: string }).characterId !== 'tech';
+    const who = this.mods as { characterId?: string; techGloves?: boolean };
+    const canPush = who.characterId !== 'mage' && (who.characterId !== 'tech' || who.techGloves === true);
     if (!canPush) {
       this.shoveCharge = 0;
       this.shoveWasHeld = false;

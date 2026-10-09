@@ -177,6 +177,8 @@ export interface PlayerMods extends SkillModifiers {
   techPassBossCase?: boolean;
   techGpRadius?: number;
   techGpLuggage?: number;
+  /** G1–G3 worn. Hold-to-shove exists only with these. */
+  techGloves?: boolean;
   techActives?: string[];
   techCore?: 'str' | 'spd' | 'sta' | null;
   techConsumables?: string[];

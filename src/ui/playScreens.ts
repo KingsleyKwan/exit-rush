@@ -76,6 +76,7 @@ export function renderPlayHud(game: Game): HTMLElement {
   const act = (id: string, title: string, on: boolean, ico: string) =>
     `<button type="button" class="skill-use act-${id} ${on ? '' : 'dim'}" data-act-skill="${id}" title="${title}" aria-label="${title}" ${on ? '' : 'disabled'}>${icon(on ? ico : 'lock')}</button>`;
 
+  const showShove = who === 'hero' || (who === 'tech' && game.runMods.techGloves === true);
   const doorBanner = game.doorBannerT > 0
     ? `<div class="door-banner" id="door-banner" role="status">
         <span class="door-banner-zh">${fmt(dict.doorBannerZh, { n: game.doorBannerOpen })}</span>
@@ -142,7 +143,7 @@ export function renderPlayHud(game: Game): HTMLElement {
           ${mods.hasSecondWind ? act('wind', `${dict.skillNodeActive}: ${dict.skSecondWind}`, true, 'sta') : ''}
           `}
         </div>
-        ${who === 'hero' ? `<button type="button" class="shove-btn" id="btn-shove" title="${dict.shove}" aria-label="${dict.shove}">${icon('shove')}</button>` : ''}
+        ${showShove ? `<button type="button" class="shove-btn" id="btn-shove" title="${dict.shove}" aria-label="${dict.shove}">${icon('shove')}</button>` : ''}
       </div>
     </div>
   `);
