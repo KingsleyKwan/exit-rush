@@ -9,6 +9,7 @@ import { itemDef, previewCoins } from '../game/techKit';
 import { linesFor, lineColor } from '../game/lines';
 import { icon, itemIcon, langIcon } from './icons';
 import { el, iconBtn, langBtn, qualityLabel, stationName, loadoutStrip, wireLoadoutStrip } from './uiShared';
+import { stationReading } from '../game/stations';
 import { charPortraitUrl } from '../game/charPortraits';
 
 
@@ -52,14 +53,17 @@ function techActions(game: Game, dict: ReturnType<typeof t>): string {
   return `${drinks ? `<div class="cons-row">${drinks}</div>` : ''}${gadget.join('')}`;
 }
 
-/** Station name while the doors are still shut. The spoken line uses the same words. */
+/** Station name while the doors are still shut. The two lines are what the train says. */
 export function renderArrival(game: Game): HTMLElement {
   const lv = game.level!;
   const name = stationName(lv);
+  const ja = fmt(t().trainCallJa, { station: stationReading(lv.stationEn) });
+  const en = fmt(t().trainCallEn, { station: lv.stationEn });
   return el(`
     <div class="arrival-banner" role="status">
       <b>${name}</b>
-      <p>${fmt(t().stationCall, { station: name })}</p>
+      <p lang="ja">${ja}</p>
+      <p class="arrival-en" lang="en">${en}</p>
     </div>
   `);
 }

@@ -23,7 +23,6 @@ export class GameAudio {
   private ambientNodes: AudioNode[] = [];
   private ambientGain: GainNode | null = null;
   private ambientWant = 0;
-  private warnPair = 0;
   private voiceHooked = false;
   /** Bumped by stopVoice so a late announcement callback cannot fire. */
   private voiceGen = 0;
@@ -206,73 +205,61 @@ export class GameAudio {
   }
 
   /**
-   * Spoken station name while the doors are still shut.
-   * Original speech only — the parody name, not a recorded railway announcement.
-   * `onDone` fires when the line finishes, fails, or cannot play.
+   * Japanese line, then English. Original speech of the parody name only.
+   * Does not wait, and does not hold the doors — both lines are queued and the run continues.
+   * A later `stopVoice` drops anything still queued.
    */
-  stationCall(lang: 'en' | 'zh-HK', text: string, onDone: () => void): void {
+  stationCall(ja: string, en: string): void {
     this.stopVoice();
     const gen = this.voiceGen;
-    let fired = false;
-    const done = () => {
-      if (fired || gen !== this.voiceGen) return;
-      fired = true;
-      onDone();
-    };
-    if (!this.unlocked || this.settings.muted || this.settings.sfx <= 0.01 || !text || !window.speechSynthesis) {
-      done();
-      return;
-    }
-    this.tone(523.25, 0.12, 'sine', 0.05);
-    this.tone(659.25, 0.16, 'sine', 0.045, 0.14);
-    this.speak(text, lang === 'en' ? 'en-GB' : 'zh-HK', { onend: done, onerror: done });
-    window.setTimeout(done, 9000);
+    if (!this.unlocked || this.settings.muted || this.settings.sfx <= 0.01 || !window.speechSynthesis) return;
+    if (!ja && !en) return;
+    // One soft bell as the announcement starts. Not a departure melody.
+    this.tone(1046.5, 0.08, 'sine', 0.035);
+    // Chrome drops an utterance spoken in the same turn as cancel().
+    window.setTimeout(() => {
+      if (gen !== this.voiceGen || this.settings.muted || this.settings.sfx <= 0.01) return;
+      if (ja) this.speakQueued(ja, 'ja-JP');
+      if (en) this.speakQueued(en, 'en-GB');
+    }, 40);
   }
 
-  /**
-   * One spoken door warning. A short chime first, then the line in the player's language.
-   * Original speech only — not a recorded railway announcement.
-   */
-  mindTheDoor(lang: 'en' | 'zh-HK', text: string): void {
-    if (!this.unlocked || this.settings.muted || this.settings.sfx <= 0.01 || !text) return;
-    this.tone(880, 0.1, 'sine', 0.05);
-    this.tone(1174.7, 0.16, 'sine', 0.04, 0.12);
-    this.speak(text, lang === 'en' ? 'en-GB' : 'zh-HK');
-  }
-
-  private speak(text: string, lang: string, hooks?: { onend?: () => void; onerror?: () => void }): void {
+  private speakQueued(text: string, lang: string): void {
     const synth = window.speechSynthesis;
-    if (!synth) return;
+    if (!synth || !text) return;
     try {
       const u = new SpeechSynthesisUtterance(text);
       u.lang = lang;
-      u.rate = lang.startsWith('zh') ? 1.02 : 0.98;
+      u.rate = lang.startsWith('ja') ? 0.94 : 0.98;
       u.pitch = 1;
       u.volume = clamp01(this.settings.master * this.settings.sfx);
       const voice = pickVoice(synth.getVoices(), lang);
       if (voice) u.voice = voice;
-      if (hooks?.onend) u.onend = hooks.onend;
-      if (hooks?.onerror) u.onerror = () => hooks.onerror?.();
-      synth.cancel();
       synth.resume();
       synth.speak(u);
     } catch {
-      hooks?.onerror?.();
+      /* this browser will not speak */
     }
   }
 
+  /** Repeating pin-pon while the doors are about to close. Does not stop speech. */
   warnBeep(urgency: number): void {
-    const hi = 1480 + urgency * 220;
-    const lo = 1180 + urgency * 180;
-    const g = 0.04 + urgency * 0.025;
-    if (this.warnPair % 2 === 0) {
-      this.tone(hi, 0.055, 'square', g);
-      this.tone(lo, 0.055, 'square', g * 0.85, 0.06);
-    } else {
-      this.tone(lo, 0.055, 'square', g);
-      this.tone(hi, 0.055, 'square', g * 0.85, 0.06);
-    }
-    this.warnPair++;
+    const g = 0.04 + urgency * 0.02;
+    this.tone(1318.5, 0.07, 'sine', g);
+    this.tone(988, 0.1, 'sine', g * 0.85, 0.08);
+  }
+
+  /**
+   * One closing warning as the last seconds start.
+   * Original bell, not a recorded chime and not a departure melody.
+   * Web Audio only, so the station announcement keeps playing.
+   */
+  doorWarn(): void {
+    this.tone(988, 0.12, 'sine', 0.06);
+    this.tone(1976, 0.08, 'triangle', 0.014);
+    this.tone(1318.5, 0.16, 'sine', 0.055, 0.14);
+    this.tone(880, 0.28, 'sine', 0.05, 0.32);
+    this.tone(1760, 0.14, 'triangle', 0.012, 0.32);
   }
   arrival(): void {
     const notes = [523.25, 659.25, 783.99, 1046.5, 783.99, 987.77];
@@ -298,8 +285,13 @@ export class GameAudio {
     this.tone(1318.5, 0.35, 'sine', 0.015, 2.05, undefined, 'music');
   }
   doorOpen(): void {
-    this.noise(0.35, 0.14, 900, 0.7, 0, 280);
-    this.noise(0.22, 0.08, 2200, 1.2, 0.05, 600);
+    // Short rising bell with the door mechanism. Original intervals, not a copied chime.
+    this.tone(784, 0.16, 'sine', 0.055);
+    this.tone(1568, 0.1, 'triangle', 0.016);
+    this.tone(1046.5, 0.24, 'sine', 0.05, 0.14);
+    this.tone(2093, 0.12, 'triangle', 0.012, 0.14);
+    this.noise(0.35, 0.14, 900, 0.7, 0.05, 280);
+    this.noise(0.22, 0.08, 2200, 1.2, 0.1, 600);
     this.tone(140, 0.08, 'sine', 0.05, 0.28, 70);
     this.tone(90, 0.06, 'triangle', 0.04, 0.32);
   }
@@ -486,14 +478,22 @@ export class GameAudio {
   }
 }
 function pickVoice(voices: SpeechSynthesisVoice[], lang: string): SpeechSynthesisVoice | undefined {
+  if (lang.startsWith('ja')) {
+    const ja = voices.filter((v) => v.lang.toLowerCase().startsWith('ja'));
+    for (const name of [/kyoko/i, /otoya/i, /nanami/i, /haruka/i, /google/i]) {
+      const hit = ja.find((v) => name.test(v.name));
+      if (hit) return hit;
+    }
+    // macOS tags novelty voices (Eddy, Flo, …) as ja-JP. Skip those when a plain voice exists.
+    const novelty = /eddy|flo|grandma|grandpa|rocko|sandy|shelley|reed|bells|bahh|boing|bubbles|cellos|jester|organ|trinoids|whisper|wobble|zarvox|superstar/i;
+    return ja.find((v) => !novelty.test(v.name)) ?? ja[0];
+  }
   const want = lang.startsWith('zh') ? ['zh-HK', 'yue-HK', 'zh-TW', 'zh-CN'] : ['en-GB', 'en-US', 'en'];
   for (const tag of want) {
     const hit = voices.find((v) => v.lang === tag || v.lang.toLowerCase().startsWith(tag.toLowerCase()));
     if (hit) return hit;
   }
-  if (lang.startsWith('zh')) {
-    return voices.find((v) => /cantonese|sinji|粵/i.test(v.name));
-  }
+  if (lang.startsWith('zh')) return voices.find((v) => /cantonese|sinji|粵/i.test(v.name));
   return voices.find((v) => v.lang.toLowerCase().startsWith('en'));
 }
 

@@ -1415,8 +1415,12 @@ button {
 }
 .arrival-banner p {
   margin: 6px 0 0;
-  font-size: 15px;
+  font-size: 14px;
   line-height: 1.35;
+}
+.arrival-banner .arrival-en {
+  margin-top: 2px;
+  color: rgba(255, 255, 255, 0.78);
 }
 
 /* Wide / desktop: centre the title column over the key art. */

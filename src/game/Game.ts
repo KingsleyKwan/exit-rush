@@ -41,6 +41,7 @@ import type { PassengerKind } from './PassengerTypes';
 import { loadSave, writeSave, type QualityLevel, type QualitySetting, type SaveData, type SkillState } from './storage';
 import { FpsProbe, PROBE_MIN_FPS, pixelRatioFor, resolveQuality } from './quality';
 import { setLang, getLang, t, fmt } from '../i18n';
+import { stationReading } from './stations';
 import { Sim } from './sim/Sim';
 import { TUNING } from './sim/tuning';
 import type { SimEvent, UltKind } from './sim/events';
@@ -127,11 +128,10 @@ export class Game {
   clock = 0;
   private hudT = 0;
   private beepT = 0;
-  /** Spoken door warning already played this run. */
+  /** Closing-door chime already played this run. */
   private doorMinded = false;
   /** Doors-shut station call before the run starts. Null once the doors have opened. */
-  private arrival: { spoken: boolean; hold: number; phase: 'call' | 'open'; open: number } | null = null;
-  private arrivalGen = 0;
+  private arrival: { hold: number; phase: 'call' | 'open'; open: number } | null = null;
   private ghostT = 0;
   private stinkT = 0;
   /** 大聲公 chatter-blip timer. */
@@ -552,28 +552,26 @@ export class Game {
     }
     // Boss entrance waits until the doors have opened, so its clock starts then.
     this.bossCut = null;
-    this.arrivalGen++;
-    this.arrival = { spoken: false, hold: 0, phase: 'call', open: 0 };
+    this.arrival = { hold: 0, phase: 'call', open: 0 };
     this.screen = 'arrival';
-    const station = getLang() === 'en' ? level.stationEn : level.stationZh;
-    const gen = this.arrivalGen;
-    this.audio.stationCall(getLang(), fmt(t().stationCall, { station }), () => {
-      if (gen !== this.arrivalGen || !this.arrival) return;
-      this.arrival.spoken = true;
-    });
+    const dict = t();
+    this.audio.stationCall(
+      fmt(dict.trainCallJa, { station: stationReading(level.stationEn) }),
+      fmt(dict.trainCallEn, { station: level.stationEn }),
+    );
     this.hooks.onState();
   }
 
   /**
-   * Doors stay shut while the station name is spoken, then slide open.
-   * The run (boss cut, intro card, or play) starts only after they are open.
+   * Doors open after a short hold. Japanese then English keeps playing into the run.
+   * The run (boss cut, intro card, or play) starts once the doors are open.
    */
   private tickArrival(dt: number): void {
     const a = this.arrival;
     if (this.screen !== 'arrival' || !a || !this.sim) return;
     if (document.hidden) return;
     a.hold += dt;
-    if (a.phase === 'call' && a.spoken && a.hold >= 1.2) {
+    if (a.phase === 'call' && a.hold >= 0.45) {
       a.phase = 'open';
       this.audio.doorOpen();
     }
@@ -728,7 +726,6 @@ export class Game {
     this.showFtueGhost = false;
     this.level = null;
     this.arrival = null;
-    this.arrivalGen++;
     this.input.reset();
     this.train.setWarning(0);
     this.audio.stopVoice();
@@ -1390,7 +1387,8 @@ export class Game {
     if (!sim.result && sim.timeLeft < W && sim.timeLeft > 0) {
       if (!this.doorMinded) {
         this.doorMinded = true;
-        this.audio.mindTheDoor(getLang(), t().doorMind);
+        this.beepT = 0.75;
+        this.audio.doorWarn();
         this.hooks.onToast?.(t().doorMind);
       }
       const u = 1 - sim.timeLeft / W;

@@ -158,10 +158,12 @@ export interface Dict {
   clearBonusN: string;
   levelsTeaserV05: string;
   doorClosedToast: string;
-  /** Spoken once in the last few seconds, while the doors are about to close. */
+  /** Toast when the doors are about to close. The warning itself is a chime. */
   doorMind: string;
-  /** Spoken once before the doors open. `{station}` is the parody name. */
-  stationCall: string;
+  /** In-car announcement, Japanese first. `{station}` is the kana reading. */
+  trainCallJa: string;
+  /** Same announcement in English. `{station}` is the parody English name. */
+  trainCallEn: string;
   doorBanner: string;
   doorBannerZh: string;
   doorBannerEn: string;
@@ -442,7 +444,8 @@ export const en: Dict = {
   levelsTeaserV05: 'Short exits · learn one special every few levels',
   doorClosedToast: "This door won't open!",
   doorMind: 'Please mind the door.',
-  stationCall: 'Passengers, this station is {station}.',
+  trainCallJa: '{station}、{station}。ドアが開きます。',
+  trainCallEn: '{station}. Doors will open.',
   doorBanner: 'Only {n} doors open',
   doorBannerZh: '只開{n}道門',
   doorBannerEn: 'Only {n} doors open',
