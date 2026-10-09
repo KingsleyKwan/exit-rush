@@ -17,6 +17,7 @@ import {
   isItemId,
   itemDef,
   placeCheck,
+  placementOnCell,
   type BuyBlock,
   type ItemId,
   type Rot,
@@ -126,22 +127,24 @@ function everFits(id: ItemId, tier: Tier): boolean {
  * Every tier's footprint at once. `dimAbove` greys tiers the player does not own yet.
  * `mark` is the tier a tap would place, or the tier the shop is selling next.
  */
-function tierSizesHtml(id: ItemId, dict: ReturnType<typeof t>, dimAbove = 0, mark = 0): string {
+function tierSizesHtml(id: ItemId, dict: ReturnType<typeof t>, dimAbove = 0, mark = 0, pickable = false): string {
   const def = itemDef(id);
   if (!def) return '';
   const chips = def.shape.map((_, i) => {
     const tier = (i + 1) as Tier;
     const n = cellsFor(id, tier, 0).length;
+    const locked = dimAbove > 0 && tier > dimAbove;
     const fit = everFits(id, tier);
     const cls = [
       'tier-size',
       mark === tier ? 'on' : '',
-      dimAbove > 0 && tier > dimAbove ? 'locked' : '',
+      locked ? 'locked' : '',
       fit ? '' : 'nofit',
     ].filter(Boolean).join(' ');
     const fitNote = fit ? '' : `<small>${dict.wontFit}</small>`;
     const job = gearJob(id, tier, dict);
-    return `<span class="${cls}">${shapeHtml(id, tier, dict)}<small>${tierName(tier, dict)} · ${n} ${dict.cells}</small><em class="tier-job">${job}</em>${fitNote}</span>`;
+    const pickAttr = pickable && !locked ? ` data-tier-pick="${tier}"` : '';
+    return `<span class="${cls}"${pickAttr}>${shapeHtml(id, tier, dict)}<small>${tierName(tier, dict)} · ${n} ${dict.cells}</small><em class="tier-job">${job}</em>${fitNote}</span>`;
   }).join('');
   return `<span class="tier-sizes">${chips}</span>`;
 }
@@ -229,7 +232,8 @@ export function renderWorkshop(game: Game, _rerender: (game: Game) => void): HTM
     const tier = Math.min(3, Math.max(1, owned)) as Tier;
     const on = pick?.id === it.id ? ' on' : '';
     const name = en ? it.nameEn : it.nameZh;
-    const sizes = isItemId(it.id) ? tierSizesHtml(it.id, dict, tier, tier) : '';
+    const shown = pick?.id === it.id ? pick.tier : tier;
+    const sizes = isItemId(it.id) ? tierSizesHtml(it.id, dict, tier, shown, true) : '';
     const tag = it.slot === 'consumable' ? `<small>×${owned}</small>` : '';
     const use = gearUseOf(it.id, dict);
     const kind = gearKind(it.slot, it.active, dict);
@@ -330,11 +334,17 @@ export function renderWorkshop(game: Game, _rerender: (game: Game) => void): HTM
   });
 
   page.querySelectorAll<HTMLElement>('[data-tray]').forEach((b) => {
-    b.addEventListener('click', () => {
+    b.addEventListener('click', (ev) => {
       const id = b.dataset.tray ?? '';
       if (!isItemId(id)) return;
-      const tier = Number(b.dataset.tier) as Tier;
-      pick = pick?.id === id ? null : { id, tier: tier === 2 || tier === 3 ? tier : 1 };
+      const owned = Number(b.dataset.tier);
+      const chip = (ev.target as HTMLElement | null)?.closest?.('[data-tier-pick]') as HTMLElement | null;
+      const picked = chip ? Number(chip.dataset.tierPick) : NaN;
+      const tier = (picked === 1 || picked === 2 || picked === 3) && picked <= owned
+        ? picked as Tier
+        : ((owned === 2 || owned === 3 ? owned : 1) as Tier);
+      // A tier row chooses that size. Tapping the item again puts it down.
+      pick = !chip && pick?.id === id ? null : { id, tier };
       selected = -1;
       _rerender(game);
     });
@@ -351,24 +361,15 @@ export function renderWorkshop(game: Game, _rerender: (game: Game) => void): HTM
         _rerender(game);
         return;
       }
-      // Rot 0 is often wider than the 2-column bag. Turn until this cell accepts it.
-      let blocked: 'bounds' | 'overlap' = 'bounds';
-      for (const rot of [0, 1, 2, 3] as Rot[]) {
-        const p = { id: pick.id, tier: pick.tier, x, y, rot };
-        const chk = placeCheck(placements as never, tech.gridTier, tech.items, tech.stock, p);
-        if (chk.ok) {
-          pick = null;
-          selected = -1;
-          game.techPlace(p);
-          return;
-        }
-        if (chk.reason !== 'bounds' && chk.reason !== 'overlap') {
-          game.toast(whyBlocked(chk.reason, itemDef(pick.id)?.slot, dict));
-          return;
-        }
-        blocked = chk.reason;
+      // The tap can be any square of the piece. A 2-wide bar fits an empty row from either cell.
+      const fit = placementOnCell(placements as never, tech.gridTier, tech.items, tech.stock, pick.id, pick.tier, x, y);
+      if (fit.ok) {
+        pick = null;
+        selected = -1;
+        game.techPlace(fit.placement);
+        return;
       }
-      game.toast(whyBlocked(blocked, itemDef(pick.id)?.slot, dict));
+      game.toast(whyBlocked(fit.reason, itemDef(pick.id)?.slot, dict));
     });
   });
 

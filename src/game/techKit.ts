@@ -334,6 +334,34 @@ export function placeCheck(
   return { ok: true };
 }
 
+/**
+ * Drop so the tapped cell is any square of the piece, not only its corner.
+ * A 2-wide bar in a 2-wide bag otherwise fails when the tap is the right-hand cell.
+ */
+export function placementOnCell(
+  placements: readonly { id: string; tier: number; x: number; y: number; rot: number }[],
+  gridTier: number,
+  owned: TechProgress['items'],
+  stock: TechProgress['stock'],
+  id: ItemId,
+  tier: Tier,
+  tapX: number,
+  tapY: number,
+  skipIndex?: number,
+): { ok: true; placement: Placement } | { ok: false; reason: 'bounds' | 'overlap' | 'unknown' | 'tier' | 'body' | 'once' | 'active' | 'consumable' | 'stock' } {
+  let blocked: { ok: false; reason: 'bounds' | 'overlap' } = { ok: false, reason: 'bounds' };
+  for (const rot of [0, 1, 2, 3] as Rot[]) {
+    for (const anchor of cellsFor(id, tier, rot)) {
+      const placement: Placement = { id, tier, x: tapX - anchor.x, y: tapY - anchor.y, rot };
+      const chk = placeCheck(placements, gridTier, owned, stock, placement, skipIndex);
+      if (chk.ok) return { ok: true, placement };
+      if (chk.reason !== 'bounds' && chk.reason !== 'overlap') return chk;
+      if (chk.reason === 'overlap') blocked = { ok: false, reason: 'overlap' };
+    }
+  }
+  return blocked;
+}
+
 export interface ActiveKit {
   placements: Placement[];
   /** Up to 3 active gadget/shoe ids (not cores). */
@@ -913,11 +941,19 @@ export function retierAt(tech: TechProgress, index: number, tier: Tier): boolean
   if (!cur || !isItemId(cur.id)) return false;
   const owned = tech.items[cur.id] ?? 0;
   if (tier < 1 || tier > owned) return false;
-  const next: Placement = { ...cur, id: cur.id, tier };
-  const chk = placeCheck(set.placements, tech.gridTier, tech.items, tech.stock, next, index);
-  if (!chk.ok) return false;
-  set.placements[index] = next;
-  return true;
+  const oldTier = (cur.tier === 2 || cur.tier === 3 ? cur.tier : 1) as Tier;
+  const oldRot = (cur.rot & 3) as Rot;
+  for (const cell of cellsFor(cur.id, oldTier, oldRot)) {
+    const found = placementOnCell(
+      set.placements, tech.gridTier, tech.items, tech.stock,
+      cur.id, tier, cur.x + cell.x, cur.y + cell.y, index,
+    );
+    if (found.ok) {
+      set.placements[index] = found.placement;
+      return true;
+    }
+  }
+  return false;
 }
 
 export function packActive(tech: TechProgress): void {
@@ -1042,6 +1078,29 @@ export function techKitSelfTest(): string[] {
   eq('active cap', !fourth.ok && fourth.reason === 'active', fourth.ok ? '' : fourth.reason);
   const down = placeCheck([], 0, { S3: 3 }, {}, { id: 'S3', tier: 1, x: 0, y: 0, rot: 0 });
   eq('downsize', down.ok);
+  // 2×3 bag, top and bottom full, middle row empty. Cheap jet pack is ##.
+  const middle: Placement[] = [
+    { id: 'S1', tier: 1, x: 0, y: 0, rot: 0 },
+    { id: 'G1', tier: 1, x: 1, y: 0, rot: 0 },
+    { id: 'H3', tier: 1, x: 0, y: 2, rot: 0 },
+    { id: 'D1', tier: 1, x: 1, y: 2, rot: 0 },
+  ];
+  const midOwned = { S1: 1 as const, G1: 1 as const, H3: 1 as const, D1: 1 as const, C2: 1 as const };
+  const stuck = placeCheck(middle, 1, midOwned, {}, { id: 'C2', tier: 1, x: 1, y: 1, rot: 0 });
+  eq('right cell is not the corner', !stuck.ok);
+  const fromRight = placementOnCell(middle, 1, midOwned, {}, 'C2', 1, 1, 1);
+  const fromLeft = placementOnCell(middle, 1, midOwned, {}, 'C2', 1, 0, 1);
+  eq('cheap jet pack fits an empty middle row', fromRight.ok && fromLeft.ok
+    && fromRight.ok && fromRight.placement.y === 1 && fromRight.placement.x === 0
+    && fromLeft.ok && fromLeft.placement.y === 1);
+  const worn = emptyTech();
+  worn.gridTier = 1;
+  worn.items = { C2: 2, H3: 1 };
+  worn.sets[0].placements = [
+    { id: 'C2', tier: 2, x: 0, y: 0, rot: 0 },
+    { id: 'H3', tier: 1, x: 1, y: 0, rot: 0 },
+  ];
+  eq('cheap jet pack still wears when the corner is blocked', retierAt(worn, 0, 1) && worn.sets[0].placements[0].tier === 1);
   const cleared = Array.from({ length: 12 }, (_, i) => i + 1);
   const save = {
     tech: emptyTech(),

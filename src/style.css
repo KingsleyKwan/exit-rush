@@ -2214,6 +2214,7 @@ button {
   line-height: 1.25;
   opacity: .95;
 }
+.tier-size[data-tier-pick] { cursor: pointer; }
 .tier-size.locked { opacity: .45; }
 .tier-size.nofit b { color: #ffb74d; }
 .tier-size.on b { color: #ffb03a; }
