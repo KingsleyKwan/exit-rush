@@ -2266,35 +2266,31 @@ button {
 }
 .help-pop p { margin: 0 0 4px; }
 .fit-stage {
-  container-type: size;
-  flex: 1 1 auto;
-  min-height: 0;
-  display: grid;
-  place-items: center;
+  flex: 0 0 auto;
+  display: flex;
+  justify-content: center;
 }
-/* Icons stay beside the bag, not stretched into the empty space above and below it. */
+/* The bag is only for dropping a piece. Cells stay about a thumb, and the item list gets the rest. */
 .bag-cluster {
   display: grid;
-  grid-template-columns: 48px minmax(0, 1fr) 48px;
-  gap: 6px;
-  align-items: stretch;
-  width: min(100cqw, calc(100cqh * var(--cols) / var(--rows) + 108px));
-  height: min(100cqh, calc((100cqw - 108px) * var(--rows) / var(--cols)));
+  grid-template-columns: 48px auto 48px;
+  gap: 8px;
+  align-items: center;
+  width: max-content;
+  max-width: 100%;
 }
 .slot-col, .slot-row { display: flex; gap: 4px; }
 .slot-col {
   display: grid;
-  grid-template-rows: repeat(3, minmax(0, 1fr));
-  align-items: center;
+  grid-template-rows: repeat(3, 44px);
+  align-content: center;
   justify-items: center;
-  min-height: 0;
+  gap: 4px;
 }
 .slot-row { flex: 0 0 auto; justify-content: space-between; align-items: center; }
 .slot-ico {
-  width: min(46px, 100%);
-  height: min(46px, 100%);
-  max-width: 46px;
-  max-height: 46px;
+  width: 44px;
+  height: 44px;
   aspect-ratio: 1;
   border: 0;
   border-radius: 14px;
@@ -2311,15 +2307,14 @@ button {
 .slot-ico.has { box-shadow: inset 0 -3px 0 #ffb03a; }
 .slot-ico.on.has { box-shadow: inset 0 -3px 0 #1b1408; }
 .bag-wrap {
-  container-type: size;
   min-width: 0;
   min-height: 0;
   display: grid;
   place-items: center;
 }
-/* Largest cols×rows rectangle that stays inside the space beside the type icons. */
 .workshop .bag-grid {
-  width: min(100cqw, calc(100cqh * var(--cols) / var(--rows)));
+  --cell: 52px;
+  width: calc(var(--cell) * var(--cols) + (var(--cols) - 1) * 4px);
   height: auto;
   aspect-ratio: var(--cols) / var(--rows);
   gap: 4px;
@@ -2327,27 +2322,37 @@ button {
   grid-template-rows: repeat(var(--rows), minmax(0, 1fr));
 }
 .workshop .bag-cell { aspect-ratio: auto; width: 100%; height: 100%; min-width: 0; min-height: 0; }
+.workshop .bag-cell .ico { width: 22px; height: 22px; }
 .fit-dock {
   position: relative;
-  flex: 0 0 auto;
+  flex: 0 1 auto;
+  min-height: 0;
+  overflow: auto;
+  overscroll-behavior: contain;
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: 6px;
   z-index: 2;
 }
 .dock-title { margin: 0; font-size: 12px; font-weight: 800; opacity: 0.8; }
-.item-row { display: flex; flex-wrap: wrap; gap: 4px; min-width: 0; }
+.item-row { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
 .item-row .tray-item {
-  flex: 1 1 30%;
+  flex: 0 0 auto;
+  width: 100%;
   min-width: 0;
   flex-direction: row;
   align-items: center;
-  gap: 4px;
-  min-height: 34px;
-  padding: 2px 6px;
+  gap: 8px;
+  min-height: 44px;
+  padding: 6px 10px;
 }
-.item-row .name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 12px; }
-.item-row .ico { width: 20px; height: 20px; flex: 0 0 auto; }
+.item-row .name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 15px; font-weight: 800; }
+.item-row .ico { width: 26px; height: 26px; flex: 0 0 auto; }
+.fit-dock .shape {
+  grid-template-columns: repeat(var(--sw), 12px);
+  grid-template-rows: repeat(var(--sh), 12px);
+}
+.fit-dock .shape i { width: 12px; height: 12px; }
 .size-row { display: flex; min-width: 0; }
 .size-row .tier-sizes { flex-direction: row; flex-wrap: nowrap; gap: 4px; width: 100%; }
 .size-row .tier-size {
@@ -2362,6 +2367,8 @@ button {
   background: rgba(255, 255, 255, 0.08);
 }
 .size-row .tier-size small { font-size: 10px; white-space: nowrap; }
+.fit-dock .size-row .tier-size { min-height: 52px; gap: 2px; padding: 4px 2px; }
+.fit-dock .size-row .tier-size small { font-size: 12px; }
 button.tier-size { border: 0; color: inherit; font: inherit; cursor: pointer; }
 .size-row .tier-size.on { outline: 2px solid #ffb03a; }
 .workshop .place-hint { font-size: 12px; line-height: 1.25; }
