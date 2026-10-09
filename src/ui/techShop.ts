@@ -272,12 +272,21 @@ export function renderWorkshop(game: Game, _rerender: (game: Game) => void): HTM
     if (slot === 'consumable') return (tech.stock[it.id] ?? 0) > 0;
     return (tech.items[it.id] ?? 0) > 0;
   });
+  const wornAt = (id: string): number => {
+    if (selected >= 0 && placements[selected]?.id === id) return selected;
+    return placements.findIndex((p) => p.id === id);
+  };
   const itemBtn = (it: (typeof ITEMS)[number]) => {
     const owned = it.slot === 'consumable' ? (tech.stock[it.id] ?? 0) : (tech.items[it.id] ?? 0);
     const tier = Math.min(3, Math.max(1, owned)) as Tier;
     const name = en ? it.nameEn : it.nameZh;
     const tag = it.slot === 'consumable' ? `<small>×${owned}</small>` : '';
-    return `<button type="button" class="tray-item${pick?.id === it.id ? ' on' : ''}" data-tray="${it.id}" data-tier="${tier}">${gearIcon(it.id, it.slot)}<span class="name">${name}</span>${tag}</button>`;
+    const off = wornAt(it.id);
+    const wearing = off >= 0 || (selected >= 0 && placements[selected]?.id === it.id);
+    const take = off >= 0
+      ? `<button type="button" class="ghost take-off" data-off="${off}">${dict.removeItem}</button>`
+      : '';
+    return `<div class="item-line"><button type="button" class="tray-item${pick?.id === it.id || wearing ? ' on' : ''}" data-tray="${it.id}" data-tier="${tier}">${gearIcon(it.id, it.slot)}<span class="name">${name}</span>${tag}</button>${take}</div>`;
   };
 
   const sel = selected >= 0 ? placements[selected] : undefined;
@@ -435,6 +444,18 @@ export function renderWorkshop(game: Game, _rerender: (game: Game) => void): HTM
       if (!isItemId(id)) return;
       const owned = Number(b.dataset.tier);
       const tier = (owned === 2 || owned === 3 ? owned : 1) as Tier;
+      const def = itemDef(id);
+      const placed = placements.map((p, i) => (p.id === id ? i : -1)).filter((i) => i >= 0);
+      const spare = def?.slot === 'consumable' && (tech.stock[id] ?? 0) > placed.length;
+      // Already wearing it, and no spare to drop: select it so Take off is the action.
+      if (placed.length && !spare) {
+        selected = placed.includes(selected) ? selected : placed[0];
+        pick = null;
+        failNote = '';
+        if (def) slotOn = def.slot;
+        _rerender(game);
+        return;
+      }
       // Tapping the item again puts it down. A size chip chooses the tier.
       if (pick?.id === id) {
         pick = null;
@@ -443,7 +464,6 @@ export function renderWorkshop(game: Game, _rerender: (game: Game) => void): HTM
         pick = { id, tier };
         selected = -1;
         failNote = '';
-        const def = itemDef(id);
         if (def) slotOn = def.slot;
       }
       _rerender(game);
@@ -479,7 +499,9 @@ export function renderWorkshop(game: Game, _rerender: (game: Game) => void): HTM
         return;
       }
       // The tap can be any square of the piece. A 2-wide bar fits an empty row from either cell.
-      const fit = placementOnCell(placements as never, tech.gridTier, tech.items, tech.stock, pick.id, pick.tier, x, y);
+      const placingId = pick.id;
+      const placingSlot = itemDef(placingId)?.slot;
+      const fit = placementOnCell(placements as never, tech.gridTier, tech.items, tech.stock, placingId, pick.tier, x, y);
       if (fit.ok) {
         failNote = '';
         pick = null;
@@ -488,7 +510,25 @@ export function renderWorkshop(game: Game, _rerender: (game: Game) => void): HTM
         game.techPlace(fit.placement);
         return;
       }
-      failNote = whyBlocked(fit.reason, itemDef(pick.id)?.slot, dict);
+      // The cell already holds something, or this piece is already worn. Select it instead of only saying no.
+      const held = hit ?? (
+        fit.reason === 'once'
+          ? placements.findIndex((p) => p.id === placingId)
+          : fit.reason === 'body'
+            ? placements.findIndex((p) => itemDef(p.id)?.slot === placingSlot)
+            : -1
+      );
+      if (held >= 0 && (fit.reason === 'overlap' || fit.reason === 'once' || fit.reason === 'body')) {
+        pick = null;
+        moreId = null;
+        selected = held;
+        failNote = '';
+        const heldDef = isItemId(placements[held].id) ? itemDef(placements[held].id) : undefined;
+        if (heldDef) slotOn = heldDef.slot;
+        _rerender(game);
+        return;
+      }
+      failNote = whyBlocked(fit.reason, placingSlot, dict);
       game.toast(failNote);
       _rerender(game);
     });
@@ -503,11 +543,16 @@ export function renderWorkshop(game: Game, _rerender: (game: Game) => void): HTM
       _rerender(game);
     }
   });
-  page.querySelector('[data-act="bag-off"]')?.addEventListener('click', () => {
-    if (selected >= 0) {
-      game.techRemove(selected);
-      selected = -1;
-    }
+  const takeOff = (index: number) => {
+    if (!(index >= 0)) return;
+    selected = -1;
+    pick = null;
+    failNote = '';
+    game.techRemove(index);
+  };
+  page.querySelector('[data-act="bag-off"]')?.addEventListener('click', () => takeOff(selected));
+  page.querySelectorAll<HTMLElement>('[data-off]').forEach((b) => {
+    b.addEventListener('click', () => takeOff(Number(b.dataset.off)));
   });
   page.querySelectorAll<HTMLElement>('[data-tier-set]').forEach((b) => {
     b.addEventListener('click', () => {

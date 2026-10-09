@@ -2336,6 +2336,8 @@ button {
 }
 .dock-title { margin: 0; font-size: 12px; font-weight: 800; opacity: 0.8; }
 .item-row { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+.item-line { display: flex; gap: 6px; align-items: stretch; min-width: 0; }
+.item-line .take-off { flex: 0 0 auto; align-self: stretch; }
 .item-row .tray-item {
   flex: 0 0 auto;
   width: 100%;
@@ -2346,6 +2348,7 @@ button {
   min-height: 44px;
   padding: 6px 10px;
 }
+.item-line .tray-item { width: auto; flex: 1 1 auto; }
 .item-row .name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 15px; font-weight: 800; }
 .item-row .ico { width: 26px; height: 26px; flex: 0 0 auto; }
 .fit-dock .shape {
