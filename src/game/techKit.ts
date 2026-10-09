@@ -473,6 +473,14 @@ function applyPiece(fx: Fx, id: ItemId, tier: Tier): void {
   }
 }
 
+/**
+ * The worn core is the ultimate. Hero skill flags are not required:
+ * Gear L never spends those points, so a jet pack must fire on its own.
+ */
+export function techUltReady(core: 'str' | 'spd' | 'sta' | null | undefined, kind: 'str' | 'spd' | 'sta'): boolean {
+  return core === kind;
+}
+
 /** Validate a set and fold placed pieces into modifiers. Invalid pieces are dropped. */
 export function resolveKit(tech: Pick<TechProgress, 'items' | 'gridTier' | 'sets' | 'activeSet' | 'stock'>): ActiveKit {
   const set = tech.sets[tech.activeSet] ?? tech.sets[0] ?? { placements: [] };
@@ -1145,6 +1153,7 @@ export function techKitSelfTest(): string[] {
   eq('autopack', packOk, why.join('; ') || `n=${packed.length}`);
   const kit = resolveKit(packedTech);
   eq('resolve', kit.placements.length > 0 && kit.core === 'C2', kit.core ?? 'none');
+  eq('jet pack fires without a hero ult', kit.extras.techCore === 'spd' && techUltReady(kit.extras.techCore, 'spd') && !techUltReady(kit.extras.techCore, 'str'));
   return fail;
 }
 

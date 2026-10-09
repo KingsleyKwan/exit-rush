@@ -21,6 +21,7 @@ import {
   reconcileTech,
   removeAt,
   resolveKit,
+  techUltReady,
   retierAt,
   rotateAt,
   sellItem,
@@ -470,7 +471,10 @@ export class Game {
 
   ultCooldown(kind: UltKind): number {
     const p = this.sim?.player;
-    return p ? p.ultCd[kind] / TUNING.ult.cooldown : 0;
+    if (!p) return 0;
+    const who = this.trial?.character ?? this.save.character;
+    const worn = who === 'tech' && this.runMods.techCore === kind ? this.runMods.techUltCd : undefined;
+    return p.ultCd[kind] / (worn || TUNING.ult.cooldown);
   }
 
   /** 0–1 remaining cooldown of a Tier-3 active ('leap' | 'wind'). */
@@ -917,8 +921,11 @@ export class Game {
   }
 
   tryUltimate(kind: UltKind): void {
+    const who = this.trial?.character ?? this.save.character;
     const s = this.runSkills;
-    const ok = (kind === 'str' && s.ultStr) || (kind === 'spd' && s.ultSpd) || (kind === 'sta' && s.ultSta);
+    // Gear L's core is the button. It does not look at the hero's ult flags.
+    const heroOk = (kind === 'str' && s.ultStr) || (kind === 'spd' && s.ultSpd) || (kind === 'sta' && s.ultSta);
+    const ok = who === 'tech' ? techUltReady(this.runMods.techCore, kind) : heroOk;
     if (!ok || this.screen !== 'playing' || !this.sim || this.sim.ambient) return;
     if (this.sim.tryUltimate(kind)) {
       this.flushSimEvents();
