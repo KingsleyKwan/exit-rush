@@ -236,6 +236,18 @@ export interface Dict {
   bagLimit: string;
   /** {n} = cells this piece covers. */
   placeSize: string;
+  /** Short cell count, shown while a piece is selected. `{n}` is the count. */
+  placeShort: string;
+  /** Equip dock when no type icon is selected. */
+  pickType: string;
+  /** That type is not owned yet. */
+  noneOwned: string;
+  /** Opens the hidden description. */
+  moreInfo: string;
+  /** Closes the hidden description. */
+  lessInfo: string;
+  /** The ? button. */
+  tips: string;
   /** {slot} = shoes / gloves / head / core. */
   whyBody: string;
   whyOnce: string;
@@ -517,11 +529,17 @@ export const en: Dict = {
   oneEach: 'Shoes, gloves, head and core: one each. Upgrades take more cells.',
   bagLimit: 'The bag stops at 6 cells. Pack for this stage. One kit will not cover every car.',
   placeSize: 'Covers {n} cells. Tap a cell to drop it.',
-  whyBody: 'Already wearing {slot}. Only one.',
-  whyOnce: 'Already in the bag.',
-  whyActive: 'Only 3 active pieces.',
-  whyCons: 'Only 3 drinks or snacks.',
-  whyStock: 'None left to place.',
+  placeShort: '{n} cells',
+  pickType: 'Pick a type',
+  noneOwned: 'None yet. Buy it in the shop.',
+  moreInfo: 'More',
+  lessInfo: 'Less',
+  tips: 'Tips',
+  whyBody: 'Already have {slot}',
+  whyOnce: 'Already in the bag',
+  whyActive: 'Only 3 buttons',
+  whyCons: 'Only 3 snacks',
+  whyStock: 'None left',
   slotShoes: 'shoes',
   slotGloves: 'gloves',
   slotHead: 'head',

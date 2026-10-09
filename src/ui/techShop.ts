@@ -21,6 +21,7 @@ import {
   type BuyBlock,
   type ItemId,
   type Rot,
+  type Slot,
   type Tier,
 } from '../game/techKit';
 import { icon, itemIcon } from './icons';
@@ -30,6 +31,13 @@ type Tab = 'equip' | 'shop' | 'sets';
 let tab: Tab = 'equip';
 let pick: { id: ItemId; tier: Tier } | null = null;
 let selected = -1;
+/** Type icon beside the bag. Null until the player picks one. */
+let slotOn: Slot | null = null;
+let helpOn = false;
+/** Item id whose description is open. */
+let moreId: string | null = null;
+/** Last place failure, so the reason stays on screen after the toast. */
+let failNote = '';
 
 function gearIcon(id: string, slot: string): string {
   return icon(itemIcon(id), `it it-${slot}`);
@@ -57,12 +65,9 @@ function slotName(slot: string | undefined, dict: ReturnType<typeof t>): string 
   return '';
 }
 
-const SLOT_ORDER = ['shoes', 'gloves', 'head', 'gadget', 'core', 'consumable'] as const;
-
-function gearJob(id: string, tier: Tier, dict: ReturnType<typeof t>): string {
-  const lines = dict.gearTier[id as keyof typeof dict.gearTier];
-  return lines?.[tier - 1] ?? '';
-}
+const SLOT_LEFT: Slot[] = ['shoes', 'gloves', 'head'];
+const SLOT_RIGHT: Slot[] = ['gadget', 'core', 'consumable'];
+const SLOT_ORDER: Slot[] = [...SLOT_LEFT, ...SLOT_RIGHT];
 
 function gearUseOf(id: string, dict: ReturnType<typeof t>): string {
   return dict.gearUse[id as keyof typeof dict.gearUse] ?? '';
@@ -70,12 +75,6 @@ function gearUseOf(id: string, dict: ReturnType<typeof t>): string {
 
 function gearKind(slot: string, active: boolean | undefined, dict: ReturnType<typeof t>): string {
   return active || slot === 'core' || slot === 'consumable' ? dict.gearKindTap : dict.gearKindOn;
-}
-
-function slotBlock(slot: string, inner: string, dict: ReturnType<typeof t>): string {
-  if (!inner) return '';
-  const note = dict.gearSlotNote[slot as keyof typeof dict.gearSlotNote] ?? '';
-  return `<h3 class="gear-slot">${slotName(slot, dict)}<small>${note}</small></h3>${inner}`;
 }
 
 function whyBlocked(reason: string, slot: string | undefined, dict: ReturnType<typeof t>): string {
@@ -124,10 +123,16 @@ function everFits(id: ItemId, tier: Tier): boolean {
 }
 
 /**
- * Every tier's footprint at once. `dimAbove` greys tiers the player does not own yet.
- * `mark` is the tier a tap would place, or the tier the shop is selling next.
+ * The three sizes, shapes only. The long effect line stays behind More.
+ * `pick` makes an owned size selectable. `set` changes a piece already in the bag.
  */
-function tierSizesHtml(id: ItemId, dict: ReturnType<typeof t>, dimAbove = 0, mark = 0, pickable = false): string {
+function tierSizesHtml(
+  id: ItemId,
+  dict: ReturnType<typeof t>,
+  dimAbove = 0,
+  mark = 0,
+  mode: 'look' | 'pick' | 'set' = 'look',
+): string {
   const def = itemDef(id);
   if (!def) return '';
   const chips = def.shape.map((_, i) => {
@@ -141,12 +146,32 @@ function tierSizesHtml(id: ItemId, dict: ReturnType<typeof t>, dimAbove = 0, mar
       locked ? 'locked' : '',
       fit ? '' : 'nofit',
     ].filter(Boolean).join(' ');
-    const fitNote = fit ? '' : `<small>${dict.wontFit}</small>`;
-    const job = gearJob(id, tier, dict);
-    const pickAttr = pickable && !locked ? ` data-tier-pick="${tier}"` : '';
-    return `<span class="${cls}"${pickAttr}>${shapeHtml(id, tier, dict)}<small>${tierName(tier, dict)} · ${n} ${dict.cells}</small><em class="tier-job">${job}</em>${fitNote}</span>`;
+    const label = `${tierName(tier, dict)} · ${n}`;
+    const title = fit ? label : `${label} · ${dict.wontFit}`;
+    const attr = mode === 'pick' && !locked
+      ? ` data-tier-pick="${tier}"`
+      : mode === 'set' && !locked
+        ? ` data-tier-set="${tier}"`
+        : '';
+    const tag = mode === 'look' || locked ? 'span' : 'button';
+    const type = tag === 'button' ? ' type="button"' : '';
+    return `<${tag}${type} class="${cls}"${attr} title="${title}" aria-label="${title}">${shapeHtml(id, tier, dict)}<small>${label}</small></${tag}>`;
   }).join('');
-  return `<span class="tier-sizes">${chips}</span>`;
+  // div, not span: a span cannot contain the size buttons, and the parser would pull them out.
+  return `<div class="tier-sizes">${chips}</div>`;
+}
+
+function moreBlock(id: string, dict: ReturnType<typeof t>): string {
+  if (moreId !== id) return '';
+  const def = itemDef(id as ItemId);
+  const kind = def ? gearKind(def.slot, def.active, dict) : '';
+  const lines = (dict.gearTier[id as keyof typeof dict.gearTier] ?? []).join(' · ');
+  return `<div class="gear-more"><p><i class="gear-kind">${kind}</i> ${gearUseOf(id, dict)}</p>${lines ? `<p>${lines}</p>` : ''}</div>`;
+}
+
+function moreBtn(id: string, dict: ReturnType<typeof t>): string {
+  const open = moreId === id;
+  return `<button type="button" class="ghost more-btn${open ? ' on' : ''}" data-more="${id}" aria-expanded="${open}">${open ? dict.lessInfo : dict.moreInfo}</button>`;
 }
 
 function nextUncleared(game: Game): number {
@@ -176,7 +201,7 @@ export function renderWorkshop(game: Game, _rerender: (game: Game) => void): HTM
   });
   const cap = grid.cols * grid.rows;
 
-  let hint = dict.placeHint;
+  let hint = '';
   let hintWarn = false;
   let clashSlot = '';
   if (pick) {
@@ -190,9 +215,16 @@ export function renderWorkshop(game: Game, _rerender: (game: Game) => void): HTM
       hint = whyBlocked(chk.reason, def?.slot, dict);
       hintWarn = true;
       if (chk.reason === 'body' && def) clashSlot = def.slot;
+    } else if (failNote) {
+      hint = failNote;
+      hintWarn = true;
     } else {
-      hint = dict.placeSize.replace('{n}', String(n));
+      hint = dict.placeShort.replace('{n}', String(n));
     }
+  } else if (failNote) {
+    // Rotate / resize failed with nothing in hand. Keep the reason next to the bag.
+    hint = failNote;
+    hintWarn = true;
   }
 
   const cells: string[] = [];
@@ -223,99 +255,141 @@ export function renderWorkshop(game: Game, _rerender: (game: Game) => void): HTM
     }
   }
 
-  const ownedItems = ITEMS.filter((it) => {
-    if (it.slot === 'consumable') return (tech.stock[it.id] ?? 0) > 0;
+  const wornSlot = new Set<string>();
+  for (const p of placements) {
+    if (!isItemId(p.id)) continue;
+    const d = itemDef(p.id);
+    if (d) wornSlot.add(d.slot);
+  }
+  const slotBtn = (slot: Slot) => {
+    const sample = ITEMS.find((it) => it.slot === slot);
+    const id = sample && isItemId(sample.id) ? sample.id : 'S1';
+    const name = slotName(slot, dict);
+    return `<button type="button" class="slot-ico${slotOn === slot ? ' on' : ''}${wornSlot.has(slot) ? ' has' : ''}" data-slot="${slot}" aria-label="${name}" aria-pressed="${slotOn === slot}" title="${name}">${gearIcon(id, slot)}</button>`;
+  };
+  const ownedOf = (slot: Slot) => ITEMS.filter((it) => {
+    if (it.slot !== slot) return false;
+    if (slot === 'consumable') return (tech.stock[it.id] ?? 0) > 0;
     return (tech.items[it.id] ?? 0) > 0;
   });
-  const tray = SLOT_ORDER.map((slot) => slotBlock(slot, ownedItems.filter((it) => it.slot === slot).map((it) => {
+  const itemBtn = (it: (typeof ITEMS)[number]) => {
     const owned = it.slot === 'consumable' ? (tech.stock[it.id] ?? 0) : (tech.items[it.id] ?? 0);
     const tier = Math.min(3, Math.max(1, owned)) as Tier;
-    const on = pick?.id === it.id ? ' on' : '';
     const name = en ? it.nameEn : it.nameZh;
-    const shown = pick?.id === it.id ? pick.tier : tier;
-    const sizes = isItemId(it.id) ? tierSizesHtml(it.id, dict, tier, shown, true) : '';
     const tag = it.slot === 'consumable' ? `<small>×${owned}</small>` : '';
-    const use = gearUseOf(it.id, dict);
-    const kind = gearKind(it.slot, it.active, dict);
-    return `<button type="button" class="tray-item${on}" data-tray="${it.id}" data-tier="${tier}">${gearIcon(it.id, it.slot)}<span class="name">${name}<i class="gear-kind">${kind}</i></span><span class="gear-use">${use}</span>${sizes}${tag}</button>`;
-  }).join(''), dict)).join('');
+    return `<button type="button" class="tray-item${pick?.id === it.id ? ' on' : ''}" data-tray="${it.id}" data-tier="${tier}">${gearIcon(it.id, it.slot)}<span class="name">${name}</span>${tag}</button>`;
+  };
 
   const sel = selected >= 0 ? placements[selected] : undefined;
   const selId = sel && isItemId(sel.id) ? sel.id : null;
   const selDef = selId ? itemDef(selId) : undefined;
-  const selTools = selDef && sel && selId
-    ? `<p class="gear-use">${gearUseOf(selId, dict)}</p>
-      <div class="bag-tools">
-        <button type="button" class="ghost" data-act="bag-rot">${dict.rotateItem}</button>
-        <button type="button" class="ghost" data-act="bag-off">${dict.removeItem}</button>
-        ${([1, 2, 3] as Tier[]).filter((n) => (tech.items[selId] ?? 0) >= n && selDef.price.length >= n).map((n) =>
-          `<button type="button" class="ghost ${sel.tier === n ? 'on' : ''}" data-tier-set="${n}">${tierName(n, dict)} ${shapeHtml(selId, n, dict)}<em class="tier-job">${gearJob(selId, n, dict)}</em></button>`,
-        ).join('')}
-      </div>`
-    : '';
+  const ownedCount = (id: ItemId, slot: Slot) => (
+    slot === 'consumable' ? ((tech.stock[id] ?? 0) > 0 ? 1 : 0) : (tech.items[id] ?? 0)
+  );
+
+  let dock = `<p class="place-hint">${dict.pickType}</p>`;
+  if (slotOn) {
+    const owned = ownedOf(slotOn);
+    const buttons = owned.map(itemBtn).join('');
+    const focus = pick && itemDef(pick.id)?.slot === slotOn
+      ? pick.id
+      : selId && selDef?.slot === slotOn
+        ? selId
+        : null;
+    let sizes = '';
+    let extra = '';
+    if (focus && isItemId(focus)) {
+      const def = itemDef(focus);
+      if (pick && pick.id === focus) {
+        sizes = `<div class="size-row">${tierSizesHtml(focus, dict, ownedCount(focus, def?.slot ?? slotOn), pick.tier, 'pick')}</div>`;
+      } else if (sel && selId === focus && selDef) {
+        const worn = (sel.tier === 2 || sel.tier === 3 ? sel.tier : 1) as Tier;
+        sizes = `<div class="size-row">${tierSizesHtml(focus, dict, ownedCount(focus, selDef.slot), worn, 'set')}</div>`;
+      }
+      extra = `${moreBtn(focus, dict)}${moreBlock(focus, dict)}`;
+    }
+    const line = hint ? `<p class="place-hint${hintWarn ? ' warn' : ''}">${hint}</p>` : '';
+    dock = `<p class="dock-title">${slotName(slotOn, dict)}</p>
+      <div class="item-row">${buttons || `<p class="place-hint">${dict.noneOwned}</p>`}</div>
+      ${sizes}${line}${extra}`;
+  }
 
   const nextGrid = tech.gridTier + 1 < GRID_TIERS.length ? GRID_TIERS[tech.gridTier + 1] : null;
   const growLocked = nextGrid != null && coins < nextGrid.price;
-  const growBtn = (label: string, extra = '') => nextGrid
-    ? `<button type="button" class="primary${growLocked ? ' is-locked' : ''}${extra}" data-act="bag-grow" ${growLocked ? 'aria-disabled="true"' : ''}>${label}</button>`
+  const growBtn = nextGrid
+    ? `<button type="button" class="primary${growLocked ? ' is-locked' : ''}" data-act="bag-grow" ${growLocked ? 'aria-disabled="true"' : ''}>${dict.expandBag} · ${nextGrid.price}</button>`
     : '';
-  const shopCards = SLOT_ORDER.map((slot) => slotBlock(slot, ITEMS.filter((it) => it.slot === slot).map((it) => {
+  const shopRows = (slotOn ? ITEMS.filter((it) => it.slot === slotOn) : []).map((it) => {
     const owned = it.slot === 'consumable' ? 0 : (tech.items[it.id] ?? 0);
     const stock = tech.stock[it.id] ?? 0;
     const next = it.slot === 'consumable' ? (stock >= 9 ? -1 : 0) : (owned >= it.price.length ? -1 : owned);
     const price = next >= 0 ? it.price[next] : 0;
     const name = en ? it.nameEn : it.nameZh;
-    const use = gearUseOf(it.id, dict);
-    const kind = gearKind(it.slot, it.active, dict);
-    const have = it.slot === 'consumable' ? (stock > 0 ? `${dict.ownedTier} ×${stock}` : '') : owned > 0 ? `${dict.ownedTier} · ${tierName(owned, dict)}` : '';
     const buyLabel = it.slot === 'consumable' || owned === 0 ? dict.buyItem : dict.upgradeItem;
     const buyTier = (next >= 0 ? Math.min(next + 1, it.shape.length, 3) : Math.min(owned, it.shape.length, 3)) as Tier | 0;
-    const sizes = isItemId(it.id) ? tierSizesHtml(it.id, dict, 0, buyTier) : '';
+    const sizes = isItemId(it.id) ? tierSizesHtml(it.id, dict, 0, buyTier, 'look') : '';
     const lockLine = buyLock(buyBlock(game.save, it.id), dict);
-    return `<article class="shop-card">
-      <header>${gearIcon(it.id, it.slot)}<b>${name}</b><i class="gear-kind">${kind}</i></header>
-      <p class="gear-use">${use}</p>
-      <div class="shop-size">${sizes}</div>
-      ${have ? `<p class="shop-meta">${have}</p>` : ''}
-      ${lockLine ? `<p class="shop-lock">${lockLine}</p>` : ''}
-      <div class="shop-actions">
-        ${next >= 0 ? `<button type="button" class="primary${lockLine ? ' is-locked' : ''}" data-buy="${it.id}" ${lockLine ? 'aria-disabled="true"' : ''}>${buyLabel} · ${price}</button>` : ''}
+    const have = it.slot === 'consumable' && stock > 0 ? ` ×${stock}` : '';
+    return `<article class="shop-row">
+      <div class="shop-id">${gearIcon(it.id, it.slot)}<b>${name}</b>${have ? `<small>${have}</small>` : ''}</div>
+      <div class="size-row">${sizes}</div>
+      <div class="shop-buy">
+        ${next >= 0 ? `<button type="button" class="primary${lockLine ? ' is-locked' : ''}" data-buy="${it.id}" title="${lockLine}" ${lockLine ? 'aria-disabled="true"' : ''}>${buyLabel} ${price}</button>` : ''}
         ${owned > 0 && it.slot !== 'consumable' ? `<button type="button" class="ghost" data-sell="${it.id}">${dict.sellItem}</button>` : ''}
+        ${isItemId(it.id) ? moreBtn(it.id, dict) : ''}
       </div>
+      ${isItemId(it.id) ? moreBlock(it.id, dict) : ''}
     </article>`;
-  }).join(''), dict)).join('');
+  }).join('');
 
   const sets = [0, 1, 2].map((i) => {
     const n = tech.sets[i]?.placements.length ?? 0;
     return `<button type="button" class="set-btn ${tech.activeSet === i ? 'on' : ''}" data-set="${i}"><b>${dict.tabSets} ${i + 1}</b><small>${n}</small></button>`;
   }).join('');
 
+  const pieceTools = selected >= 0 && !pick
+    ? `<button type="button" class="ghost" data-act="bag-rot">${dict.rotateItem}</button>
+       <button type="button" class="ghost" data-act="bag-off">${dict.removeItem}</button>`
+    : '';
+  const actions = `<div class="bag-actions">${pieceTools}
+      <button type="button" class="ghost" data-act="bag-pack">${dict.autoPack}</button>
+      <button type="button" class="ghost" data-act="bag-rec">${dict.recommendKit}</button>
+      ${growBtn}
+    </div>`;
+
+  const help = helpOn
+    ? `<div class="help-pop" role="note">
+        <p>${dict.placeHint}</p>
+        <p>${dict.oneEach}</p>
+        <p>${dict.bagLimit}</p>
+        <p>${dict.coinShop}</p>
+        ${slotOn ? `<p>${dict.gearSlotNote[slotOn]}</p>` : ''}
+      </div>`
+    : '';
+
   const body = tab === 'equip'
-    ? `<p class="place-hint${hintWarn ? ' warn' : ''}">${hint}</p>
-       <p class="sfx-note">${dict.oneEach}</p>
-       <p class="sfx-note">${dict.bagLimit}</p>
-       <div class="bag-grid" style="--cols:${grid.cols}">${cells.join('')}</div>
-       ${selTools}
-       <div class="tray">${tray || `<p class="sfx-note">${dict.tabShop}</p>`}</div>
-       <div class="bag-actions">
-         <button type="button" class="ghost" data-act="bag-pack">${dict.autoPack}</button>
-         <button type="button" class="ghost" data-act="bag-rec">${dict.recommendKit}</button>
-         ${growBtn(`${dict.expandBag} · ${nextGrid?.price ?? ''}`)}
-       </div>`
+    ? `<div class="fit-stage" style="--cols:${grid.cols};--rows:${grid.rows}">
+         <div class="bag-cluster">
+           <div class="slot-col">${SLOT_LEFT.map(slotBtn).join('')}</div>
+           <div class="bag-wrap"><div class="bag-grid" style="--cols:${grid.cols};--rows:${grid.rows}">${cells.join('')}</div></div>
+           <div class="slot-col">${SLOT_RIGHT.map(slotBtn).join('')}</div>
+         </div>
+       </div>
+       <div class="fit-dock">${dock}</div>
+       ${actions}`
     : tab === 'shop'
-      ? `<div class="shop-list"><p class="sfx-note">${dict.coinShop}</p><p class="sfx-note">${dict.bagLimit}</p>${shopCards}
-          ${growBtn(`${dict.expandBag} · ${nextGrid?.cols ?? ''}×${nextGrid?.rows ?? ''} · ${nextGrid?.price ?? ''}`, ' bag-grow')}
-        </div>`
-      : `<div class="set-row">${sets}</div><p class="sfx-note">${dict.placeHint}</p>`;
+      ? `<div class="slot-row">${SLOT_ORDER.map(slotBtn).join('')}</div>
+         <div class="shop-fit">${slotOn ? shopRows : `<p class="place-hint">${dict.pickType}</p>`}</div>
+         <div class="bag-actions">${growBtn}</div>`
+      : `<div class="set-fit"><div class="set-row">${sets}</div></div>`;
+
+  const barRight = `<span class="bar-stat" title="${dict.coins}">${coins}</span><span class="bar-stat" title="${dict.cells}">${used}/${cap}</span><button type="button" class="icon-btn help-btn${helpOn ? ' on' : ''}" data-act="help" aria-label="${dict.tips}" aria-expanded="${helpOn}">?</button>`;
 
   const page = el(`
     <div class="sub-screen workshop" data-ui="1">
-      ${screenBar(dict.workshop, 'skills')}
+      ${screenBar(dict.workshop, 'skills', barRight)}
       <div class="sub-body workshop-body">
-        <div class="workshop-top">
-          <b>${dict.coins} ${coins}</b>
-          <span>${used}/${cap} ${dict.cells}</span>
-        </div>
+        ${help}
         <div class="workshop-tabs">
           <button type="button" class="${tab === 'equip' ? 'on' : ''}" data-tab="equip">${dict.tabEquip}</button>
           <button type="button" class="${tab === 'shop' ? 'on' : ''}" data-tab="shop">${dict.tabShop}</button>
@@ -326,6 +400,28 @@ export function renderWorkshop(game: Game, _rerender: (game: Game) => void): HTM
     </div>
   `);
 
+  page.querySelector('[data-act="help"]')?.addEventListener('click', () => {
+    helpOn = !helpOn;
+    _rerender(game);
+  });
+  page.querySelectorAll<HTMLElement>('[data-slot]').forEach((b) => {
+    b.addEventListener('click', () => {
+      const slot = b.dataset.slot as Slot;
+      slotOn = slotOn === slot ? null : slot;
+      pick = null;
+      selected = -1;
+      moreId = null;
+      failNote = '';
+      _rerender(game);
+    });
+  });
+  page.querySelectorAll<HTMLElement>('[data-more]').forEach((b) => {
+    b.addEventListener('click', () => {
+      const id = b.dataset.more ?? '';
+      moreId = moreId === id ? null : id;
+      _rerender(game);
+    });
+  });
   page.querySelectorAll<HTMLElement>('[data-tab]').forEach((b) => {
     b.addEventListener('click', () => {
       tab = (b.dataset.tab as Tab) || 'equip';
@@ -334,18 +430,34 @@ export function renderWorkshop(game: Game, _rerender: (game: Game) => void): HTM
   });
 
   page.querySelectorAll<HTMLElement>('[data-tray]').forEach((b) => {
-    b.addEventListener('click', (ev) => {
+    b.addEventListener('click', () => {
       const id = b.dataset.tray ?? '';
       if (!isItemId(id)) return;
       const owned = Number(b.dataset.tier);
-      const chip = (ev.target as HTMLElement | null)?.closest?.('[data-tier-pick]') as HTMLElement | null;
-      const picked = chip ? Number(chip.dataset.tierPick) : NaN;
-      const tier = (picked === 1 || picked === 2 || picked === 3) && picked <= owned
-        ? picked as Tier
-        : ((owned === 2 || owned === 3 ? owned : 1) as Tier);
-      // A tier row chooses that size. Tapping the item again puts it down.
-      pick = !chip && pick?.id === id ? null : { id, tier };
-      selected = -1;
+      const tier = (owned === 2 || owned === 3 ? owned : 1) as Tier;
+      // Tapping the item again puts it down. A size chip chooses the tier.
+      if (pick?.id === id) {
+        pick = null;
+        moreId = null;
+      } else {
+        pick = { id, tier };
+        selected = -1;
+        failNote = '';
+        const def = itemDef(id);
+        if (def) slotOn = def.slot;
+      }
+      _rerender(game);
+    });
+  });
+  page.querySelectorAll<HTMLElement>('[data-tier-pick]').forEach((b) => {
+    b.addEventListener('click', () => {
+      const tier = Number(b.dataset.tierPick);
+      if (!pick || (tier !== 1 && tier !== 2 && tier !== 3)) return;
+      const def = itemDef(pick.id);
+      const have = def ? ownedCount(pick.id, def.slot) : 0;
+      if (tier > have) return;
+      pick = { id: pick.id, tier };
+      failNote = '';
       _rerender(game);
     });
   });
@@ -358,23 +470,38 @@ export function renderWorkshop(game: Game, _rerender: (game: Game) => void): HTM
       const hit = occ.get(`${x},${y}`);
       if (!pick) {
         selected = hit ?? -1;
+        failNote = '';
+        if (hit != null && isItemId(placements[hit].id)) {
+          const def = itemDef(placements[hit].id);
+          if (def) slotOn = def.slot;
+        }
         _rerender(game);
         return;
       }
       // The tap can be any square of the piece. A 2-wide bar fits an empty row from either cell.
       const fit = placementOnCell(placements as never, tech.gridTier, tech.items, tech.stock, pick.id, pick.tier, x, y);
       if (fit.ok) {
+        failNote = '';
         pick = null;
+        moreId = null;
         selected = -1;
         game.techPlace(fit.placement);
         return;
       }
-      game.toast(whyBlocked(fit.reason, itemDef(pick.id)?.slot, dict));
+      failNote = whyBlocked(fit.reason, itemDef(pick.id)?.slot, dict);
+      game.toast(failNote);
+      _rerender(game);
     });
   });
 
   page.querySelector('[data-act="bag-rot"]')?.addEventListener('click', () => {
-    if (selected >= 0 && !game.techRotate(selected)) game.toast(dict.noRoom);
+    if (selected < 0) return;
+    failNote = '';
+    if (!game.techRotate(selected)) {
+      failNote = dict.noRoom;
+      game.toast(dict.noRoom);
+      _rerender(game);
+    }
   });
   page.querySelector('[data-act="bag-off"]')?.addEventListener('click', () => {
     if (selected >= 0) {
@@ -385,7 +512,13 @@ export function renderWorkshop(game: Game, _rerender: (game: Game) => void): HTM
   page.querySelectorAll<HTMLElement>('[data-tier-set]').forEach((b) => {
     b.addEventListener('click', () => {
       const tier = Number(b.dataset.tierSet) as Tier;
-      if (selected >= 0 && !game.techSetTier(selected, tier)) game.toast(dict.noRoom);
+      if (selected < 0) return;
+      failNote = '';
+      if (!game.techSetTier(selected, tier)) {
+        failNote = dict.noRoom;
+        game.toast(dict.noRoom);
+        _rerender(game);
+      }
     });
   });
   page.querySelectorAll('[data-act="bag-pack"]').forEach((b) => b.addEventListener('click', () => game.techAutoPack()));
