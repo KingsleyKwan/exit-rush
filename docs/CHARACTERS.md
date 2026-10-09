@@ -339,7 +339,7 @@ Grid sizes are **cols × rows**.
 - **Workshop › Equip tab:** the live grid on top (2 columns, 2 then 3 rows), with the **tray** below. One 「擴充背囊」 button buys 2×3 for 150, then disappears. A standing note says the bag stops at 6 cells.
 - **Drag** an item from the tray. The ghost footprint is green when it fits and red with a reason chip when it doesn't (「冇位」 / 「已有鞋」 / 「主動道具上限」). Snap on release with a haptic tick.
 - **Rotate:** ⟳ button while dragging/selected, or two-finger twist / double-tap.
-- **Tier switch:** tap a placed item → 平/中價/名貴 pills (owned tiers only). The footprint previews before you confirm.
+- **Tier switch:** tap a placed item → 平/中價/名貴 pills (owned tiers only). Each pill says what that level does, not only the footprint. The footprint still previews before you confirm.
 - **Tap-to-place alternative** (accessibility, no drag needed): tap an item, then tap a target cell. If that turn sticks out of the bag, the next turn that fits is used.
 - **Remove:** drag back to the tray, or tap → 「除低」.
 - **自動排 Auto-pack:** packs what fits in the current bag (largest footprints first, then a fixed rotation order). Also used by 「推介套裝」. Pieces that do not fit stay in the tray.
@@ -408,7 +408,7 @@ General rules: icon-first, EN + 粵 (zh-HK default, colloquial). Every string go
 |---|---|---|
 | Hero | 🌟 技能 Skills | Existing constellation (`constellationSkills.ts`) |
 | Mage | 📖 魔法 Spells | Her own book, not the hero constellation. A wheel: the start is the centre, ice at 10 o'clock, wind at 2, gravity at 6. Only those three lines leave the centre. A mix of a rank needs both schools of that rank, and the last mix follows the mix before it. Farther out is the stronger version. More than one last skill is allowed unless they share an element. Tap a ready node to spend 1 point. The HUD shows one button per learned line and casts the highest rank. |
-| Tech | 🛒 裝備 Gear | **Workshop 工作室**: tabs **裝備 Equip (backpack grid + tray, §5.4.6) / 商店 Shop / 套裝 Sets 1-2-3**; coin balance + 「4/6 格」 top-right; each item card shows icon, 平/中價/名貴 pills with footprints, effect, counters chip, price, 買/升級/賣. Expand stops after 2×3 |
+| Tech | 🛒 裝備 Gear | **Workshop 工作室**: tabs **裝備 Equip (backpack grid + tray, §5.4.6) / 商店 Shop / 套裝 Sets 1-2-3**; coin balance + 「4/6 格」 top-right. Cards are grouped by slot. Each one says what that piece does, and cheap / mid / luxury each say what changes. The footprint stays beside that line. Shoes are not the same job: sprint, hop, or walk through a suitcase. Expand stops after 2×3 |
 
 The hero constellation is unchanged. 凱婷 does not share those node positions or the fire / lightning schools.
 

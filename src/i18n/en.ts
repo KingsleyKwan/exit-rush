@@ -244,6 +244,53 @@ export interface Dict {
   /** {n} = cleared level required before this tier. */
   needLevel: string;
   needCoins: string;
+  /** Passive gear. It works without a button. */
+  gearKindOn: string;
+  /** Active gear, a core, or a consumable. */
+  gearKindTap: string;
+  slotGadget: string;
+  slotSnack: string;
+  /** Why the pieces in one worn slot are not interchangeable. */
+  gearSlotNote: {
+    shoes: string;
+    gloves: string;
+    head: string;
+    gadget: string;
+    core: string;
+    consumable: string;
+  };
+  /** What this piece is for, against the others in its slot. */
+  gearUse: {
+    S1: string; S2: string; S3: string;
+    G1: string; G2: string; G3: string;
+    H1: string; H2: string; H3: string;
+    D1: string; D2: string; D3: string; D4: string; D5: string;
+    C1: string; C2: string; C3: string;
+    K1: string; K2: string; K3: string;
+  };
+  /** Cheap, then mid, then luxury. One line each. Consumables have one. */
+  gearTier: {
+    S1: readonly [string, string, string];
+    S2: readonly [string, string, string];
+    S3: readonly [string, string, string];
+    G1: readonly [string, string, string];
+    G2: readonly [string, string, string];
+    G3: readonly [string, string, string];
+    H1: readonly [string, string, string];
+    H2: readonly [string, string, string];
+    H3: readonly [string, string, string];
+    D1: readonly [string, string, string];
+    D2: readonly [string, string, string];
+    D3: readonly [string, string, string];
+    D4: readonly [string, string, string];
+    D5: readonly [string, string, string];
+    C1: readonly [string, string, string];
+    C2: readonly [string, string, string];
+    C3: readonly [string, string, string];
+    K1: readonly [string];
+    K2: readonly [string];
+    K3: readonly [string];
+  };
 }
 
 export const en: Dict = {
@@ -472,5 +519,61 @@ export const en: Dict = {
   coinShop: 'Upgrades spend coins from clears, not skill points.',
   needLevel: 'Clear level {n} first.',
   needCoins: 'Not enough coins. Clear levels to earn them.',
+  gearKindOn: 'Always on',
+  gearKindTap: 'Button',
+  slotGadget: 'Gadget',
+  slotSnack: 'Snack',
+  gearSlotNote: {
+    shoes: 'One pair. Each pair does a different job.',
+    gloves: 'One pair. Each pair changes the shove differently.',
+    head: 'One. Each one blocks a different nuisance.',
+    gadget: 'You can pack more than one. Each does its own job.',
+    core: 'One ultimate. They do not stack.',
+    consumable: 'Used once. It still takes a cell.',
+  },
+  gearUse: {
+    S1: 'These shoes only make you run faster. No button.',
+    S2: 'A button. Jump over someone squatting, and over kids. Walking is not faster.',
+    S3: 'Walk through suitcases. Not a jump, and not a speed boost.',
+    G1: 'A harder shove. Not a shockwave, and couples stay holding hands.',
+    G2: 'A full shove bursts outward. Suitcases fly further.',
+    G3: 'A shove makes a couple let go. How long is the same at every level.',
+    H1: 'The smell slows you less. It does not quiet a loud call.',
+    H2: 'A loud call drains you less. It does not stop the smell.',
+    H3: 'You read a gap and slip through. It does not warn you early.',
+    D1: 'A bigger stamina bar that refills faster. Not a drink.',
+    D2: 'You are heavier, so an angry shove moves you less.',
+    D3: 'A button. Nearby brats chase the drone instead of you.',
+    D4: 'A button. A nearby family stops to watch.',
+    D5: 'A button. A gust clears the people in front and blows the smell aside.',
+    C1: 'The ultimate. Charge through. Not a dash, and not a shield.',
+    C2: 'The ultimate. Dash off the train. Not a charge.',
+    C3: 'The ultimate. Plant your feet and catch your breath. Not a dash.',
+    K1: 'One drink. Stamina comes back and you are not winded.',
+    K2: 'One drink. A short burst of speed. Not the shoes.',
+    K3: 'One piece. The smell and the loud call ease off for a moment.',
+  },
+  gearTier: {
+    S1: ['10% faster', '20% faster, and quicker through a gap', '30% faster, and quickest through a gap'],
+    S2: ['Jump. Ready again in 9 s', 'Jump. Ready again in 7.5 s', 'Jump. Ready again in 6 s'],
+    S3: ['Through a suitcase, a bit slower', 'Through a suitcase, almost full pace', 'Full pace, and through the giant case too'],
+    G1: ['Push 12% harder', 'Push 25% harder, and shoves move you less', 'Push 40% harder, and shoves move you least'],
+    G2: ['Shockwave. Suitcases fly further', 'Wider shockwave, and a harder push', 'Widest shockwave, and the hardest push'],
+    G3: ['Couples let go', 'Couples let go, and you push harder', 'Couples let go, and you push hardest'],
+    H1: ['Half the slow is gone', 'Three quarters of the slow is gone', 'The smell does not slow you'],
+    H2: ['Drain cut by 35%', 'Drain cut by 55%', 'Drain cut by 70%'],
+    H3: ['A small nudge toward the gap', 'A clearer nudge toward the gap', 'The strongest nudge toward the gap'],
+    D1: ['+15 stamina, refill +3', '+30 stamina, refill +8', '+45 stamina, refill +14'],
+    D2: ['An angry shove keeps 60% of its force', 'An angry shove keeps 35%', 'An angry shove keeps 15%'],
+    D3: ['They chase for 2.5 s', 'They chase for 3.5 s', 'They chase for 4.5 s'],
+    D4: ['The family stops for 3 s', 'The family stops for 4 s', 'The family stops for 5 s, and brats for 2 s'],
+    D5: ['A short, light gust', 'A longer, harder gust', 'The longest, hardest gust'],
+    C1: ['Ready again in 14 s', 'Ready again in 12 s', 'Ready again in 10 s'],
+    C2: ['Ready again in 14 s', 'Ready again in 12 s', 'Ready again in 10 s'],
+    C3: ['Ready again in 14 s', 'Ready again in 12 s', 'Ready again in 10 s'],
+    K1: ['+40 stamina. Then it is gone'],
+    K2: ['Extra speed for 5 s. Then it is gone'],
+    K3: ['6 s. No smell, and the call is quieter'],
+  },
 };
 
