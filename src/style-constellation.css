@@ -158,12 +158,15 @@
 .b-str .cst-node.on .cst-dot { background: linear-gradient(180deg, #ff8a3d, #d84315); color: #fff; --ico-ink: #7a2a08; --ico-w: #e25a22; }
 .b-spd .cst-node.on .cst-dot { background: linear-gradient(180deg, #4fd2f0, #0288d1); color: #fff; --ico-w: #19a4cc; }
 .b-sta .cst-node.on .cst-dot { background: linear-gradient(180deg, #66bb6a, #2e7d32); color: #fff; --ico-ink: #1b5e20; --ico-w: #43a047; }
-/* Mage: ice is the stamina arm, thunder is the speed arm. Hero colours stay above. */
-.constellation.mage .b-spd.cst-arm { border-color: rgba(251, 192, 45, 0.7); background: rgba(251, 192, 45, 0.12); }
+/* Mage: wind=str teal, gravity=spd amber, ice=sta blue. Hero colours stay above. */
+.constellation.mage .b-str.cst-arm { border-color: rgba(0, 137, 123, 0.7); background: rgba(0, 137, 123, 0.12); }
+.constellation.mage .b-spd.cst-arm { border-color: rgba(239, 108, 0, 0.7); background: rgba(239, 108, 0, 0.12); }
 .constellation.mage .b-sta.cst-arm { border-color: rgba(30, 136, 229, 0.6); background: rgba(30, 136, 229, 0.12); }
-.constellation.mage .b-spd .cst-arm-line { background: linear-gradient(to bottom, #fbc02d, transparent); }
+.constellation.mage .b-str .cst-arm-line { background: linear-gradient(to bottom, #26a69a, transparent); }
+.constellation.mage .b-spd .cst-arm-line { background: linear-gradient(to bottom, #ef6c00, transparent); }
 .constellation.mage .b-sta .cst-arm-line { background: linear-gradient(to bottom, #42a5f5, transparent); }
-.constellation.mage .b-spd .cst-node.on .cst-dot { background: linear-gradient(180deg, #ffee58, #fbc02d); color: #1a1200; --ico-ink: #5d4037; --ico-w: #fdd835; }
+.constellation.mage .b-str .cst-node.on .cst-dot { background: linear-gradient(180deg, #b2dfdb, #00897b); color: #00332e; --ico-ink: #004d40; --ico-w: #26a69a; }
+.constellation.mage .b-spd .cst-node.on .cst-dot { background: linear-gradient(180deg, #ffb74d, #ef6c00); color: #3e1f00; --ico-ink: #e65100; --ico-w: #fb8c00; }
 .constellation.mage .b-sta .cst-node.on .cst-dot { background: linear-gradient(180deg, #42a5f5, #1565c0); color: #fff; --ico-ink: #0d47a1; --ico-w: #1e88e5; }
 /* v0.6.2 Tier 3 counter badge: passenger-type icon on the node's corner */
 .cst-dot { position: relative; }
@@ -461,11 +464,11 @@
   transform: translate(-50%, -50%);
 }
 .spell-ray-label.line-i { color: #90caf9; }
-.spell-ray-label.line-w { color: #b3e5fc; }
-.spell-ray-label.line-g { color: #d1c4e9; }
-.spell-ray-label.line-iw { color: #81d4fa; }
-.spell-ray-label.line-ig { color: #9fa8da; }
-.spell-ray-label.line-wg { color: #b39ddb; }
+.spell-ray-label.line-w { color: #80cbc4; }
+.spell-ray-label.line-g { color: #ffcc80; }
+.spell-ray-label.line-iw { color: #4dd0e1; }
+.spell-ray-label.line-ig { color: #ce93d8; }
+.spell-ray-label.line-wg { color: #a5d6a7; }
 .spell-wheel .spell-node {
   position: absolute;
   width: 7.6%;
@@ -487,7 +490,7 @@
 .spell-wheel .spell-node.locked { opacity: 0.48; }
 .spell-wheel .spell-node.selected { outline: 2px solid #ffe082; outline-offset: 1px; z-index: 3; }
 .spell-wheel .spell-dot { position: relative; display: inline-flex; align-items: center; justify-content: center; }
-.spell-wheel .spell-node .ico { width: 4.4cqi; height: 4.4cqi; }
+.spell-wheel .spell-node .ico { width: 5cqi; height: 5cqi; }
 .spell-wheel .spell-pair { display: flex; align-items: center; }
 .spell-wheel .spell-pair .ico { width: 3.1cqi; height: 3.1cqi; }
 .spell-star {
@@ -499,15 +502,18 @@
   line-height: 1;
   color: #ffe082;
 }
-.spell-wheel .line-w { --ico-ink: #0277bd; }
+.spell-wheel .line-w { --ico-ink: #00695c; }
 .spell-wheel .line-i { --ico-ink: #0d47a1; }
-.spell-wheel .line-g { --ico-ink: #311b92; }
-.spell-wheel .line-w.on { background: linear-gradient(180deg, #e1f5fe, #4fc3f7); color: #083040; }
+.spell-wheel .line-g { --ico-ink: #e65100; }
+.spell-wheel .line-iw { --ico-ink: #00838f; }
+.spell-wheel .line-ig { --ico-ink: #6a1b9a; }
+.spell-wheel .line-wg { --ico-ink: #558b2f; }
+.spell-wheel .line-w.on { background: linear-gradient(180deg, #b2dfdb, #00897b); color: #00332e; }
 .spell-wheel .line-i.on { background: linear-gradient(180deg, #42a5f5, #1565c0); color: #fff; }
-.spell-wheel .line-g.on { background: linear-gradient(180deg, #9575cd, #4527a0); color: #fff; }
-.spell-wheel .line-iw { --tilt: 90deg; --c1: #1e88e5; --c2: #4fc3f7; }
-.spell-wheel .line-wg { --tilt: 210deg; --c1: #4fc3f7; --c2: #7e57c2; }
-.spell-wheel .line-ig { --tilt: 330deg; --c1: #7e57c2; --c2: #1e88e5; }
+.spell-wheel .line-g.on { background: linear-gradient(180deg, #ffb74d, #ef6c00); color: #3e1f00; }
+.spell-wheel .line-iw { --tilt: 90deg; --c1: #1e88e5; --c2: #26a69a; }
+.spell-wheel .line-wg { --tilt: 210deg; --c1: #26a69a; --c2: #fb8c00; }
+.spell-wheel .line-ig { --tilt: 330deg; --c1: #fb8c00; --c2: #1e88e5; }
 .spell-wheel .spell-node.mix {
   background: linear-gradient(var(--tilt), color-mix(in srgb, var(--c1) 55%, #121820), color-mix(in srgb, var(--c2) 55%, #121820));
 }
@@ -544,11 +550,11 @@
 }
 .skills-panel .spell-ray-label { background: rgba(255, 255, 255, 0.88); }
 .skills-panel .spell-ray-label.line-i { color: #1565c0; }
-.skills-panel .spell-ray-label.line-w { color: #0277bd; }
-.skills-panel .spell-ray-label.line-g { color: #4527a0; }
-.skills-panel .spell-ray-label.line-iw { color: #0277bd; }
-.skills-panel .spell-ray-label.line-ig { color: #3949ab; }
-.skills-panel .spell-ray-label.line-wg { color: #5e35b1; }
+.skills-panel .spell-ray-label.line-w { color: #00695c; }
+.skills-panel .spell-ray-label.line-g { color: #e65100; }
+.skills-panel .spell-ray-label.line-iw { color: #00838f; }
+.skills-panel .spell-ray-label.line-ig { color: #6a1b9a; }
+.skills-panel .spell-ray-label.line-wg { color: #558b2f; }
 .skills-panel .spell-wheel .spell-node:not(.on) {
   background: #f3f5f8;
   color: #18202e;
