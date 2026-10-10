@@ -57,7 +57,7 @@ const pointsChip = (game: Game): string => {
 };
 
 const LINE_ICON: Record<SpellLine, string> = {
-  w: 'wind', i: 'ice', g: 'grav', iw: 'wind', ig: 'ice', wg: 'grav',
+  w: 'wind', i: 'ice', g: 'grav', iw: 'sp_iw', ig: 'sp_ig', wg: 'sp_wg',
 };
 
 /** Clockwise degrees from 12. Ice 10 o'clock, wind 2, gravity 6. Mixes sit between. */
@@ -84,7 +84,7 @@ function polar(angleDeg: number, radius: number): { x: number; y: number } {
 
 
 
-const SCHOOL_INK = { w: '#4fc3f7', i: '#1e88e5', g: '#7e57c2' } as const;
+const SCHOOL_INK = { w: '#26a69a', i: '#1e88e5', g: '#fb8c00' } as const;
 
 /** A stroke is a requirement. Three spokes leave the hub. Mixes bridge the same rank, and the mix itself runs from rank 1 to rank 4. */
 function raySvg(): string {
@@ -156,9 +156,7 @@ function renderMageBook(game: Game, rerender: (game: Game) => void): HTMLElement
     const title = `${n.nameEn} / ${n.nameZh} — ${tip}${why ? ` (${why})` : ''}`;
     const mix = n.line.length > 1;
     const at = polar(RAY_ANGLE[n.line], RAY_R[n.rank - 1]);
-    const glyphs = mix
-      ? `<span class="spell-pair">${lineElements(n.line).map((part) => icon(part === 'w' ? 'wind' : part === 'i' ? 'ice' : 'grav')).join('')}</span>`
-      : icon(LINE_ICON[n.line]);
+    const glyphs = icon(LINE_ICON[n.line]);
     return `<button type="button" class="spell-node line-${n.line} ${mix ? 'mix' : ''} ${on ? 'on' : ''} ${ready ? 'ready' : ''} ${n.rank === 4 ? 'cap' : ''} ${!on && !ready ? 'locked' : ''}" data-spell="${id}" data-line="${n.line}" style="left:${at.x.toFixed(2)}%;top:${at.y.toFixed(2)}%" data-tip="${tip.replace(/"/g, '&quot;')}" data-why="${why.replace(/"/g, '&quot;')}" data-kind="${kind}" data-en="${n.nameEn}" data-zh="${n.nameZh}" title="${title.replace(/"/g, '&quot;')}" aria-label="${title.replace(/"/g, '&quot;')}">
       <span class="spell-dot">${glyphs}${n.rank === 4 ? '<i class="spell-star">★</i>' : ''}</span>
     </button>`;

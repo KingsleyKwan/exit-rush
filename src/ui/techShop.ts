@@ -295,13 +295,14 @@ export function renderWorkshop(game: Game, _rerender: (game: Game) => void): HTM
     const owned = it.slot === 'consumable' ? (tech.stock[it.id] ?? 0) : (tech.items[it.id] ?? 0);
     const tier = Math.min(3, Math.max(1, owned)) as Tier;
     const name = en ? it.nameEn : it.nameZh;
+    const blurb = en ? it.blurbEn : it.blurbZh;
     const tag = it.slot === 'consumable' ? `<small>×${owned}</small>` : '';
     const off = wornAt(it.id);
     const wearing = off >= 0 || (selected >= 0 && placements[selected]?.id === it.id);
     const take = off >= 0
       ? actBtn(dict.removeItem, 'unequip', `data-off="${off}"`, { cls: 'take-off' })
       : '';
-    return `<div class="item-line"><button type="button" class="tray-item${pick?.id === it.id || wearing ? ' on' : ''}" data-tray="${it.id}" data-tier="${tier}">${gearIcon(it.id, it.slot)}<span class="name">${name}</span>${tag}</button>${take}</div>`;
+    return `<div class="item-line"><button type="button" class="tray-item${pick?.id === it.id || wearing ? ' on' : ''}" data-tray="${it.id}" data-tier="${tier}">${gearIcon(it.id, it.slot)}<span class="tray-copy"><span class="name">${name}</span>${tag}<span class="tray-blurb">${blurb}</span></span></button>${take}</div>`;
   };
 
   const sel = selected >= 0 ? placements[selected] : undefined;
@@ -355,6 +356,7 @@ export function renderWorkshop(game: Game, _rerender: (game: Game) => void): HTM
     const next = it.slot === 'consumable' ? (stock >= 9 ? -1 : 0) : (owned >= it.price.length ? -1 : owned);
     const price = next >= 0 ? it.price[next] : 0;
     const name = en ? it.nameEn : it.nameZh;
+    const blurb = en ? it.blurbEn : it.blurbZh;
     const buying = it.slot === 'consumable' || owned === 0;
     const buyLabel = buying ? dict.buyItem : dict.upgradeItem;
     const buyTier = (next >= 0 ? Math.min(next + 1, it.shape.length, 3) : Math.min(owned, it.shape.length, 3)) as Tier | 0;
@@ -362,7 +364,7 @@ export function renderWorkshop(game: Game, _rerender: (game: Game) => void): HTM
     const lockLine = buyLock(buyBlock(game.save, it.id), dict);
     const have = it.slot === 'consumable' && stock > 0 ? ` ×${stock}` : '';
     return `<article class="shop-row">
-      <div class="shop-id">${gearIcon(it.id, it.slot)}<b>${name}</b>${have ? `<small>${have}</small>` : ''}</div>
+      <div class="shop-id">${gearIcon(it.id, it.slot)}<span class="shop-copy"><b>${name}</b>${have ? `<small>${have}</small>` : ''}<span class="tray-blurb">${blurb}</span></span></div>
       <div class="size-row">${sizes}</div>
       <div class="shop-buy">
         ${next >= 0 ? actBtn(`${buyLabel} ${price}`, buying ? 'shop' : 'up', `data-buy="${it.id}"${lockLine ? ' aria-disabled="true"' : ''}`, { primary: true, extra: String(price), title: lockLine || `${buyLabel} ${price}`, cls: lockLine ? 'is-locked' : '' }) : ''}

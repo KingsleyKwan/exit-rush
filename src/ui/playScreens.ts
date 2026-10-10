@@ -13,13 +13,21 @@ import { stationReading } from '../game/stations';
 import { charPortraitUrl } from '../game/charPortraits';
 
 
+const SPELL_HUD: Record<string, { el: string; ico: string }> = {
+  w: { el: 'wind', ico: 'wind' },
+  i: { el: 'ice', ico: 'ice' },
+  g: { el: 'grav', ico: 'grav' },
+  iw: { el: 'iw', ico: 'sp_iw' },
+  ig: { el: 'ig', ico: 'sp_ig' },
+  wg: { el: 'wg', ico: 'sp_wg' },
+};
+
 function mageActions(game: Game, _dict: ReturnType<typeof t>): string {
   return (game.runMods.spellBar ?? []).map((id) => {
     const n = spellById(id);
     const title = n ? `${n.nameZh} / ${n.nameEn}` : id;
-    const el = !n || n.line === 'w' || n.line === 'iw' || n.line === 'wg' ? 'wind' : n.line === 'g' ? 'grav' : 'ice';
-    const ico = el === 'wind' ? 'wind' : el === 'grav' ? 'grav' : 'ice';
-    return `<button type="button" class="skill-use act-spell el-${el}" data-spell="${id}" title="${title}" aria-label="${title}">${icon(ico)}</button>`;
+    const hud = SPELL_HUD[n?.line ?? ''] ?? SPELL_HUD.w;
+    return `<button type="button" class="skill-use act-spell el-${hud.el}" data-spell="${id}" title="${title}" aria-label="${title}">${icon(hud.ico)}</button>`;
   }).join('');
 }
 
