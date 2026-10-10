@@ -1,7 +1,7 @@
 {
   "name": "exit-rush",
-  "version": "0.8.2",
-  "description": "逼落車 — Exit Rush on 香城鐵路 / Hong City Rail: push through crowds to exit the train",
+  "version": "0.8.3",
+  "description": "\u903c\u843d\u8eca \u2014 Exit Rush on \u9999\u57ce\u9435\u8def / Hong City Rail: push through crowds to exit the train",
   "type": "module",
   "scripts": {
     "dev": "vite",

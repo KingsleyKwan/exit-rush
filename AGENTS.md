@@ -1,4 +1,4 @@
-<!-- v0.8.2: Katie spell icons distinct; workshop blurbs -->
+<!-- v0.8.3: distinct school/verb VFX; Cool Breeze ice array -->
 # AGENTS.md — 逼落車 / Exit Rush (香城鐵路 · Hong City Rail)
 
 Read this first, then read **[`docs/APP_STORE.md`](docs/APP_STORE.md)**. It describes the **current mission: ship on the iOS App Store**.
@@ -18,7 +18,7 @@ of each type every 10 levels from L20 (v0.7, `src/game/bosses.ts`, `docs/BOSSES.
 3-branch constellation skill tree (力量 STR / 速度 SPD / 體力 STA), per-station themes, original synthesised audio,
 and EN + 粵 (zh-HK) UI.
 
-- Version: see `package.json` → `version` (0.8.2). Katie ice/wind/grav(+mix) icons distinct; Gear L workshop shows effect blurbs.
+- Version: see `package.json` → `version` (0.8.3). Distinct Katie school VFX + Gear L item cast FX; Cool Breeze ice array.
 - Levels **1–100** are playable. L20/30/…/90 are boss levels (one king each), L99 is the final exam, and L100 (頓沙嘴 · 十一煙花後, all eight kings) unlocks after you clear L99.
 - Every **10** first clears give 1 skill point; replays give 0 (10 points from 100 levels). One point learns one skill (power jumps 10 / 20 / … / 60) or the ultimate. Points are derived from that character's `cleared`. Free respec, plus 3 loadouts (`save.loadouts`, `activeLoadout`).
 
