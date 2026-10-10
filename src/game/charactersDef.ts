@@ -63,7 +63,7 @@ export const HERO_TREE: TreeDef = {
 export const SPELL_TREE: TreeDef = {
   kind: 'tree',
   branches: ['str', 'spd', 'sta'],
-  colours: { str: '#4fc3f7', spd: '#7e57c2', sta: '#64b5f6' },
+  colours: { str: '#26a69a', spd: '#fb8c00', sta: '#1e88e5' },
   nodes: SPELL_NODES as unknown as SkillNodeDef[],
   ults: SPELL_ULT_DEFS as unknown as typeof ULT_DEFS,
   labelKey: 'mage',

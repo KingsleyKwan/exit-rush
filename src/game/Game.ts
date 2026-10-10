@@ -1160,7 +1160,7 @@ export class Game {
           ? e.ability.slice(0, 2)
           : e.ability.slice(0, 1);
         if (line === 'w' || line === 'wg') {
-          fx.gust(e.x, e.z, dx, dz, e.r ?? 2.6, e.w ?? 0.9, line === 'wg' ? 0xb39ddb : 0x4fc3f7);
+          fx.gust(e.x, e.z, dx, dz, e.r ?? 2.6, e.w ?? 0.9, line === 'wg' ? 0xa5d6a7 : 0x26a69a);
           cam.addTrauma(line === 'wg' ? 0.07 : 0.05);
           cam.kickCamera(dx, dz, line === 'wg' ? 0.7 : 0.45);
           this.audio.dash();
@@ -1174,7 +1174,7 @@ export class Game {
           cam.addTrauma(0.04);
           this.audio.sense();
         } else {
-          const colors: Record<string, number> = { wind: 0xb3e5fc, ice: 0x81d4fa, grav: 0x7e57c2 };
+          const colors: Record<string, number> = { wind: 0x80cbc4, ice: 0x81d4fa, grav: 0xffb74d };
           fx.puff(e.x, 0.9, e.z, 10, colors[e.el] ?? 0xce93d8, 1.6, 1.1, 0.45);
           cam.addTrauma(0.06);
         }
