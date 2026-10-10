@@ -455,7 +455,8 @@ function spellAbility(node: SpellNodeDef, mods: PlayerMods): AbilityDef | null {
       const pz = ctx.player.body.z;
       const dir = blowVector(px, pz, a.body.x, a.body.z);
       const dist = Math.hypot(a.body.x - px, a.body.z - pz);
-      const step = Math.max(0.8, row.radius - dist + 0.9);
+      // Push them past the rim so the ice array clears and the leave reads on phone.
+      const step = Math.max(1.2, row.radius - dist + 1.35);
       markFlee(a, ctx.time + row.flee, a.body.x + dir.x * step, a.body.z + dir.z * step, ctx.emit);
     });
   }
