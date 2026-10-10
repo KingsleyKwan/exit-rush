@@ -272,8 +272,12 @@ export class Passenger {
         // Frozen: icy cyan tint so freeze reads from iso cam.
         const pulse = 0.85 + 0.15 * Math.sin(time * 8 + a.id);
         this.tint.setRGB(0.35 * pulse, 0.55 * pulse, 1.35 * pulse);
-      } else if (a.chillUntil > this.agentTime(time)) {
-        this.tint.setRGB(0.55, 0.7, 1.2);
+      } else if (a.chillUntil > this.agentTime(time) || a.coldUntil > this.agentTime(time)) {
+        // Chill / cold patch: icy body tint (pure ice + mixes).
+        this.tint.setRGB(0.5, 0.72, 1.25);
+      } else if (a.slowUntil > this.agentTime(time)) {
+        // Gravity-slow: amber sink tint.
+        this.tint.setRGB(1.15, 0.85, 0.55);
       } else if (this.flash > 0.01) {
         const k = 1 + this.flash * 1.6;
         this.tint.setRGB(k, k, k);

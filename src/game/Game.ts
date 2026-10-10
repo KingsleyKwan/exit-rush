@@ -910,6 +910,80 @@ export class Game {
     }
   }
 
+  /** Icy body tint so pure ice / mixes read on people (uses chill window). */
+  private paintIceTint(x: number, z: number, radius: number): void {
+    if (!this.sim) return;
+    const until = this.sim.time + 1.35;
+    for (const a of this.sim.crowd.agents) {
+      const d = Math.hypot(a.body.x - x, a.body.z - z);
+      if (d > radius) continue;
+      a.chillUntil = Math.max(a.chillUntil, until);
+    }
+  }
+
+  /** Downward squash kick on agents (gravity / freezing-sink / funnel). */
+  private paintSquash(x: number, z: number, radius: number, amount = 0.8): void {
+    if (!this.sim) return;
+    for (const a of this.sim.crowd.agents) {
+      const d = Math.hypot(a.body.x - x, a.body.z - z);
+      if (d > radius) continue;
+      a.bumpAcc = Math.max(a.bumpAcc, amount);
+    }
+  }
+
+  /** Wind shove pose: offset + velocity along the cone so the lane reads mid-cast. */
+  private paintWindShove(x: number, z: number, dx: number, dz: number, range: number, width: number): void {
+    if (!this.sim) return;
+    const len = Math.hypot(dx, dz) || 1;
+    const ndx = dx / len;
+    const ndz = dz / len;
+    const yaw = Math.atan2(ndx, ndz);
+    for (const a of this.sim.crowd.agents) {
+      if (a.boss) continue;
+      const vx = a.body.x - x;
+      const vz = a.body.z - z;
+      const dist = Math.hypot(vx, vz);
+      if (dist < 0.05 || dist > range) continue;
+      const along = (vx * ndx + vz * ndz) / dist;
+      if (along < 0.05) continue;
+      const lat = Math.abs(vx * -ndz + vz * ndx);
+      if (lat > width + dist * 0.55) continue;
+      const push = 0.9 + (1 - dist / range) * 0.7;
+      a.body.x += ndx * push;
+      a.body.z += ndz * push;
+      a.body.px = a.body.x - ndx * 0.55;
+      a.body.pz = a.body.z - ndz * 0.55;
+      a.body.vx = ndx * 4.2;
+      a.body.vz = ndz * 4.2;
+      a.bumpAcc = Math.max(a.bumpAcc, 0.7);
+    }
+    // Face + lean along the shove so the lane reads on phone.
+    for (const v of this.crowd.passengers) {
+      const a = v.agent;
+      if (a.boss) continue;
+      const vx = a.body.x - x;
+      const vz = a.body.z - z;
+      const dist = Math.hypot(vx, vz);
+      if (dist > range + 0.4) continue;
+      const along = dist > 0.05 ? (vx * ndx + vz * ndz) / dist : 0;
+      if (along < 0.05) continue;
+      v.faceYaw = yaw;
+    }
+  }
+
+  /** Amber sink pillars on each freeze-shell target (ig hybrid). */
+  private paintSinkPillars(x: number, z: number, radius: number): void {
+    if (!this.sim) return;
+    let n = 0;
+    for (const a of this.sim.crowd.agents) {
+      if (n >= 8) break;
+      const d = Math.hypot(a.body.x - x, a.body.z - z);
+      if (d > radius) continue;
+      this.effects.sinkPillar(a.body.x, a.body.z, a.boss ? 1.5 : a.isKid ? 0.75 : 1.1, 0.85);
+      n++;
+    }
+  }
+
   /** Drain sim.events into VFX immediately (UI casts happen between frames). */
   private flushSimEvents(): void {
     if (!this.sim) return;
@@ -942,6 +1016,11 @@ export class Game {
   trySecondWind(): void {
     if (this.screen !== 'playing' || !this.sim || this.sim.ambient) return;
     if (this.sim.trySecondWind()) {
+      const b = this.sim.player.body;
+      // Stamina bloom — green, not the gold Iron Stance ring.
+      this.effects.puff(b.x, 0.9, b.z, 16, 0x81c784, 2.0, 1.3, 0.55, 1.4, -1.5);
+      this.effects.puff(b.x, 0.5, b.z, 10, 0xc8e6c9, 1.2, 1.0, 0.4, 0.6, -0.8, false);
+      this.effects.shockwave(b.x, b.z, 1.6, 0x66bb6a, 0.45);
       this.audio.skillPoint();
       this.hooks.onState();
     }
@@ -1159,18 +1238,48 @@ export class Game {
         const line = e.ability.startsWith('iw') || e.ability.startsWith('ig') || e.ability.startsWith('wg')
           ? e.ability.slice(0, 2)
           : e.ability.slice(0, 1);
-        if (line === 'w' || line === 'wg') {
-          fx.gust(e.x, e.z, dx, dz, e.r ?? 2.6, e.w ?? 0.9, line === 'wg' ? 0xa5d6a7 : 0x26a69a);
-          cam.addTrauma(line === 'wg' ? 0.07 : 0.05);
-          cam.kickCamera(dx, dz, line === 'wg' ? 0.7 : 0.45);
+        if (line === 'w') {
+          // Wind: gust streaks / cone lane — people shoved sideways.
+          fx.gust(e.x, e.z, dx, dz, e.r ?? 2.6, e.w ?? 0.9, 0x00897b);
+          this.paintWindShove(e.x, e.z, dx, dz, e.r ?? 2.6, e.w ?? 0.9);
+          cam.addTrauma(0.05);
+          cam.kickCamera(dx, dz, 0.45);
           this.audio.dash();
-        } else if (line === 'i' || line === 'iw' || line === 'ig') {
-          fx.coldPool(e.x, e.z, e.r ?? 2.2, line === 'iw');
+        } else if (line === 'wg') {
+          // Wind+grav: funnel pull into a thin hard lane.
+          fx.funnelGust(e.x, e.z, dx, dz, e.r ?? 2.6, e.w ?? 0.9);
+          this.paintSquash(e.x, e.z, e.r ?? 2.6, 0.55);
+          cam.addTrauma(0.07);
+          cam.kickCamera(dx, dz, 0.7);
+          this.audio.dash();
+        } else if (line === 'iw') {
+          // Cool Breeze: persistent geometric ice array + people leave the zone.
+          fx.coldPool(e.x, e.z, e.r ?? 2.2, true);
+          fx.iceArray(e.x, e.z, e.r ?? 2.2, 2.6);
+          this.paintIceTint(e.x, e.z, e.r ?? 2.2);
+          cam.addTrauma(0.05);
+          this.audio.sense();
+        } else if (line === 'ig') {
+          // Ice+grav: freezing sink — frost + amber pillars on frozen targets.
+          fx.freezingSink(e.x, e.z, e.r ?? 2.2);
+          this.paintFreezeShells(e.x, e.z, e.r ?? 2.2);
+          this.paintSinkPillars(e.x, e.z, e.r ?? 2.2);
+          this.paintSquash(e.x, e.z, e.r ?? 2.2, 1.1);
+          this.paintIceTint(e.x, e.z, e.r ?? 2.2);
+          cam.addTrauma(0.04);
+          this.audio.sense();
+        } else if (line === 'i') {
+          // Pure ice: frost crystals on floor + icy body tint / freeze shell.
+          fx.coldPool(e.x, e.z, e.r ?? 2.2, false);
+          this.paintFreezeShells(e.x, e.z, e.r ?? 2.2);
+          this.paintIceTint(e.x, e.z, e.r ?? 2.2);
           if (e.hold) this.paintFreezeShells(e.x, e.z, e.r ?? 2.2);
           cam.addTrauma(0.03);
           this.audio.sense();
         } else if (line === 'g' || e.el === 'grav') {
+          // Gravity: her own weight — downward squash / sink / pull on her.
           fx.weightOn(e.x, e.z);
+          this.player.punch(2.2);
           cam.addTrauma(0.04);
           this.audio.sense();
         } else {
@@ -1198,7 +1307,14 @@ export class Game {
       }
       case 'status':
         break;
-      case 'gadget':
+      case 'gadget': {
+        const face = sim.player;
+        const fl = Math.hypot(face.faceX, face.faceZ) || 1;
+        fx.gadgetFx(e.id, e.x, e.z, face.faceX / fl, face.faceZ / fl);
+        cam.addTrauma(0.04);
+        haptic(10, 0);
+        break;
+      }
       case 'coins':
         break;
     }
