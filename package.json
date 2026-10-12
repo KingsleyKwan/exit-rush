@@ -1,6 +1,6 @@
 {
   "name": "exit-rush",
-  "version": "0.8.3",
+  "version": "0.8.4",
   "description": "\u903c\u843d\u8eca \u2014 Exit Rush on \u9999\u57ce\u9435\u8def / Hong City Rail: push through crowds to exit the train",
   "type": "module",
   "scripts": {

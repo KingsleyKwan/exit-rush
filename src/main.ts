@@ -36,6 +36,7 @@ function lockPageZoom(): void {
     { passive: false },
   );
   document.addEventListener('dblclick', block);
+  document.addEventListener('selectstart', (e) => e.preventDefault());
 }
 
 lockPageZoom();
