@@ -1088,6 +1088,10 @@ export class Game {
     this.persist();
     this.screen = 'win';
     this.hooks.onState();
+    // First clear of L20/30/40… may show a non-personalized interstitial (store builds only).
+    void import('../native/ads')
+      .then(({ maybeShowInterstitialAfterClear }) => maybeShowInterstitialAfterClear(id, first))
+      .catch(() => undefined);
   }
 
   private onLose(): void {

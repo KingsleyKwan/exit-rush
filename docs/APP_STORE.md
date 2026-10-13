@@ -246,18 +246,19 @@ When you add it (hybrid-casual, ads first, per the review):
 | Element | Rule |
 |---------|------|
 | **Rewarded video** (opt-in) | Revive once per run, or +3 s door time. Optional, per review: double SP on first clear (changes the SP economy, so check with `test:sim`/BALANCE first). |
-| **Interstitial** | At most one every **2–3 level ends**, with a 30–45 s cooldown. **Never** before the first win, never mid-run, never right after a rewarded ad, and never on a fail unless a rewarded alternative (revive) was offered. |
+| **Interstitial** | Only after a **first-time clear** of levels **20, 30, 40, 50, …** (`level % 10 === 0 && level >= 20`). **Never** on fail, mid-run, before L20, or on replays. **Off** if `noAds` or any paid character (mage/tech) is owned. Web never shows. Fail quietly if AdMob has no fill. |
 | **Remove Ads** IAP | **Non-consumable**, ~US$2.99–4.99 (pick an ASC price tier). Removes interstitials. Rewarded stays optional. Needs a **Restore Purchases** button (guideline 3.1.1). Show prices from StoreKit, never hard-coded. |
 | Later | Cheap hero skin pack. Battle pass only after D7 retention and weekly content. |
 
 **Tech:**
 
-- Ads: `@capacitor-community/admob` **8.2.0**. It bundles the Google Mobile Ads SDK plus UMP consent and ATT helpers (<https://github.com/capacitor-community/admob>).
-  Info.plist: `GADApplicationIdentifier` (👤 from AdMob), `SKAdNetworkItems` (Google's list from <https://developers.google.com/admob/ios/quick-start>),
-  and `NSUserTrackingUsageDescription` (only if you request ATT).
-- **ATT:** request tracking permission only if you want personalised ads, and only after the first win, not at launch
-  (<https://developer.apple.com/documentation/apptrackingtransparency>). Simpler: non-personalised ads only, no ATT prompt (lower eCPM).
-  Either way, run the **UMP** consent flow for EEA/UK users.
+- Ads: `@capacitor-community/admob` **8.2.x** (wired in `src/native/ads.ts`). Bundles Google Mobile Ads SDK + UMP.
+  Info.plist: `GADApplicationIdentifier` + `SKAdNetworkItems` (Google's list). **v1 uses non-personalised ads (`npa: true`) and does not prompt ATT.**
+  UMP consent form still runs when required (EEA/UK). No `NSUserTrackingUsageDescription` unless ATT is added later.
+- **Test IDs (default until 👤 creates a real AdMob app):**
+  - App ID (Info.plist): `ca-app-pub-3940256099942544~1458002511`
+  - Interstitial unit: `ca-app-pub-3940256099942544/4411468910` (override with `VITE_ADMOB_INTERSTITIAL_ID` in `.env.local`)
+  - **TODO (owner):** create AdMob iOS app + interstitial unit → put real App ID in `Info.plist` `GADApplicationIdentifier` and real unit id in `.env.local` / CI secrets. Never commit production IDs that you want private; demo IDs in git are fine.
 - Set the AdMob max ad content rating to match the app's age rating (e.g. G/PG). Guideline 2.5.18: ads must suit the rating, have a visible
   close button, and let users report ads.
 - **Test ad IDs (iOS, Google demo units):** interstitial `ca-app-pub-3940256099942544/4411468910`, rewarded
@@ -413,7 +414,7 @@ Description (繁中 draft):
 ### Phase 4 (optional, 1.1): monetisation
 - [ ] 👤 AdMob account, iOS app + ad units, payments profile · Paid Apps Agreement, tax, banking in ASC
 - [ ] 👤 Create the Remove Ads non-consumable in ASC and a Sandbox tester
-- [ ] 🤖 AdMob plugin + UMP + (optional) ATT + SKAdNetwork list + test IDs; interstitial/rewarded rules (§E)
+- [x] 🤖 AdMob plugin + UMP (no ATT) + SKAdNetwork list + Google test IDs; interstitial on first clear L20/30/40… (`src/native/ads.ts`). Rewarded still TODO. **👤** replace test App/unit IDs with real AdMob before App Review.
 - [x] 🤖 IAP code: RevenueCat adapter, Restore Purchases (character select + title settings), StoreKit config `ios/App/ExitRush.storekit` (`familyShareable: false` — do not turn Family Sharing on without Kingsley's OK). Sandbox buy/restore/revoke is still 👤 (needs `VITE_REVENUECAT_IOS_KEY` and a Sandbox Apple ID). Product ids: `exitrush.char.mage`, `exitrush.char.tech`, `exitrush.pack.chars`, `exitrush.noads`.
 - [ ] 🤖 Update the privacy policy + 👤 update the App Privacy labels
 

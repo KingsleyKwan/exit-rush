@@ -1,7 +1,7 @@
 {
   "name": "exit-rush",
   "version": "0.8.4",
-  "description": "\u903c\u843d\u8eca \u2014 Exit Rush on \u9999\u57ce\u9435\u8def / Hong City Rail: push through crowds to exit the train",
+  "description": "逼落車 — Exit Rush on 香城鐵路 / Hong City Rail: push through crowds to exit the train",
   "type": "module",
   "scripts": {
     "dev": "vite",
@@ -15,6 +15,7 @@
     "assets:ios": "capacitor-assets generate --ios"
   },
   "dependencies": {
+    "@capacitor-community/admob": "^8.2.1",
     "@capacitor-community/keep-awake": "^8.0.1",
     "@capacitor/app": "^8.1.2",
     "@capacitor/core": "^8.5.2",

@@ -542,7 +542,7 @@ Quality tiers (`quality.ts`): Low uses fewer particles and no arc glow or bloom-
 | Characters | All unlocked | Hero free; Mage/Tech need IAP (or the pack) |
 | IAP code / plugin | Not bundled | Bundled (dynamic import) |
 | Buy / Restore / Try UI | Hidden | Shown |
-| Ads (AdMob) | None | Per §8.2 (off if any character or `noads` is owned) |
+| Ads (AdMob) | Interstitials on first clear L20/30/40… | Per §8.2 (off if any character or `noads` is owned); Google test IDs until real AdMob |
 | Save | Same format; entitlement cache ignored | Entitlement cache + StoreKit truth |
 
 ```ts
@@ -618,7 +618,7 @@ export const entitlements = IS_STORE_BUILD ? await loadStoreEntitlements() : web
 |---|---|
 | Rewarded: revive once / +3 s door time | Same for all characters. Not usable in trial runs |
 | Rewarded: "double SP on first clear" (optional idea in §E) | **Drop it.** It breaks SP parity, and a Tech equivalent would break the bounded-coin rule. Never offer coins/SP for ads |
-| Interstitial | Rules unchanged (≤ 1 per 2–3 level ends, never before the first win, never right after a rewarded ad). **Off** if the player owns any character or `noads`. Never on the character-select or shop screens |
+| Interstitial | **First clear only** of L20 / L30 / L40 / L50… (`level % 10 === 0 && level >= 20`). Never on fail, mid-run, replays, or before L20. **Off** if the player owns any character or `noads`. Never on character-select or shop. Web never shows (`src/native/ads.ts`) |
 | Upsell | Character offer shown at most once per session, after a win (never after a loss), plus naturally at L6 / L20 trial unlocks |
 
 Release order (per APP_STORE.md): v1.0 ships free with no IAP. **Characters land in 1.1 together with ads/Remove Ads**, so the Paid Apps Agreement, privacy label update and IAP review happen once.

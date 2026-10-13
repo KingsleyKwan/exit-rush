@@ -44,6 +44,8 @@ export async function startNativeShell(game: NativeGame): Promise<void> {
     const style = pattern <= 15 ? ImpactStyle.Light : pattern <= 40 ? ImpactStyle.Medium : ImpactStyle.Heavy;
     void Haptics.impact({ style }).catch(() => undefined);
   });
+  // AdMob: non-personalized interstitials (see src/native/ads.ts). Fail quietly.
+  void import('./ads').then(({ initAds }) => initAds()).catch(() => undefined);
 }
 
 let awake = false;
