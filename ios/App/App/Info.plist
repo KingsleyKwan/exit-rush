@@ -67,9 +67,9 @@
 	</array>
 	<key>UIViewControllerBasedStatusBarAppearance</key>
 	<true/>
-	<!-- AdMob: Google sample App ID for TestFlight. TODO(owner): replace with real AdMob iOS App ID before App Review. -->
+	<!-- AdMob: production iOS App ID (逼落車 / Exit Rush). -->
 	<key>GADApplicationIdentifier</key>
-	<string>ca-app-pub-3940256099942544~1458002511</string>
+	<string>ca-app-pub-9510894860447277~4167868267</string>
 	<!-- SKAdNetworkItems from Google Mobile Ads iOS quick-start (https://developers.google.com/admob/ios/quick-start) -->
 	<key>SKAdNetworkItems</key>
 	<array>
