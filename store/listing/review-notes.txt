@@ -1,0 +1,11 @@
+Exit Rush (逼落車) is a single-player, offline arcade game (three.js inside a Capacitor iOS shell).
+
+No account or login. Progress is stored on device only.
+
+How to play: first launch can start Level 1. Drag anywhere to move; hold the fist button to charge a shove; reach an open door (green markers) before the timer ends.
+
+Characters: Office Worker (free). Paid unlocks: 凱婷 (Katie) and 裝備L (Gear L) via non-consumable IAP. Settings include Restore Purchases.
+
+Ads: AdMob interstitial after select first clears (e.g. after clearing levels 20/30/40… for the first time). Non-personalized requests. Optional non-consumable Remove Ads IAP disables them.
+
+Fiction: Hong City Rail / 香城鐵路 is a parody operator. Not affiliated with any real railway. Audio follows the Ring/Silent switch. Native: haptics, portrait lock, keep-awake during play.
