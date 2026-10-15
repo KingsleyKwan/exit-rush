@@ -151,7 +151,7 @@ export function renderPlayHud(game: Game): HTMLElement {
         ${game.teachTip ? `<div class="tip-chip tip-under-meters teach-chip" id="teach-chip">${icon(teachIcon(game.teachTip), 'xs')}<span>${dict.tipChip}: ${teachCopy(game.teachTip, dict)}</span></div>` : ''}
       </div>
       <div class="drag-hint ${game.showFtueGhost ? 'ftue-ghost' : ''}" aria-hidden="true">
-        ${game.showFtueGhost ? `<span class="ghost-hand"></span><span class="ghost-exit">${icon('door')}</span><span class="ghost-label">${dict.hintDragGreen}</span>` : icon('drag')}
+        ${game.showFtueGhost ? `<span class="ghost-hand"></span><span class="ghost-exit">${icon('door')}</span><span class="ghost-label" id="ghost-label">${dict.hintDragGreen}</span>` : icon('drag')}
       </div>
       <div class="hud-actions">
         <div class="ult-col ${who === 'mage' ? 'mage-cast' : ''}">

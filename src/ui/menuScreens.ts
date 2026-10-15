@@ -106,7 +106,7 @@ export function renderMenu(game: Game): HTMLElement {
         <p class="tagline">${dict.tagline}</p>
         <div class="howto-icons" aria-label="${game.save.character === 'mage' ? dict.howToMage : game.save.character === 'tech' ? dict.howToTech : dict.howTo}">
           <span>${icon('drag')}<small>${dict.hintDrag}</small></span>
-          <span>${game.save.character === 'mage' ? `${icon('wind')}<small>${dict.hintCast}</small>` : game.save.character === 'tech' ? `${icon(itemIcon('G1'))}<small>${dict.hintGear}</small>` : `${icon('shove')}<small>${dict.hintShove}</small>`}</span>
+          <span>${game.save.character === 'mage' ? `${icon('wind')}<small>${dict.tipMageBreeze}</small>` : game.save.character === 'tech' ? `${icon(itemIcon('G1'))}<small>${dict.tipTechGloves}</small>` : `${icon('shove')}<small>${dict.tipShoveHold}</small>`}</span>
           <span>${icon('door')}<small>${dict.hintExit}</small></span>
         </div>
         ${titleCharPick(game)}
@@ -159,7 +159,7 @@ export function renderLevels(game: Game): HTMLElement {
       ${screenBar(dict.levelsTitle, 'levels', levelsWhoChip(game) + pointsChip(game))}
       <div class="sub-body lv-body">
         <div class="lv-sticky">
-          ${loadoutStrip(game, { edit: true, cls: 'pre-level' })}
+          ${game.save.character === 'tech' ? '' : loadoutStrip(game, { edit: true, cls: 'pre-level' })}
           <nav class="lv-jump" aria-label="${dict.levelsTitle}">${[1, 11, 21, 31, 41, 51, 61, 71, 81, 91, 100].map((n) => `<button type="button" data-jump="${n}">${n}</button>`).join('')}</nav>
         </div>
         <div class="level-grid" id="level-list"></div><div class="level-teaser">${dict.levelsTeaser}</div></div>

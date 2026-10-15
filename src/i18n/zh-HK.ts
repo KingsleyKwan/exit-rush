@@ -138,9 +138,10 @@ export const zhHK: Dict = {
   off: '閂',
   hintDrag: '拖動',
   hintDragGreen: '拖去呢度綠色門',
-  hintShove: '按住推',
-  hintCast: '微風',
-  hintGear: '用手套',
+  // Menu howto chips reuse the same sentences as in-run teach tips (R4).
+  hintShove: '按住推人，體力會扣',
+  hintCast: '撳微風，吹向綠色門',
+  hintGear: '用手套按住推',
   hintExit: '落車',
   tipShoveHold: '按住推人，體力會扣',
   tipMageBreeze: '撳微風，吹向綠色門',

@@ -478,9 +478,10 @@ export const en: Dict = {
   off: 'Off',
   hintDrag: 'Drag',
   hintDragGreen: 'Drag to THIS green door',
-  hintShove: 'Hold',
-  hintCast: 'Breeze',
-  hintGear: 'Gloves',
+  // Menu howto chips reuse the same sentences as in-run teach tips (R4).
+  hintShove: 'Hold shove — stamina drains',
+  hintCast: 'Tap Breeze toward the green door',
+  hintGear: 'Hold shove with your gloves',
   hintExit: 'Get off',
   tipShoveHold: 'Hold shove — stamina drains',
   tipMageBreeze: 'Tap Breeze toward the green door',
