@@ -1,6 +1,7 @@
 import { t, getLang } from '../i18n';
 import type { Game } from '../game/Game';
-import { playableLevels, type LevelDef } from '../game/levels';
+import { isLevelUnlocked, playableLevels, type LevelDef } from '../game/levels';
+import { progressOf } from '../game/storage';
 import type { QualitySetting } from '../game/storage';
 import type { PassengerKind } from '../game/PassengerTypes';
 import { bookMarks } from '../game/SpellTree';
@@ -73,9 +74,14 @@ export const stationName = (lv: Pick<LevelDef, 'stationEn' | 'stationZh'>): stri
 export const stationAlt = (lv: Pick<LevelDef, 'stationEn' | 'stationZh'>): string =>
   getLang() === 'en' ? lv.stationZh : lv.stationEn;
 
+/** First unlocked station that is still uncleared. Never skips ahead of that frontier. */
 export function nextLevel(game: Game): LevelDef {
   const list = playableLevels();
-  return list.find((l) => !game.save.cleared.includes(l.id)) ?? list[list.length - 1];
+  const cleared = new Set(progressOf(game.save).cleared);
+  const nxt = list.find((l) => isLevelUnlocked(game.save, l.id) && !cleared.has(l.id));
+  if (nxt) return nxt;
+  const unlocked = list.filter((l) => isLevelUnlocked(game.save, l.id));
+  return unlocked[unlocked.length - 1] ?? list[0];
 }
 
 /**

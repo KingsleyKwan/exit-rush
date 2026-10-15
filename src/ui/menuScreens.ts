@@ -1,7 +1,7 @@
 import { BOSSES } from '../game/bosses';
 import { t, getLang, fmt } from '../i18n';
 import type { Game } from '../game/Game';
-import { playableLevels, isFinaleUnlocked } from '../game/levels';
+import { playableLevels, isLevelUnlocked } from '../game/levels';
 import { LINE_COLORS, linesFor, lineColor } from '../game/lines';
 import { themeFor } from '../game/stationThemes';
 import type { PassengerKind } from '../game/PassengerTypes';
@@ -12,7 +12,8 @@ import {
 } from './uiShared';
 import { CHARACTER_ORDER, CHARACTERS, type CharacterId } from '../game/charactersDef';
 import { charPortraitUrl } from '../game/charPortraits';
-import { coinBalance } from '../game/techKit';
+import { coinBalance, gearStarterFace } from '../game/techKit';
+import { progressOf } from '../game/storage';
 import { entitlements } from '../game/entitlements';
 import { IS_STORE_BUILD } from '../game/platform';
 
@@ -73,18 +74,20 @@ export function renderMenu(game: Game): HTMLElement {
   const gear = game.save.character === 'tech';
   const progLabel = gear ? dict.gear : game.save.character === 'mage' ? dict.spells : dict.skills;
   const progEm = gear
-    ? String(coinBalance(game.save))
+    ? (gearStarterFace(game.save)
+      ? `<span class="starter-chip">${dict.gearStarter}</span>`
+      : `${dict.coins} ${Math.max(0, coinBalance(game.save))}`)
     : String(game.save.character === 'mage' ? (game.save.mage.loadouts[game.save.mage.active]?.points ?? 0) : game.save.skills.points);
   const levels = playableLevels();
   const nxt = nextLevel(game);
-  const clearedCount = levels.filter((l) => game.save.cleared.includes(l.id)).length;
+  const clearedCount = levels.filter((l) => progressOf(game.save).cleared.includes(l.id)).length;
   const panel = el(`
     <div class="title-screen" data-ui="1">
       <div class="top-bar">
         ${langBtn()}
         <div class="bar-right">
           ${iconBtn('legend', 'legend', dict.legendTitle)}
-          ${iconBtn('skills', 'skills', progLabel)}
+          ${iconBtn('skills', gear ? 'shop' : 'skills', progLabel)}
         </div>
       </div>
       <div class="title-main">
@@ -155,20 +158,22 @@ export function renderLevels(game: Game): HTMLElement {
   `);
   wireLoadoutStrip(page, game);
   const list = page.querySelector('#level-list')!;
+  const clearedIds = progressOf(game.save).cleared;
   for (const lv of levels) {
     // v0.7: act header every 10 levels (1–10, 11–20, … 91–99, 100).
     if (lv.id % 10 === 1 || lv.id === 100) {
       const to = lv.id === 100 ? 100 : Math.min(lv.id + 9, 99);
-      const doneN = levels.filter((l) => l.id >= lv.id && l.id <= to && game.save.cleared.includes(l.id)).length;
+      const doneN = levels.filter((l) => l.id >= lv.id && l.id <= to && clearedIds.includes(l.id)).length;
       list.appendChild(el(`<h3 class="lv-act" id="lv-act-${lv.id}"><span>${lv.id === 100 ? dict.finale : `${lv.id}–${to}`}</span><small>${doneN}/${to - lv.id + 1}</small></h3>`));
     }
-    const done = game.save.cleared.includes(lv.id);
+    const done = clearedIds.includes(lv.id);
     const finale = lv.id === 100;
-    const locked = finale && !isFinaleUnlocked(game.save.cleared, game.save.highestCleared);
+    const locked = !isLevelUnlocked(game.save, lv.id);
+    const lockCopy = finale ? dict.finaleLocked : dict.levelLocked;
     const lines = linesFor(lv.stationEn);
     const flav = getLang() === 'en' ? lv.flavourEn : lv.flavourZh;
     const btn = el(`
-      <button type="button" class="lv-card ${done ? 'done' : ''} ${finale ? 'finale' : ''} ${lv.boss?.length && !finale ? 'boss' : ''} ${lv.exam ? 'exam' : ''} ${locked ? 'locked' : ''}" data-id="${lv.id}" ${locked ? 'disabled' : ''} style="--line:${LINE_COLORS[lines[0]]};--station:${themeFor(lv.stationEn).wall}${finale ? `;background-image:linear-gradient(90deg,rgba(14,18,28,.92),rgba(14,18,28,.35)),url('${asset('art/key-art.webp')}')` : ''}" title="${locked ? dict.finaleLocked : flav}" aria-label="${dict.level} ${lv.id} ${stationName(lv)}${done ? ` · ${dict.cleared}` : ''}${locked ? ` · ${dict.locked}` : ''}">
+      <button type="button" class="lv-card ${done ? 'done' : ''} ${finale ? 'finale' : ''} ${lv.boss?.length && !finale ? 'boss' : ''} ${lv.exam ? 'exam' : ''} ${locked ? 'locked' : ''}" data-id="${lv.id}" ${locked ? 'disabled' : ''} style="--line:${LINE_COLORS[lines[0]]};--station:${themeFor(lv.stationEn).wall}${finale ? `;background-image:linear-gradient(90deg,rgba(14,18,28,.92),rgba(14,18,28,.35)),url('${asset('art/key-art.webp')}')` : ''}" title="${locked ? lockCopy : flav}" aria-label="${dict.level} ${lv.id} ${stationName(lv)}${done ? ` · ${dict.cleared}` : ''}${locked ? ` · ${lockCopy}` : ''}">
         <span class="lv-swatch" aria-hidden="true"></span>
         <span class="lv-badge">${lv.id}<span class="lv-lines">${lines.map((l) => `<i style="background:${LINE_COLORS[l]}"></i>`).join('')}</span></span>
         <span class="lv-station"><b class="${titleCls(stationName(lv))}">${stationName(lv)}</b><small class="${fitCls(stationAlt(lv))}">${stationAlt(lv)}</small></span>
@@ -196,7 +201,7 @@ export function renderLevels(game: Game): HTMLElement {
     }),
   );
   // Open near the next uncleared level so 100 cards don't bury progress.
-  if (game.save.cleared.length) {
+  if (clearedIds.length) {
     const nxt = nextLevel(game);
     requestAnimationFrame(() => scrollToEl(page.querySelector(`.lv-card[data-id="${nxt.id}"]`), false));
   }

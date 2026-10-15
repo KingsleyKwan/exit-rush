@@ -23,11 +23,15 @@ const SPELL_HUD: Record<string, { el: string; ico: string }> = {
 };
 
 function mageActions(game: Game, _dict: ReturnType<typeof t>): string {
+  const teach = game.teachTip === 'cast';
+  const en = getLang() === 'en';
   return (game.runMods.spellBar ?? []).map((id) => {
     const n = spellById(id);
     const title = n ? `${n.nameZh} / ${n.nameEn}` : id;
     const hud = SPELL_HUD[n?.line ?? ''] ?? SPELL_HUD.w;
-    return `<button type="button" class="skill-use act-spell el-${hud.el}" data-spell="${id}" title="${title}" aria-label="${title}">${icon(hud.ico)}</button>`;
+    const breeze = teach && id === 'w1';
+    const label = breeze ? (en ? (n?.nameEn ?? 'Breeze') : (n?.nameZh ?? '微風')) : '';
+    return `<button type="button" class="skill-use act-spell el-${hud.el}${breeze ? ' teach' : ''}" data-spell="${id}" title="${title}" aria-label="${breeze ? label : title}">${icon(hud.ico)}${label ? `<small class="spell-teach">${label}</small>` : ''}</button>`;
   }).join('');
 }
 
@@ -114,14 +118,17 @@ export function renderPlayHud(game: Game): HTMLElement {
           <div class="meters">
             <div class="meter door-meter">
               <span class="meter-icon" title="${dict.door}">${icon('door')}</span>
+              <small class="meter-label">${dict.hudDoor}</small>
               <div class="meter-bar"><i id="m-door"></i><b class="tick" style="left:25%"></b><b class="tick" style="left:50%"></b><b class="tick" style="left:75%"></b></div>
             </div>
             <div class="meter stam-meter">
               <span class="meter-icon" title="${dict.stamina}">${icon('stamina')}</span>
+              <small class="meter-label">${dict.hudStamina}</small>
               <div class="meter-bar stamina"><i id="m-stam"></i></div>
             </div>
             ${who === 'mage' ? `<div class="meter mana-meter">
               <span class="meter-icon" title="${dict.mana}">${icon('mana')}</span>
+              <small class="meter-label">${dict.hudMana}</small>
               <div class="meter-bar mana"><i id="m-mana"></i></div>
             </div>` : ''}
             ${who === 'tech' && game.level && !game.trial ? (() => {
@@ -130,7 +137,7 @@ export function renderPlayHud(game: Game): HTMLElement {
                 prev.first ? `+${prev.first}` : '',
                 prev.fast ? dict.fastExit : '',
               ].filter(Boolean).join(' · ');
-              return `<div class="coin-chip" id="m-coins">${icon('star', 'xs')}<b>${bits || dict.coins}</b><small>${fmt(dict.replayCoins, { n: prev.replaysLeft })}</small></div>`;
+              return `<div class="coin-chip" id="m-coins">${icon('star', 'xs')}<b><span class="meter-label">${dict.hudCoins}</span>${bits ? ` ${bits}` : ''}</b><small>${fmt(dict.replayCoins, { n: prev.replaysLeft })}</small></div>`;
             })() : ''}
             <div class="meter timer" id="m-timer">
               <span class="meter-icon" title="${dict.time}">${icon('timer')}</span>
@@ -261,7 +268,7 @@ export function updatePlayHud(root: HTMLElement, game: Game): void {
     b.classList.toggle('cooling', cd > 0);
     // Typical mage CD 2–6 s; map remaining onto a full pie.
     b.style.setProperty('--cd', String(Math.min(1, cd / 6)));
-    b.classList.toggle('teach', game.teachTip === 'cast' && game.teachTipT > 0);
+    b.classList.toggle('teach', game.teachTip === 'cast' && game.teachTipT > 0 && b.dataset.spell === 'w1');
   });
   // 大聲公 noise zone: pulse the stamina bar + show the loudmouth chip.
   const noisy = game.noiseDrain() > 0;
@@ -299,6 +306,21 @@ export function updatePlayHud(root: HTMLElement, game: Game): void {
 const roundBtn = (attrs: string, name: string, label: string, cls = ''): string =>
   `<button type="button" class="round-btn ${cls}" ${attrs} aria-label="${label}">${icon(name)}<small>${label}</small></button>`;
 
+/** Skills for the hero, the spell book for Katie, the workshop for Gear L. Never locked. */
+function progressBtn(game: Game, dict: ReturnType<typeof t>): string {
+  const who = game.save.character;
+  if (who === 'tech') return roundBtn('data-act="skills"', 'shop', dict.gear);
+  if (who === 'mage') return roundBtn('data-act="skills"', 'skills', dict.spells);
+  return roundBtn('data-act="skills"', 'skills', dict.skills);
+}
+
+function loseCopy(game: Game, dict: ReturnType<typeof t>): string {
+  const who = game.save.character;
+  if (who === 'mage') return dict.loseHintMage;
+  if (who === 'tech') return dict.loseHintTech;
+  return dict.loseHintHero;
+}
+
 export function renderPause(game: Game): HTMLElement {
   const dict = t();
   const p = el(`
@@ -310,7 +332,7 @@ export function renderPause(game: Game): HTMLElement {
         <button type="button" class="primary" id="btn-resume">${icon('play', 'sm')}<span>${dict.resume}</span></button>
         <div class="round-row">
           ${roundBtn('id="btn-restart"', 'restart', dict.retry)}
-          ${roundBtn('data-act="skills"', 'skills', dict.skills)}
+          ${progressBtn(game, dict)}
           <button type="button" class="round-btn" data-act="lang" aria-label="${dict.language}">${langIcon(getLang() === 'en' ? '粵' : 'EN')}<small>${dict.language}</small></button>
           ${roundBtn('data-act="mute"', game.save.muted ? 'mute' : 'volume', game.save.muted ? dict.unmute : dict.mute)}
           ${roundBtn('data-act="home"', 'home', dict.menu)}
@@ -339,7 +361,7 @@ export function renderEnd(game: Game, win: boolean): HTMLElement {
         }
         <h2>${win ? dict.win : dict.lose}</h2>
         ${lv ? `<p class="end-station"><span class="lv-badge sm" style="--line:${lineColor(lv.stationEn)}">${lv.id}</span>${stationName(lv)}</p>` : ''}
-        ${win ? endBonus(game) : `<p class="howto">${dict.loseHint}</p>`}
+        ${win ? endBonus(game) : `<p class="howto">${loseCopy(game, dict)}</p>`}
         ${game.save.character === 'tech' ? '' : loadoutStrip(game, { cls: 'on-end' })}
         ${
           hasNext
@@ -348,7 +370,7 @@ export function renderEnd(game: Game, win: boolean): HTMLElement {
         }
         <div class="round-row">
           ${hasNext ? roundBtn('id="btn-retry"', 'restart', dict.retry) : ''}
-          ${roundBtn('data-act="skills"', game.save.character === 'tech' ? 'shop' : 'skills', game.save.character === 'tech' ? dict.gear : dict.skills)}
+          ${progressBtn(game, dict)}
           ${roundBtn('data-act="home"', 'home', dict.menu)}
         </div>
       </div>

@@ -11,6 +11,7 @@ import {
   cellsFor,
   buyBlock,
   coinBalance,
+  gearStarterFace,
   gridOf,
   gridMaxTier,
   GRID_TIERS,
@@ -49,10 +50,11 @@ function tierName(tier: number, dict: ReturnType<typeof t>): string {
   return dict.tierCheap;
 }
 
-function buyLock(block: BuyBlock | null, dict: ReturnType<typeof t>): string {
-  if (!block || block.reason === 'max') return '';
-  if (block.reason === 'level') return dict.needLevel.replace('{n}', String(block.need));
-  return dict.needCoins;
+function buyLock(block: BuyBlock | null, dict: ReturnType<typeof t>, starter = false): { text: string; soft: boolean } {
+  if (!block || block.reason === 'max') return { text: '', soft: false };
+  if (block.reason === 'level') return { text: dict.needLevel.replace('{n}', String(block.need)), soft: false };
+  if (starter) return { text: dict.earnCoins, soft: true };
+  return { text: dict.needCoins, soft: false };
 }
 
 function slotName(slot: string | undefined, dict: ReturnType<typeof t>): string {
@@ -200,6 +202,8 @@ export function renderWorkshop(game: Game, _rerender: (game: Game) => void): HTM
   const en = getLang() === 'en';
   const tech = game.save.tech;
   const coins = coinBalance(game.save);
+  const starterFace = gearStarterFace(game.save);
+  const shownCoins = Math.max(0, coins);
   const grid = gridOf(tech.gridTier);
   const set = tech.sets[tech.activeSet] ?? tech.sets[0];
   const placements = set?.placements ?? [];
@@ -342,12 +346,13 @@ export function renderWorkshop(game: Game, _rerender: (game: Game) => void): HTM
   const nextGrid = tech.gridTier + 1 < GRID_TIERS.length ? GRID_TIERS[tech.gridTier + 1] : null;
   const growLocked = nextGrid != null && coins < nextGrid.price;
   const growLabel = nextGrid ? `${dict.expandBag} · ${nextGrid.price}` : '';
+  const growWhy = starterFace ? dict.earnCoins : dict.needCoins;
   const growBtn = nextGrid
     ? actBtn(growLabel, 'grow', `data-act="bag-grow"${growLocked ? ' aria-disabled="true"' : ''}`, {
         primary: true,
         extra: String(nextGrid.price),
-        cls: growLocked ? 'is-locked' : '',
-        title: growLocked ? dict.needCoins : growLabel,
+        cls: growLocked ? (starterFace ? 'is-earn' : 'is-locked') : '',
+        title: growLocked ? growWhy : growLabel,
       })
     : '';
   const shopRows = (slotOn ? ITEMS.filter((it) => it.slot === slotOn) : []).map((it) => {
@@ -361,13 +366,14 @@ export function renderWorkshop(game: Game, _rerender: (game: Game) => void): HTM
     const buyLabel = buying ? dict.buyItem : dict.upgradeItem;
     const buyTier = (next >= 0 ? Math.min(next + 1, it.shape.length, 3) : Math.min(owned, it.shape.length, 3)) as Tier | 0;
     const sizes = isItemId(it.id) ? tierSizesHtml(it.id, dict, 0, buyTier, 'look') : '';
-    const lockLine = buyLock(buyBlock(game.save, it.id), dict);
+    const lock = buyLock(buyBlock(game.save, it.id), dict, starterFace);
+    const lockLine = lock.text;
     const have = it.slot === 'consumable' && stock > 0 ? ` ×${stock}` : '';
     return `<article class="shop-row">
       <div class="shop-id">${gearIcon(it.id, it.slot)}<span class="shop-copy"><b>${name}</b>${have ? `<small>${have}</small>` : ''}<span class="tray-blurb">${blurb}</span></span></div>
       <div class="size-row">${sizes}</div>
       <div class="shop-buy">
-        ${next >= 0 ? actBtn(`${buyLabel} ${price}`, buying ? 'shop' : 'up', `data-buy="${it.id}"${lockLine ? ' aria-disabled="true"' : ''}`, { primary: true, extra: String(price), title: lockLine || `${buyLabel} ${price}`, cls: lockLine ? 'is-locked' : '' }) : ''}
+        ${next >= 0 ? actBtn(`${buyLabel} ${price}`, buying ? 'shop' : 'up', `data-buy="${it.id}"${lockLine ? ' aria-disabled="true"' : ''}`, { primary: true, extra: String(price), title: lockLine || `${buyLabel} ${price}`, cls: lockLine ? (lock.soft ? 'is-earn' : 'is-locked') : '' }) : ''}
         ${owned > 0 && it.slot !== 'consumable' ? actBtn(dict.sellItem, 'coin', `data-sell="${it.id}"`) : ''}
         ${isItemId(it.id) ? moreBtn(it.id, dict) : ''}
       </div>
@@ -415,13 +421,15 @@ export function renderWorkshop(game: Game, _rerender: (game: Game) => void): HTM
          <div class="bag-actions">${growBtn}</div>`
       : `<div class="set-fit"><div class="set-row">${sets}</div></div>`;
 
-  const barRight = `<span class="bar-stat" title="${dict.coins}">${coins}</span><span class="bar-stat" title="${dict.cells}">${used}/${cap}</span><button type="button" class="icon-btn help-btn${helpOn ? ' on' : ''}" data-act="help" aria-label="${dict.tips}" aria-expanded="${helpOn}">?</button>`;
+  const coinBit = starterFace ? dict.gearStarter : `${dict.coins} ${shownCoins}`;
+  const barRight = `<span class="bar-stat" title="${dict.coins}">${coinBit}</span><span class="bar-stat" title="${dict.cells}">${used}/${cap}</span><button type="button" class="icon-btn help-btn${helpOn ? ' on' : ''}" data-act="help" aria-label="${dict.tips}" aria-expanded="${helpOn}">?</button>`;
 
   const page = el(`
     <div class="sub-screen workshop" data-ui="1">
-      ${screenBar(dict.workshop, 'skills', barRight)}
+      ${screenBar(dict.workshop, 'shop', barRight)}
       <div class="sub-body workshop-body">
         ${help}
+        ${starterFace ? `<p class="starter-ready">${dict.glovesReady}</p>` : ''}
         <div class="workshop-tabs">
           <button type="button" class="${tab === 'equip' ? 'on' : ''}" data-tab="equip">${dict.tabEquip}</button>
           <button type="button" class="${tab === 'shop' ? 'on' : ''}" data-tab="shop">${dict.tabShop}</button>
@@ -592,18 +600,18 @@ export function renderWorkshop(game: Game, _rerender: (game: Game) => void): HTM
   page.querySelectorAll('[data-act="bag-pack"]').forEach((b) => b.addEventListener('click', () => game.techAutoPack()));
   page.querySelectorAll('[data-act="bag-rec"]').forEach((b) => b.addEventListener('click', () => game.techRecommend(nextUncleared(game))));
   page.querySelectorAll('[data-act="bag-grow"]').forEach((b) => b.addEventListener('click', () => {
-    if (!game.techExpand()) game.toast(dict.needCoins);
+    if (!game.techExpand()) game.toast(gearStarterFace(game.save) ? dict.earnCoins : dict.needCoins);
   }));
   page.querySelectorAll<HTMLElement>('[data-buy]').forEach((b) => {
     b.addEventListener('click', () => {
       const id = b.dataset.buy ?? '';
       if (!isItemId(id)) return;
-      const why = buyLock(buyBlock(game.save, id), dict);
+      const why = buyLock(buyBlock(game.save, id), dict, gearStarterFace(game.save)).text;
       if (why) {
         game.toast(why);
         return;
       }
-      if (!game.techBuy(id)) game.toast(dict.needCoins);
+      if (!game.techBuy(id)) game.toast(gearStarterFace(game.save) ? dict.earnCoins : dict.needCoins);
     });
   });
   page.querySelectorAll<HTMLElement>('[data-sell]').forEach((b) => {
