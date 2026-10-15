@@ -118,6 +118,19 @@ export const SP_PER_CLEAR = 1;
 /** First clears per skill point. 100 levels → 20 points. */
 export const LEVELS_PER_SKILL_POINT = 5;
 export const LOADOUT_SLOTS = 3;
+
+/**
+ * Progress toward the next skill point from first-clear count.
+ * `into === 0` means the last block just filled (or zero clears) → next point in `step` clears.
+ * Returns null once the ladder is full (100 first clears → 20 points).
+ */
+export function skillPointDrip(clearedCount: number): { into: number; step: number; remaining: number } | null {
+  const n = Math.max(0, Math.floor(clearedCount));
+  if (n >= 100) return null;
+  const step = LEVELS_PER_SKILL_POINT;
+  const into = n % step;
+  return { into, step, remaining: into === 0 ? step : step - into };
+}
 /**
  * Skills bought.
  * Hero: each 10 power in a branch is one skill. An ultimate is one skill.

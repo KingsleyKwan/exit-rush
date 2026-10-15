@@ -35,10 +35,11 @@ import { CHARACTERS, modsFor, type CharacterId, type PlayerMods } from '../src/g
 import { kitForBot, resolveKit, techKitSelfTest, grantTechStarterIfNeeded, emptyTech } from '../src/game/techKit';
 import { grantsForProductIds } from '../src/game/entitlements';
 import { canLearn, defaultSpellBar, learnSpell, rank4Blocked } from '../src/game/SpellTree';
-import { defaultSkills, earnedFrom, migrateLegacyKeys, normalizeSave, progressOf, recordClear, SAVE_KEY, spentOf, type KeyValueStore, type SaveData, type SkillState } from '../src/game/storage';
+import { defaultSkills, earnedFrom, migrateLegacyKeys, normalizeSave, progressOf, recordClear, SAVE_KEY, spentOf, skillPointDrip, LEVELS_PER_SKILL_POINT, type KeyValueStore, type SaveData, type SkillState } from '../src/game/storage';
 import { earnedPoints, resetActiveLoadout, spendPoint, spentPoints, switchLoadout } from '../src/game/SkillTree';
 import type { PlayerInput } from '../src/game/sim/PlayerSim';
 import type { PassengerKind } from '../src/game/PassengerTypes';
+import { itemIcon } from '../src/ui/icons';
 import type { Agent } from '../src/game/sim/CrowdSim';
 
 // ------------------------------------------------------------------ overrides (for tuning sweeps)
@@ -970,6 +971,24 @@ function target(level: number, loadout: string): [number, number] | null {
   return [0.35, 0.6];
 }
 
+
+function skillDripAndGearFaceTests(): string[] {
+  const fail: string[] = [];
+  const eq = (name: string, ok: boolean, detail = '') => { if (!ok) fail.push(detail ? `${name}: ${detail}` : name); };
+  const d0 = skillPointDrip(0);
+  eq('drip 0 → next in 5', !!d0 && d0.into === 0 && d0.remaining === 5 && d0.step === LEVELS_PER_SKILL_POINT);
+  const d3 = skillPointDrip(3);
+  eq('drip 3 → 3/5', !!d3 && d3.into === 3 && d3.remaining === 2);
+  const d5 = skillPointDrip(5);
+  eq('drip 5 → next in 5', !!d5 && d5.into === 0 && d5.remaining === 5);
+  const d7 = skillPointDrip(7);
+  eq('drip 7 → 2/5', !!d7 && d7.into === 2 && d7.remaining === 3);
+  eq('drip 100 → null', skillPointDrip(100) === null);
+  eq('drip 101 → null', skillPointDrip(101) === null);
+  eq('G1 tile icon is gloves not shop/bag', itemIcon('G1') === 'it_hydro');
+  return fail;
+}
+
 function entitlementGrantTests(): string[] {
   const fail: string[] = [];
   const check = (label: string, ids: string[], exp: { mage: boolean; tech: boolean; noAds: boolean }) => {
@@ -1027,6 +1046,13 @@ async function main(): Promise<void> {
     process.exit(1);
   }
   console.log('level lock tests ok');
+  const dripFail = skillDripAndGearFaceTests();
+  if (dripFail.length) {
+    console.error(dripFail.join('\n'));
+    console.error(`${dripFail.length} skill drip / gear face test(s) failed`);
+    process.exit(1);
+  }
+  console.log('skill drip / gear face tests ok');
   const grantFail = entitlementGrantTests();
   if (grantFail.length) {
     console.error(grantFail.join('\n'));

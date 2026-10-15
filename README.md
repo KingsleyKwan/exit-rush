@@ -2,7 +2,7 @@
 
 Mobile-first 3D crowd-exit game set on the fictional **香城鐵路 / Hong City Rail (HCR)**: get **off** the train while rush-hour crowds **force on** (逼上車). **Parody** of Hong Kong metro vibes (coloured stations, bilingual signs) — **original art & audio only**; not affiliated with the real-world operator or any real railway. Station names are playful parodies (see [`docs/STATIONS.md`](docs/STATIONS.md)).
 
-> **v0.8.6**: 1 skill point every 5 first clears (max 20), and the win card shows progress to the next point. The green-door ghost stays until you steer. Katie's Breeze button pulses until the first cast. The first boss contact teaches the temper bar. Prior **v0.8.5**: First-run L1 teaches the green exit and holds the door clock until you steer; Mage empty-book run-only Breeze; Gear L starter Hydraulic Gloves; early shove/stamina chip. Prior **v0.8.3**: Distinct cast VFX per Katie school/mix + Gear L item FX. Prior **v0.8.2**: Katie spell icons distinct by school/mix + workshop effect blurbs. Prior **v0.8.1**: Per-character progress + element colours. Prior **v0.8.0**: Mage 「凱婷」 Katie + character select; ~~Gear L coming soon~~ (Gear L is in). Web demo unlocks Mage. Prior **v0.7.0**: 100 levels, eight boss kings, free respec + 3 loadouts. Vertical slice history: Steam-store polish is the aspiration; v0.2 added real crowd physics, counterflow boarding, joystick + shove controls and a juice pass; v0.2.1 was a balance pass (see [`docs/BALANCE.md`](docs/BALANCE.md)); v0.2.2 was a bug-fix / mobile-robustness pass; **v0.3.0 was the art & icon pass**; **v0.5.0 short levels + special intros**; v0.4.1 added audio, per-station themes, and HK-style side-wall sliding doors** (car ends are gangways only — see below).
+> **v0.8.7**: Cam-side handrails fade harder so FTUE/teach chips stay readable; Gear L title tile uses gloves (not a padlock-look shop bag); title + win card show SP drip (`n/5 clears → next point`); Gear tip copy says gloves/hold shove in en + zh-HK. Prior **v0.8.6**: 1 skill point every 5 first clears (max 20) + win-card progress; green-door ghost until steer; Katie Breeze pulse; boss temper tip. Prior **v0.8.5**: First-run L1 teaches the green exit and holds the door clock until you steer; Mage empty-book run-only Breeze; Gear L starter Hydraulic Gloves; early shove/stamina chip. Prior **v0.8.3**: Distinct cast VFX per Katie school/mix + Gear L item FX. Prior **v0.8.2**: Katie spell icons distinct by school/mix + workshop effect blurbs. Prior **v0.8.1**: Per-character progress + element colours. Prior **v0.8.0**: Mage 「凱婷」 Katie + character select; ~~Gear L coming soon~~ (Gear L is in). Web demo unlocks Mage. Prior **v0.7.0**: 100 levels, eight boss kings, free respec + 3 loadouts. Vertical slice history: Steam-store polish is the aspiration; v0.2 added real crowd physics, counterflow boarding, joystick + shove controls and a juice pass; v0.2.1 was a balance pass (see [`docs/BALANCE.md`](docs/BALANCE.md)); v0.2.2 was a bug-fix / mobile-robustness pass; **v0.3.0 was the art & icon pass**; **v0.5.0 short levels + special intros**; v0.4.1 added audio, per-station themes, and HK-style side-wall sliding doors** (car ends are gangways only — see below).
 
 <p align="center">
   <img src="docs/screens/ingame-l100.jpg" width="240" alt="Level 100 in-game, phone portrait">
@@ -12,6 +12,13 @@ Mobile-first 3D crowd-exit game set on the fictional **香城鐵路 / Hong City 
 <p align="center"><img src="docs/screens/desktop-l100.jpg" width="640" alt="Level 100, landscape"></p>
 
 <p align="center"><em>v0.4.1 — exits on the <strong>side wall</strong> (left); car ends are gangways. Screenshots: mid-run crowds boarding through open doors.</em></p>
+
+## v0.8.7 — Live polish (rail, gear tile, SP drip)
+
+- **Cam-side rails:** near-camera steel/red fade opacities drop (~0.11 / ~0.13); cam-side grip stubs removed so white glare no longer clips FTUE / Katie / boss teach chips.
+- **Gear tile:** title menu Gear tile (and howto / progress chrome) use Hydraulic Gloves (`it_hydro`) instead of the shop bag that read as a padlock next to 「新手手套」/Starter.
+- **SP drip:** title shows `n/5 clears → next point` (hero / Katie) before any clear; win card keeps/strengthens the same line after clear.
+- **Copy:** menu 「用手套」/ Gloves matches in-run 「用手套按住推」 / Hold shove with your gloves.
 
 ## v0.8.6 — Earlier points, teach that stays
 
@@ -188,7 +195,7 @@ The Pages deploy builds with `BASE_PATH=/exit-rush/` so assets resolve under tha
 - **Skill-point economy (v0.2.2 stop-gap, not live):** with only 21 playable levels, a level awarded a point on its first clear **and on replays, up to 5 points per level** → 105 points reachable. Live rule is **1 SP / 5 first clears, max 20**.
 - Mobile polish: brand bar hidden during a run (HUD moves up under the notch), safe-area insets on all sides, every button ≥ 44 px, `prefers-reduced-motion` followed live, three.js split into its own cached chunk.
 
-## Status (v0.8.6)
+## Status (v0.8.7)
 
 | Area | Status |
 |------|--------|
@@ -204,6 +211,7 @@ The Pages deploy builds with `BASE_PATH=/exit-rush/` so assets resolve under tha
 | Ultimates: STR shockwave · SPD dash + afterimages · WIS path highlight | ✅ v0.2 |
 | Headless sim test (`npm run test:sim`) | ✅ v0.2 |
 | Levels **1–100** playable, short timers, staged specials; L100 needs L99 clear + strong skills (1 SP / 5 first clears, max 20) | ✅ v0.8.6 |
+| Live polish: cam-side rail fade, Gear gloves tile, title SP drip, glove tip copy | ✅ v0.8.7 |
 | Boss kings L20–L90 + all eight at L100, entrance cutscenes | ✅ v0.7 |
 | Free respec + 3 skill loadouts | ✅ v0.7 |
 | HUD (door progress + milestones, stamina, timer, cooldowns) | ✅ |

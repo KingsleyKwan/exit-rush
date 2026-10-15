@@ -179,8 +179,9 @@ export class TrainScene {
     red: new THREE.MeshLambertMaterial({ color: HCR_RED }),
     steel: new THREE.MeshPhongMaterial({ color: HCR_SILVER, specular: 0x9aa3ad, shininess: 70 }),
     // Camera sits on +X; these sit between the lens and the player. Own mats so benches stay solid.
-    steelFade: new THREE.MeshPhongMaterial({ color: HCR_SILVER, specular: 0x9aa3ad, shininess: 70, transparent: true, opacity: 0.32, depthWrite: false }),
-    redFade: new THREE.MeshLambertMaterial({ color: HCR_RED, transparent: true, opacity: 0.38, depthWrite: false }),
+    // Cam-side rails sit between lens and player — keep a faint silhouette, never a white glare bar over FTUE tips.
+    steelFade: new THREE.MeshPhongMaterial({ color: HCR_SILVER, specular: 0x6a7380, shininess: 18, transparent: true, opacity: 0.11, depthWrite: false }),
+    redFade: new THREE.MeshLambertMaterial({ color: HCR_RED, transparent: true, opacity: 0.13, depthWrite: false }),
     glass: new THREE.MeshLambertMaterial({ color: 0xa9d2e6, transparent: true, opacity: 0.22, depthWrite: false, side: THREE.DoubleSide }),
     window: new THREE.MeshLambertMaterial({ color: 0x1d2631 }),
     yellow: new THREE.MeshLambertMaterial({ color: 0xf2c230 }),
@@ -789,12 +790,14 @@ export class TrainScene {
       const camSide = sx === 1;
       const railMat = camSide ? M.steelFade : M.steel;
       const gripMat = camSide ? M.redFade : M.red;
-      const r = camSide ? 0.014 : 0.022;
+      // Cam-side: thinner rail only (no stubs/grips) so near-field white never clips teach chips.
+      const r = camSide ? 0.01 : 0.022;
       const rail = new THREE.CylinderGeometry(r, r, len - 0.8, 8);
       b.add(railMat, rail, sx * 1.18, 2.05, midZ, Math.PI / 2, 0, 0);
+      if (camSide) continue;
       for (let z = CAR_Z_MIN + 0.7; z < CAR_Z_MAX - 0.5; z += 0.75) {
-        b.box(railMat, camSide ? 0.01 : 0.015, 0.16, camSide ? 0.01 : 0.015, sx * 1.18, 1.96, z);
-        b.add(gripMat, new THREE.TorusGeometry(camSide ? 0.042 : 0.055, camSide ? 0.01 : 0.016, 4, 3), sx * 1.18, 1.84, z, 0, Math.PI / 2, Math.PI / 2);
+        b.box(railMat, 0.015, 0.16, 0.015, sx * 1.18, 1.96, z);
+        b.add(gripMat, new THREE.TorusGeometry(0.055, 0.016, 4, 3), sx * 1.18, 1.84, z, 0, Math.PI / 2, Math.PI / 2);
       }
     }
   }

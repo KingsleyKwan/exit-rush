@@ -5,7 +5,7 @@ import { playableLevels, isLevelUnlocked } from '../game/levels';
 import { LINE_COLORS, linesFor, lineColor } from '../game/lines';
 import { themeFor } from '../game/stationThemes';
 import type { PassengerKind } from '../game/PassengerTypes';
-import { icon } from './icons';
+import { icon, itemIcon } from './icons';
 import {
   el, portrait, screenBar, pointsChip, stationName, stationAlt, nextLevel,
   PORTRAITS, PortraitKind, asset, langBtn, iconBtn, qualityLabel, loadoutStrip, wireLoadoutStrip,
@@ -13,7 +13,7 @@ import {
 import { CHARACTER_ORDER, CHARACTERS, type CharacterId } from '../game/charactersDef';
 import { charPortraitUrl } from '../game/charPortraits';
 import { coinBalance, gearStarterFace } from '../game/techKit';
-import { progressOf } from '../game/storage';
+import { progressOf, skillPointDrip } from '../game/storage';
 import { entitlements } from '../game/entitlements';
 import { IS_STORE_BUILD } from '../game/platform';
 
@@ -78,6 +78,14 @@ export function renderMenu(game: Game): HTMLElement {
       ? `<span class="starter-chip">${dict.gearStarter}</span>`
       : `${dict.coins} ${Math.max(0, coinBalance(game.save))}`)
     : String(game.save.character === 'mage' ? (game.save.mage.loadouts[game.save.mage.active]?.points ?? 0) : game.save.skills.points);
+  // Gloves face — never shop/bag (those read as a padlock next to "Starter").
+  const gearTileIcon = gear ? itemIcon('G1') : 'skills';
+  const drip = gear ? null : skillPointDrip(progressOf(game.save).cleared.length);
+  const spDrip = drip
+    ? (drip.into === 0
+      ? fmt(dict.nextSkillPoint, { n: drip.step })
+      : fmt(dict.skillProgress, { n: drip.into, max: drip.step }))
+    : '';
   const levels = playableLevels();
   const nxt = nextLevel(game);
   const clearedCount = levels.filter((l) => progressOf(game.save).cleared.includes(l.id)).length;
@@ -87,7 +95,7 @@ export function renderMenu(game: Game): HTMLElement {
         ${langBtn()}
         <div class="bar-right">
           ${iconBtn('legend', 'legend', dict.legendTitle)}
-          ${iconBtn('skills', gear ? 'shop' : 'skills', progLabel)}
+          ${iconBtn('skills', gear ? itemIcon('G1') : 'skills', progLabel)}
         </div>
       </div>
       <div class="title-main">
@@ -98,7 +106,7 @@ export function renderMenu(game: Game): HTMLElement {
         <p class="tagline">${dict.tagline}</p>
         <div class="howto-icons" aria-label="${game.save.character === 'mage' ? dict.howToMage : game.save.character === 'tech' ? dict.howToTech : dict.howTo}">
           <span>${icon('drag')}<small>${dict.hintDrag}</small></span>
-          <span>${game.save.character === 'mage' ? `${icon('wind')}<small>${dict.hintCast}</small>` : game.save.character === 'tech' ? `${icon('shop')}<small>${dict.hintGear}</small>` : `${icon('shove')}<small>${dict.hintShove}</small>`}</span>
+          <span>${game.save.character === 'mage' ? `${icon('wind')}<small>${dict.hintCast}</small>` : game.save.character === 'tech' ? `${icon(itemIcon('G1'))}<small>${dict.hintGear}</small>` : `${icon('shove')}<small>${dict.hintShove}</small>`}</span>
           <span>${icon('door')}<small>${dict.hintExit}</small></span>
         </div>
         ${titleCharPick(game)}
@@ -108,9 +116,10 @@ export function renderMenu(game: Game): HTMLElement {
         </button>
         <div class="menu-tiles">
           <button type="button" class="tile" data-act="levels">${icon('levels')}<span>${dict.levelsTitle}</span><em>${clearedCount}/${levels.length}</em></button>
-          <button type="button" class="tile" data-act="skills">${icon(gear ? 'shop' : 'skills')}<span>${progLabel}</span><em>${gear ? '' : icon('star', 'xs')}${progEm}</em></button>
+          <button type="button" class="tile" data-act="skills">${icon(gearTileIcon)}<span>${progLabel}</span><em>${gear ? '' : icon('star', 'xs')}${progEm}</em></button>
           <button type="button" class="tile" data-act="legend">${icon('legend')}<span>${dict.legendTitle}</span><em>9</em></button>
         </div>
+        ${spDrip ? `<p class="sp-drip" aria-live="polite">${icon('star', 'xs')}${spDrip}</p>` : ''}
         <div class="settings-row">
           <button type="button" class="setting" data-act="quality" aria-label="${dict.quality}: ${qualityLabel(game)}">${icon('quality', 'sm')}<span>${qualityLabel(game)}</span></button>
           <button type="button" class="setting ${game.save.typeIcons ? 'on' : ''}" data-act="icons" aria-pressed="${game.save.typeIcons}" aria-label="${dict.typeIcons}">${icon('tag', 'sm')}<span>${dict.typeIcons} · ${game.save.typeIcons ? dict.on : dict.off}</span></button>

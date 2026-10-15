@@ -1,6 +1,6 @@
 # Balance — v0.7.0 (history below)
 
-> **Live SP (v0.8.6):** 1 skill point per 5 first clears, max 20 (`LEVELS_PER_SKILL_POINT`). The "earned" bot below is still the old **id − 1** power spread. Do not retune bands to the new point count.
+> **Live SP (v0.8.7 / v0.8.6):** 1 skill point per 5 first clears, max 20 (`LEVELS_PER_SKILL_POINT`). The "earned" bot below is still the old **id − 1** power spread. Do not retune bands to the new point count.
 
 ## v0.7.0 — 100 levels, 1 SP per clear, bosses
 

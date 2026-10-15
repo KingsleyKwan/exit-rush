@@ -3,7 +3,7 @@ import type { Game } from '../game/Game';
 import { INTROS, type IntroKind } from '../game/intros';
 import { playableLevels } from '../game/levels';
 import { modifiersFromSkills } from '../game/SkillTree';
-import { LEVELS_PER_SKILL_POINT, progressOf } from '../game/storage';
+import { progressOf, skillPointDrip } from '../game/storage';
 import { spellById } from '../game/SpellTree';
 import { itemDef, previewCoins } from '../game/techKit';
 import { linesFor, lineColor } from '../game/lines';
@@ -309,7 +309,7 @@ const roundBtn = (attrs: string, name: string, label: string, cls = ''): string 
 /** Skills for the hero, the spell book for Katie, the workshop for Gear L. Never locked. */
 function progressBtn(game: Game, dict: ReturnType<typeof t>): string {
   const who = game.save.character;
-  if (who === 'tech') return roundBtn('data-act="skills"', 'shop', dict.gear);
+  if (who === 'tech') return roundBtn('data-act="skills"', itemIcon('G1'), dict.gear);
   if (who === 'mage') return roundBtn('data-act="skills"', 'skills', dict.spells);
   return roundBtn('data-act="skills"', 'skills', dict.skills);
 }
@@ -414,13 +414,14 @@ function teachCopy(tip: NonNullable<Game['teachTip']>, dict: ReturnType<typeof t
 
 /** First-clear progress toward the next skill point. Hidden once the ladder is full. */
 function skillProgressLine(game: Game): string {
-  const cleared = progressOf(game.save).cleared.length;
-  const step = LEVELS_PER_SKILL_POINT;
-  if (cleared >= 100) return '';
+  if (game.save.character === 'tech') return '';
+  const drip = skillPointDrip(progressOf(game.save).cleared.length);
+  if (!drip) return '';
   const dict = t();
-  const into = cleared % step;
-  if (into === 0) return `<p class="howto">${fmt(dict.nextSkillPoint, { n: step })}</p>`;
-  return `<p class="howto">${fmt(dict.skillProgress, { n: into, max: step })}</p>`;
+  const copy = drip.into === 0
+    ? fmt(dict.nextSkillPoint, { n: drip.step })
+    : fmt(dict.skillProgress, { n: drip.into, max: drip.step });
+  return `<p class="howto sp-drip-end">${copy}</p>`;
 }
 
 function endBonus(game: Game): string {
@@ -430,10 +431,10 @@ function endBonus(game: Game): string {
   if (game.save.character === 'tech') {
     return `<p class="bonus">${star}${fmt(dict.coinGain, { n: c?.coins ?? 0 })}</p>`;
   }
-  const first = !!c && c.count <= 1;
-  const progress = first ? skillProgressLine(game) : '';
+  // Always show the SP drip on the win card (pre-clear title already shows it; keep post-clear too).
+  const progress = skillProgressLine(game);
   if (c?.awarded) return `<p class="bonus">${star}${fmt(dict.clearBonusN, { n: 1 })}</p>${progress}`;
-  if (c && c.count > 1) return `<p class="howto">${dict.clearNoBonus}</p>`;
+  if (c && c.count > 1) return `<p class="howto">${dict.clearNoBonus}</p>${progress}`;
   if (progress) return progress;
   return `<p class="howto">${dict.clearNoBonus}</p>`;
 }
