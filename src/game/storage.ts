@@ -38,6 +38,8 @@ export interface TechProgress {
   consumableSpend: number;
   retroGranted: boolean;
   coinNotice: boolean;
+  /** One-shot Hydraulic Gloves G1 for an empty first bag. Old saves default false. */
+  starterGranted: boolean;
 }
 
 export type CharacterIdSave = 'hero' | 'mage' | 'tech';
@@ -398,6 +400,7 @@ export function defaultSave(): SaveData {
       consumableSpend: 0,
       retroGranted: false,
       coinNotice: false,
+      starterGranted: false,
     },
     clearedWith: {},
     trialsPlayed: {},
@@ -571,6 +574,7 @@ export function normalizeSave(parsed: Partial<SaveData> | null | undefined): Sav
     consumableSpend: num(rawTech.consumableSpend, 0),
     retroGranted: rawTech.retroGranted === true,
     coinNotice: rawTech.coinNotice === true,
+    starterGranted: rawTech.starterGranted === true,
   };
   while (tech.sets.length < 3) tech.sets.push({ placements: [] });
   const clearedWith = clearedWithEarly;

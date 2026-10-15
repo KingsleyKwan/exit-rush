@@ -265,6 +265,22 @@ function clampBag(save: SaveData): boolean {
   return changed;
 }
 
+/**
+ * First Gear L bag: persist Hydraulic Gloves G1 in the active 2×2 set.
+ * One-shot via `starterGranted`. Empty-bag tests never call this.
+ */
+export function grantTechStarterIfNeeded(tech: TechProgress): boolean {
+  if (tech.starterGranted) return false;
+  const emptyItems = Object.keys(tech.items).length === 0;
+  const noPlace = tech.sets.every((s) => s.placements.length === 0);
+  tech.starterGranted = true;
+  if (!emptyItems || !noPlace) return true;
+  tech.items.G1 = 1;
+  if (!tech.sets[tech.activeSet]) tech.sets[tech.activeSet] = { placements: [] };
+  tech.sets[tech.activeSet].placements = [{ id: 'G1', tier: 1, x: 0, y: 0, rot: 0 }];
+  return true;
+}
+
 /** Refund owned gear (not the grid, not used consumables) when a retune over-spends. */
 export function reconcileTech(save: SaveData): boolean {
   const shrunk = clampBag(save);
@@ -749,6 +765,7 @@ export function recommendKit(cleared: readonly number[], levelId: number, fastFr
     consumableSpend: 0,
     retroGranted: true,
     coinNotice: false,
+    starterGranted: true,
   };
   for (const id of cleared) {
     if (fastFrac > 0) tech.ledger[String(id)] = { replays: 0, fast: true };
@@ -894,6 +911,7 @@ export function trialTech(): TechProgress {
     consumableSpend: 0,
     retroGranted: true,
     coinNotice: false,
+    starterGranted: true,
   };
   tech.sets[0].placements = [
     { id: 'S3', tier: 1, x: 0, y: 0, rot: 0 },
@@ -991,6 +1009,7 @@ function emptyTech(): TechProgress {
     consumableSpend: 0,
     retroGranted: true,
     coinNotice: false,
+    starterGranted: true,
   };
 }
 
@@ -1193,6 +1212,16 @@ export function techKitSelfTest(): string[] {
   eq('trial gloves shove', trialKit.extras.techGloves === true);
   eq('gloves are a shove', resolveKit(capped.tech).extras.techGloves === true);
   eq('an empty bag does not shove', resolveKit(emptyTech()).extras.techGloves !== true);
+  const starter = emptyTech();
+  starter.starterGranted = false;
+  eq('starter grants G1 shove', grantTechStarterIfNeeded(starter) && starter.items.G1 === 1
+    && starter.sets[0].placements[0]?.id === 'G1' && resolveKit(starter).extras.techGloves === true);
+  eq('starter only once', grantTechStarterIfNeeded(starter) === false);
+  const already = emptyTech();
+  already.starterGranted = false;
+  already.items = { S1: 1 };
+  already.sets[0].placements = [{ id: 'S1', tier: 1, x: 0, y: 0, rot: 0 }];
+  eq('starter skips a bag that already has kit', grantTechStarterIfNeeded(already) && already.items.G1 == null && already.starterGranted);
   const buzz = emptyTech();
   buzz.items = { G3: 1 };
   buzz.sets[0].placements = [{ id: 'G3', tier: 1, x: 0, y: 0, rot: 0 }];

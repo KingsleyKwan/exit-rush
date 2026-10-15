@@ -90,7 +90,7 @@ export const CHARACTERS: Record<CharacterId, CharacterDef> = {
   },
   mage: {
     id: 'mage',
-    nameEn: 'Bad Girl',
+    nameEn: 'Katie',
     nameZh: '凱婷',
     pitchEn: 'Wind, ice, and gravity.',
     pitchZh: '風、冰、同重力。',

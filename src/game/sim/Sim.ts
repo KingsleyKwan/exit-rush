@@ -87,6 +87,11 @@ export class Sim {
   result: SimResult = null;
   /** Ambient mode (menu backdrop): no timer, no boarding, no win/lose. */
   ambient = false;
+  /**
+   * First-run L1: Game holds the door clock until the player actually steers.
+   * Physics, boarding and input still run; timeLeft does not drain.
+   */
+  holdDoorTimer = false;
   private progressBest = 0;
   private lastAngryHit = -99;
   private doors: DoorLeafPair[] = [];
@@ -339,7 +344,7 @@ export class Sim {
     if (this.ambient) {
       this.doorOpen = 1;
     } else if (!this.result) {
-      this.timeLeft = Math.max(0, this.timeLeft - dt);
+      if (!this.holdDoorTimer) this.timeLeft = Math.max(0, this.timeLeft - dt);
       this.doorOpen = Math.min(1, this.timeLeft / D.closeTime);
     } else if (this.result === 'lose') {
       this.doorOpen = Math.max(0, this.doorOpen - dt * 3);
