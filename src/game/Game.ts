@@ -36,7 +36,7 @@ import { IS_STORE_BUILD } from './platform';
 import { resolveSpellBar, trialSpellState } from './SpellTree';
 import { initEntitlements, entitlements } from './entitlements';
 import { warmCharPortraits } from './charPortraits';
-import { earnedFrom, progressOf, recordClear, spentOf, syncTopLevelProgress } from './storage';
+import { earnedFrom, progressOf, recordClear, spentOf, syncTopLevelProgress, shouldFtueHold } from './storage';
 import type { IntroKind } from './intros';
 import type { PassengerKind } from './PassengerTypes';
 import { loadSave, writeSave, type QualityLevel, type QualitySetting, type SaveData, type SkillState } from './storage';
@@ -110,6 +110,8 @@ export class Game {
   ftueGhostT = 0;
   /** First-run L1: door timer waits until the player actually steers. */
   ftueHoldTimer = false;
+  /** Seconds after entering play before a steer can end the FTUE hold (ignores residual input). */
+  private ftuePlayGrace = 0;
   /** Brief early-run teach chip: hold-shove / breeze / gloves / first boss. */
   teachTip: 'shove' | 'cast' | 'gear' | 'boss' | null = null;
   /** Seconds left on the teach chip (visual; chip hides via CSS). */
@@ -578,10 +580,14 @@ export class Game {
     this.train.setDoorOpenValue(0);
     this.train.setWarning(0);
 
-    // FTUE ghost on first L1 — door clock waits until the first real steer.
-    this.ftueHoldTimer = id === 1 && !this.save.ftueDone && !this.trial;
+    // FTUE ghost on first L1 (any character, virgin / !ftueDone) — door clock waits until steer.
+    if (shouldFtueHold(this.save, id, !!this.trial) && this.save.ftueDone) {
+      this.save.ftueDone = false;
+    }
+    this.ftueHoldTimer = shouldFtueHold(this.save, id, !!this.trial);
     this.showFtueGhost = this.ftueHoldTimer;
     this.ftueGhostT = this.showFtueGhost ? 6 : 0;
+    this.ftuePlayGrace = 0;
     sim.holdDoorTimer = this.ftueHoldTimer;
     this.teachTip = null;
     this.teachTipT = 0;
@@ -640,6 +646,7 @@ export class Game {
     } else {
       this.screen = this.pendingIntro ? 'intro' : 'playing';
     }
+    if (this.screen === 'playing') this.armFtuePlay();
     this.lastT = performance.now();
     this.acc = 0;
     this.hooks.onState();
@@ -655,6 +662,7 @@ export class Game {
     }
     this.bossCut = null;
     this.screen = this.pendingIntro ? 'intro' : 'playing';
+    if (this.screen === 'playing') this.armFtuePlay();
     this.lastT = performance.now();
     this.audio.unlock();
     this.hooks.onState();
@@ -683,6 +691,7 @@ export class Game {
     this.activeTip = this.pendingIntro;
     this.pendingIntro = null;
     this.screen = 'playing';
+    this.armFtuePlay();
     this.lastT = performance.now();
     this.audio.unlock();
     this.hooks.onState();
@@ -721,7 +730,18 @@ export class Game {
 
   private releaseFtueHold(): void {
     this.ftueHoldTimer = false;
+    this.ftuePlayGrace = 0;
     if (this.sim) this.sim.holdDoorTimer = false;
+  }
+
+  /** Re-bind FTUE hold when the run actually becomes interactive; ignore residual input briefly. */
+  private armFtuePlay(): void {
+    if (!this.ftueHoldTimer) return;
+    this.showFtueGhost = true;
+    this.ftueGhostT = Math.max(this.ftueGhostT, 6);
+    this.ftuePlayGrace = 0.35;
+    if (this.sim) this.sim.holdDoorTimer = true;
+    this.input.reset();
   }
 
   /** One-shot: first lean or bounce on any king explains the temper bar. */
@@ -813,6 +833,7 @@ export class Game {
     this.activeTip = null;
     this.showFtueGhost = false;
     this.ftueHoldTimer = false;
+    this.ftuePlayGrace = 0;
     this.teachTip = null;
     this.teachTipT = 0;
     this.teachSticky = false;
@@ -1578,11 +1599,13 @@ export class Game {
 
     // Result handling (short celebration / slam before the overlay).
     if (this.screen === 'playing') {
+      if (this.ftuePlayGrace > 0) this.ftuePlayGrace = Math.max(0, this.ftuePlayGrace - dt);
       const moved = this.input.drag.magnitude > 0.25;
       if (this.ftueHoldTimer) {
-        // Green-door cue stays for the whole hold. It only leaves on a real steer.
+        // Green-door cue stays for the whole hold. It only leaves on a real steer (after grace).
         this.showFtueGhost = true;
-        if (moved) {
+        if (this.sim) this.sim.holdDoorTimer = true;
+        if (moved && this.ftuePlayGrace <= 0) {
           this.releaseFtueHold();
           this.completeFtue();
           this.armEarlyTeach();

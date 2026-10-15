@@ -35,11 +35,13 @@ import { CHARACTERS, modsFor, type CharacterId, type PlayerMods } from '../src/g
 import { kitForBot, resolveKit, techKitSelfTest, grantTechStarterIfNeeded, emptyTech } from '../src/game/techKit';
 import { grantsForProductIds } from '../src/game/entitlements';
 import { canLearn, defaultSpellBar, learnSpell, rank4Blocked } from '../src/game/SpellTree';
-import { defaultSkills, earnedFrom, migrateLegacyKeys, normalizeSave, progressOf, recordClear, SAVE_KEY, spentOf, skillPointDrip, LEVELS_PER_SKILL_POINT, type KeyValueStore, type SaveData, type SkillState } from '../src/game/storage';
+import { defaultSave, defaultSkills, earnedFrom, isVirginProgress, migrateLegacyKeys, normalizeSave, progressOf, recordClear, SAVE_KEY, shouldFtueHold, spentOf, skillPointDrip, LEVELS_PER_SKILL_POINT, type KeyValueStore, type SaveData, type SkillState } from '../src/game/storage';
 import { earnedPoints, resetActiveLoadout, spendPoint, spentPoints, switchLoadout } from '../src/game/SkillTree';
 import type { PlayerInput } from '../src/game/sim/PlayerSim';
 import type { PassengerKind } from '../src/game/PassengerTypes';
 import { itemIcon } from '../src/ui/icons';
+import { zhHK } from '../src/i18n/zh-HK';
+import { en } from '../src/i18n/en';
 import type { Agent } from '../src/game/sim/CrowdSim';
 
 // ------------------------------------------------------------------ overrides (for tuning sweeps)
@@ -1382,6 +1384,64 @@ async function main(): Promise<void> {
       process.exit(1);
     }
     console.log('push is hero or gloved gear');
+
+    // v0.8.8: cold FTUE hold + fresh defaults + menu tip key alignment
+    {
+      const fresh = defaultSave();
+      if (fresh.character !== 'hero' || fresh.lang !== 'zh-HK' || fresh.ftueDone !== false) {
+        console.error('defaultSave must be hero + zh-HK + !ftueDone', fresh.character, fresh.lang, fresh.ftueDone);
+        process.exit(1);
+      }
+      if (!isVirginProgress(fresh) || !shouldFtueHold(fresh, 1, false)) {
+        console.error('virgin default must FTUE-hold L1');
+        process.exit(1);
+      }
+      if (shouldFtueHold(fresh, 2, false) || shouldFtueHold(fresh, 1, true)) {
+        console.error('FTUE hold is L1 non-trial only');
+        process.exit(1);
+      }
+      // Stuck ftueDone on empty progress still holds.
+      const stuck = normalizeSave({ ...fresh, ftueDone: true, character: 'tech' } as SaveData);
+      if (stuck.ftueDone !== false || !shouldFtueHold(stuck, 1, false)) {
+        console.error('virgin repair must clear ftueDone and hold', stuck.ftueDone);
+        process.exit(1);
+      }
+      // Gear / Katie / hero: hold is character-agnostic.
+      for (const who of ['hero', 'mage', 'tech'] as const) {
+        const s = { ...defaultSave(), character: who };
+        if (!shouldFtueHold(s, 1, false)) {
+          console.error('FTUE hold must work for', who);
+          process.exit(1);
+        }
+      }
+      // Sim: holdDoorTimer freezes timeLeft.
+      const holdSim = new Sim(LEVELS.find((l) => l.id === 1)!, modifiersFromSkills(defaultSkills()), mulberry32(9));
+      holdSim.holdDoorTimer = true;
+      const left0 = holdSim.timeLeft;
+      const idle = { x: 0, z: 0, mag: 0, shoveHeld: false };
+      for (let i = 0; i < 120; i++) holdSim.step(1 / 60, idle);
+      if (Math.abs(holdSim.timeLeft - left0) > 1e-6 || holdSim.result === 'lose') {
+        console.error('holdDoorTimer must freeze the door clock', holdSim.timeLeft, left0, holdSim.result);
+        process.exit(1);
+      }
+      holdSim.holdDoorTimer = false;
+      for (let i = 0; i < 30; i++) holdSim.step(1 / 60, idle);
+      if (!(holdSim.timeLeft < left0 - 0.4)) {
+        console.error('releasing hold must drain timeLeft', holdSim.timeLeft, left0);
+        process.exit(1);
+      }
+      // Menu howto chips share the in-run tip sentences.
+      if (zhHK.hintGear !== zhHK.tipTechGloves || zhHK.hintCast !== zhHK.tipMageBreeze || zhHK.hintShove !== zhHK.tipShoveHold) {
+        console.error('zh-HK menu hints must equal tip strings');
+        process.exit(1);
+      }
+      if (en.hintGear !== en.tipTechGloves || en.hintCast !== en.tipMageBreeze || en.hintShove !== en.tipShoveHold) {
+        console.error('EN menu hints must equal tip strings');
+        process.exit(1);
+      }
+      console.log('cold FTUE hold + tip alignment ok');
+    }
+
 
     const fit = { str: 10, spd: 5, sta: 5, ultStr: false, ultSpd: false, ultSta: false, points: 0 };
     const old = normalizeSave({

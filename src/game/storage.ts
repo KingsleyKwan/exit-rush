@@ -274,6 +274,26 @@ function normalizeProgress(raw: Partial<CharRunProgress> | null | undefined): Ch
   return { cleared, clears, highestCleared, seenBosses };
 }
 
+/** True when no character has cleared anything (cold profile / empty progress). */
+export function isVirginProgress(save: Pick<SaveData, 'progress'>): boolean {
+  for (const id of ['hero', 'mage', 'tech'] as const) {
+    const p = save.progress[id];
+    if (p && (p.highestCleared > 0 || p.cleared.length > 0)) return false;
+  }
+  return true;
+}
+
+/**
+ * First-run L1 FTUE: hold the door clock + show the green-door ghost.
+ * Any character on a virgin save (or while ftueDone is still false).
+ */
+export function shouldFtueHold(save: SaveData, levelId: number, trial: boolean): boolean {
+  if (trial || levelId !== 1) return false;
+  if (!save.ftueDone) return true;
+  // Repair: ftueDone stuck true with zero clears still gets the hold.
+  return isVirginProgress(save);
+}
+
 /** Active (or named) character's run progress. */
 export function progressOf(save: Pick<SaveData, 'progress' | 'character'>, id?: CharacterIdSave): CharRunProgress {
   const key = id ?? save.character;
@@ -639,6 +659,16 @@ export function normalizeSave(parsed: Partial<SaveData> | null | undefined): Sav
     bossWearSeen,
   };
   syncTopLevelProgress(out);
+  // Cold profile repair: never skip L1 FTUE when nobody has cleared a level.
+  if (isVirginProgress(out)) out.ftueDone = false;
+  // Empty save defaults: hero + zh-HK unless the player already picked otherwise
+  // (character/lang from parsed are kept). Virgin + missing character → hero.
+  if (isVirginProgress(out) && (parsed as { character?: string }).character == null) {
+    out.character = 'hero';
+  }
+  if (isVirginProgress(out) && (parsed as { lang?: string }).lang == null) {
+    out.lang = 'zh-HK';
+  }
   return out;
 }
 
