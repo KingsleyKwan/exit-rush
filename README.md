@@ -20,6 +20,7 @@ Mobile-first 3D crowd-exit game set on the fictional **香城鐵路 / Hong City 
 - **凱婷:** empty-book Breeze keeps the spell-button pulse until the first successful cast. An idle first cast nudges toward the green bay. That run-only Breeze is a little stronger. It is not saved, and she still cannot hold-shove.
 - **Bosses:** the first time you lean on a king, a tip explains the temper bar. The bar is a bit thicker. Once per save.
 - **L45 / L52 / L68:** two-door choice, a phone-canyon car, and a linked-hands aisle. Twelve mid-game station names in [`docs/STATIONS.md`](docs/STATIONS.md) are signed off (暫定 removed). 香城 is unchanged.
+- **Live play:** stations open in order (L1, then the next; L100 still needs L99). Play stays on the first unlocked uncleared station. Gear L's starter gloves are free, so a new bag shows 0 coins and 「新手手套」 instead of −100 and a lock wall. HUD meters name the door, stamina, mana, and coins. One bright arrow marks the green door (pinned beside the L1 spawn during the ghost). Fail tips match the character, and Skills / Gear always opens. Katie's teach says Breeze / 微風 on the spell button.
 
 ## v0.8.5 — First-run teach + Mage/Gear L cold start
 - **FTUE**: first L1 ghost-hand points at the green exit (「拖向綠色門」 / Drag to the green door); door timer waits until the first real steer.

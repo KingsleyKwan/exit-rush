@@ -431,6 +431,13 @@ button {
   gap: 2px;
   color: var(--gold);
 }
+.tile em .starter-chip {
+  font-size: 9px;
+  line-height: 1.05;
+  max-width: 4.8em;
+  text-align: right;
+  white-space: normal;
+}
 .tile:active { transform: scale(0.96); background: var(--navy-2); }
 
 .settings-row {
@@ -1348,7 +1355,26 @@ button {
   animation: teach-pulse 0.9s ease-in-out infinite;
 }
 .skill-use.teach {
-  animation: teach-pulse 0.9s ease-in-out infinite;
+  animation: teach-pulse-spell 0.62s ease-in-out infinite;
+  z-index: 2;
+}
+.skill-use .spell-teach {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 1px;
+  font-size: 8px;
+  font-weight: 900;
+  line-height: 1;
+  text-align: center;
+  color: #04221c;
+  letter-spacing: -0.03em;
+  pointer-events: none;
+}
+.skill-use.teach .ico { width: 20px; height: 20px; margin-top: -7px; }
+@keyframes teach-pulse-spell {
+  0%, 100% { box-shadow: 0 0 0 3px #fff59d, 0 0 14px rgba(255, 213, 79, 0.95); transform: scale(1.05); }
+  50% { box-shadow: 0 0 0 8px #ffd54f, 0 0 26px rgba(255, 236, 140, 0.9); transform: scale(1.16); }
 }
 .teach-chip {
   transition: opacity 0.35s ease;
@@ -1381,12 +1407,28 @@ button {
 .pause-btn .ico { width: 22px; height: 22px; }
 .meter-icon {
   display: inline-flex;
-  width: 24px;
+  width: 22px;
   justify-content: center;
+  flex: none;
 }
-.meter-icon .ico { width: 22px; height: 22px; }
+.meter-icon .ico { width: 20px; height: 20px; }
+.meter-label {
+  flex: none;
+  font-size: 10px;
+  font-weight: 800;
+  line-height: 1;
+  letter-spacing: 0;
+  color: #fff;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.8);
+}
 .door-meter .meter-icon { color: #ff6b7a; --ico-accent: #ffd54f; }
+.door-meter .meter-label { color: #ffc1cb; }
 .stam-meter .meter-icon { color: #4fc3f7; }
+.stam-meter .meter-label { color: #b3e5fc; }
+.mana-meter { grid-column: 1; }
+.mana-meter .meter-icon { color: #ce93d8; }
+.mana-meter .meter-label { color: #e1bee7; }
+.coin-chip .meter-label { color: #ffe0a3; font-size: 11px; text-shadow: none; }
 .timer .meter-icon { color: #fff; --ico-ink: #18202e; }
 .drag-hint { color: #fff; filter: drop-shadow(0 4px 8px rgba(0, 0, 0, 0.6)); }
 .drag-hint .ico { width: 54px; height: 54px; }
@@ -1683,10 +1725,17 @@ button {
   --ico-ink: #fff;
 }
 .drag-hint .ghost-label {
-  font-size: 13px;
-  font-weight: 800;
+  font-size: 17px;
+  font-weight: 900;
+  line-height: 1.2;
   color: #fff;
-  text-shadow: 0 2px 6px rgba(0,0,0,0.7);
+  text-align: center;
+  max-width: 230px;
+  padding: 5px 10px;
+  border-radius: 12px;
+  background: rgba(6, 18, 12, 0.9);
+  border: 2px solid #3dff8a;
+  text-shadow: 0 1px 2px #000;
 }
 @keyframes ftue-nudge {
   0%, 100% { transform: translate(-10px, 10px); opacity: 0.95; }
@@ -2237,6 +2286,17 @@ button {
 .shop-card p { margin: 4px 0; font-size: 13px; opacity: .9; }
 .shop-card p.shop-lock { color: #ffb74d; font-weight: 700; opacity: 1; }
 .workshop .primary.is-locked { opacity: 0.45; box-shadow: none; }
+.workshop .primary.is-earn { opacity: 0.78; box-shadow: none; }
+.starter-ready {
+  margin: 0;
+  padding: 8px 10px;
+  border-radius: 10px;
+  background: rgba(255, 176, 58, 0.18);
+  color: #ffe0a3;
+  font-size: 13px;
+  font-weight: 800;
+  line-height: 1.35;
+}
 .coin-chip, .trial-banner {
   display: inline-flex; align-items: center; gap: 6px;
   background: rgba(255,176,58,.16);

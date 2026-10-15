@@ -12,6 +12,9 @@ export interface Dict {
   win: string;
   lose: string;
   loseHint: string;
+  loseHintHero: string;
+  loseHintMage: string;
+  loseHintTech: string;
   skillPoints: string;
   strength: string;
   speed: string;
@@ -19,6 +22,8 @@ export interface Dict {
   staminaBranch: string;
   ultimate: string;
   locked: string;
+  /** Toast and station-card title when the previous station is still uncleared. */
+  levelLocked: string;
   spend: string;
   notEnough: string;
   branchFull: string;
@@ -29,6 +34,11 @@ export interface Dict {
   skCounters: string;
   /** 大聲公 HUD chip while the noise zone drains you. */
   loudHud: string;
+  /** Short captions beside the in-run meters. */
+  hudDoor: string;
+  hudStamina: string;
+  hudMana: string;
+  hudCoins: string;
   skLeap: string;
   skSecondWind: string;
   skillNodePassive: string;
@@ -275,6 +285,12 @@ export interface Dict {
   /** {n} = cleared level required before this tier. */
   needLevel: string;
   needCoins: string;
+  /** Shop line when the bag is only the free starter gloves. */
+  earnCoins: string;
+  /** Menu chip for a fresh Gear L bag. */
+  gearStarter: string;
+  /** Workshop banner: gloves are equipped, coins come from clears. */
+  glovesReady: string;
   /** Passive gear. It works without a button. */
   gearKindOn: string;
   /** Active gear, a core, or a consumable. */
@@ -338,6 +354,9 @@ export const en: Dict = {
   win: 'You made it out!',
   lose: 'Doors closed!',
   loseHint: 'Try a different path — or invest in Strength.',
+  loseHintHero: 'Try a different path — or invest in Strength.',
+  loseHintMage: 'Cast Breeze, or learn a spell. Strength will not help Katie.',
+  loseHintTech: 'Shove with your gloves. Clear a station for coins, then open Gear.',
   skillPoints: 'Skill points',
   strength: 'Strength',
   speed: 'Speed',
@@ -345,6 +364,7 @@ export const en: Dict = {
   staminaBranch: 'Stamina',
   ultimate: 'Ultimate',
   locked: 'Locked',
+  levelLocked: 'Clear the previous station first',
   spend: 'Spend',
   notEnough: 'Need more points',
   branchFull: 'Branch filled',
@@ -354,6 +374,10 @@ export const en: Dict = {
   ultSta: 'Iron Stance',
   skCounters: 'Counters',
   loudHud: 'Noise!',
+  hudDoor: 'Door',
+  hudStamina: 'Stamina',
+  hudMana: 'Mana',
+  hudCoins: 'Coins',
   skLeap: 'Leap',
   skSecondWind: 'Second Wind',
   skillNodePassive: 'Passive',
@@ -453,9 +477,9 @@ export const en: Dict = {
   on: 'On',
   off: 'Off',
   hintDrag: 'Drag',
-  hintDragGreen: 'Drag to the green door',
+  hintDragGreen: 'Drag to THIS green door',
   hintShove: 'Hold',
-  hintCast: 'Blow',
+  hintCast: 'Breeze',
   hintGear: 'Gear',
   hintExit: 'Get off',
   tipShoveHold: 'Hold shove — stamina drains',
@@ -565,6 +589,9 @@ export const en: Dict = {
   coinShop: 'Upgrades spend coins from clears, not skill points.',
   needLevel: 'Clear level {n} first.',
   needCoins: 'Not enough coins. Clear levels to earn them.',
+  earnCoins: 'Clear a station to earn coins.',
+  gearStarter: 'Starter',
+  glovesReady: 'Starter gloves are ready. Clear stations to earn coins.',
   gearKindOn: 'Always on',
   gearKindTap: 'Button',
   slotGadget: 'Gadget',
