@@ -29,7 +29,7 @@ import { mulberry32 } from '../src/game/sim/rng';
 import { applyImpulse, passes } from '../src/game/sim/Physics';
 import { PASSENGER_DEFS } from '../src/game/PassengerTypes';
 import { DOOR_BAYS, DOOR_Z, TUNING, doorWallX, nearestDoorBay, openDoorBays } from '../src/game/sim/tuning';
-import { LEVELS } from '../src/game/levels';
+import { isLevelUnlocked, LEVELS } from '../src/game/levels';
 import { BRANCH_FILL, modifiersFromSkills } from '../src/game/SkillTree';
 import { CHARACTERS, modsFor, type CharacterId, type PlayerMods } from '../src/game/charactersDef';
 import { kitForBot, resolveKit, techKitSelfTest } from '../src/game/techKit';
@@ -986,7 +986,47 @@ function entitlementGrantTests(): string[] {
   return fail;
 }
 
+function levelLockTests(): string[] {
+  const fail: string[] = [];
+  const eq = (name: string, ok: boolean) => { if (!ok) fail.push(name); };
+  const save = (who: 'hero' | 'mage' | 'tech', cleared: number[], highest = cleared.length ? Math.max(...cleared) : 0) => ({
+    character: who,
+    cleared,
+    highestCleared: highest,
+    progress: {
+      hero: { cleared: who === 'hero' ? cleared : [], clears: {}, highestCleared: who === 'hero' ? highest : 0, seenBosses: [] },
+      mage: { cleared: who === 'mage' ? cleared : [], clears: {}, highestCleared: who === 'mage' ? highest : 0, seenBosses: [] },
+      tech: { cleared: who === 'tech' ? cleared : [], clears: {}, highestCleared: who === 'tech' ? highest : 0, seenBosses: [] },
+    },
+  }) as unknown as SaveData;
+  const fresh = save('hero', []);
+  eq('L1 open', isLevelUnlocked(fresh, 1));
+  eq('L2 shut at 0', !isLevelUnlocked(fresh, 2));
+  eq('L50 shut at 0', !isLevelUnlocked(fresh, 50));
+  eq('L100 shut at 0', !isLevelUnlocked(fresh, 100));
+  const one = save('hero', [1]);
+  eq('L2 after L1', isLevelUnlocked(one, 2));
+  eq('L3 still shut', !isLevelUnlocked(one, 3));
+  const mid = save('hero', [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]);
+  eq('L11 open', isLevelUnlocked(mid, 11));
+  eq('L12 shut', !isLevelUnlocked(mid, 12));
+  eq('L100 needs 99', !isLevelUnlocked(mid, 100));
+  const fin = save('mage', Array.from({ length: 99 }, (_, i) => i + 1));
+  eq('L100 after 99', isLevelUnlocked(fin, 100));
+  const split = save('mage', []);
+  split.progress.hero = { cleared: [1, 2, 3, 4, 5], clears: {}, highestCleared: 5, seenBosses: [] };
+  eq('other character does not unlock', !isLevelUnlocked(split, 2) && isLevelUnlocked(split, 1));
+  return fail;
+}
+
 async function main(): Promise<void> {
+  const lockFail = levelLockTests();
+  if (lockFail.length) {
+    console.error(lockFail.join('\n'));
+    console.error(`${lockFail.length} level lock test(s) failed`);
+    process.exit(1);
+  }
+  console.log('level lock tests ok');
   const grantFail = entitlementGrantTests();
   if (grantFail.length) {
     console.error(grantFail.join('\n'));
