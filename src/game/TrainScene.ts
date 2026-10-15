@@ -125,6 +125,7 @@ export class TrainScene {
     closedSign: THREE.Mesh;
     closedFloor: THREE.Mesh;
     guide: THREE.Object3D;
+    guideMat: THREE.MeshBasicMaterial;
     /** Seconds left to flash closed-bay lights (player push feedback). */
     flashT: number;
   }[] = [];
@@ -135,6 +136,10 @@ export class TrainScene {
   private closedSignMat: THREE.MeshBasicMaterial | null = null;
   private guideMat: THREE.MeshBasicMaterial | null = null;
   private guideGeo: THREE.BufferGeometry | null = null;
+  /** Live player Z, so one arrow tracks the nearest open bay. */
+  private guidePlayerZ: number | null = null;
+  /** L1 ghost: pin the bright arrow on the bay beside the spawn. */
+  private guidePinSpawn = false;
   private closedFloorMat: THREE.MeshBasicMaterial | null = null;
   private warn = 0;
   private dirLight: THREE.DirectionalLight;
@@ -212,7 +217,7 @@ export class TrainScene {
     this.signTex = canvasTex(1024, 256, () => undefined);
     this.mapTex = canvasTex(1024, 160, () => undefined);
     this.fontsPromise = loadGameFonts();
-    this.exitMat = new THREE.MeshBasicMaterial({ color: 0x66ff99, transparent: true, opacity: 0.25, depthWrite: false });
+    this.exitMat = new THREE.MeshBasicMaterial({ color: 0x66ff99, transparent: true, opacity: 0.08, depthWrite: false });
 
     const batch = new Batch();
     this.buildCar(batch);
@@ -237,6 +242,16 @@ export class TrainScene {
     sign.position.set(backX + 0.08, 2.0, 0);
     this.scene.add(sign);
     this.setStation({ id: 0, stationEn: 'Exit Rush', stationZh: '逼落車' });
+  }
+
+  /**
+   * One bright guide arrow. During the L1 ghost it stays on the open bay nearest
+   * the spawn (the door beside you). After that it follows the nearest open bay.
+   * Other open bays stay visible but heavily dimmed.
+   */
+  setGuideFocus(playerZ: number | null, pinSpawn: boolean): void {
+    this.guidePlayerZ = playerZ;
+    this.guidePinSpawn = pinSpawn;
   }
 
   /** Which side-door bays are open for the current level (visual + exit markers). */
@@ -387,7 +402,11 @@ export class TrainScene {
         lampMats.push(lampMat);
       }
 
-      const exit = new THREE.Mesh(new THREE.PlaneGeometry(TUNING.car.winDepth + 0.15, dh * 2 - 0.15), this.exitMat);
+      // Smaller, dimmer floor glow so the player and the one guide arrow stay readable.
+      const exit = new THREE.Mesh(
+        new THREE.PlaneGeometry((TUNING.car.winDepth + 0.15) * 0.62, (dh * 2 - 0.15) * 0.68),
+        this.exitMat,
+      );
       exit.rotation.x = -Math.PI / 2;
       exit.position.set(wall - TUNING.car.winDepth / 2 - 0.05, 0.013, bz);
       this.scene.add(exit);
@@ -409,9 +428,10 @@ export class TrainScene {
       closedFloor.visible = false;
       this.scene.add(closedFloor);
 
-      // Bobbing arrow above open bays (shared geo/mat).
+      // Bobbing arrow above open bays. Each bay has its own material so extras can dim.
       const guide = new THREE.Group();
-      const tip = new THREE.Mesh(this.guideGeo!, this.guideMat!);
+      const guideMat = this.guideMat!.clone();
+      const tip = new THREE.Mesh(this.guideGeo!, guideMat);
       tip.rotation.x = Math.PI; // point down
       tip.position.y = 0;
       guide.add(tip);
@@ -431,6 +451,7 @@ export class TrainScene {
         closedSign,
         closedFloor,
         guide,
+        guideMat,
         flashT: 0,
       });
     }
@@ -937,6 +958,22 @@ export class TrainScene {
     const wall = doorWallX();
     const t = this.time;
     const warnFlash = this.warn > 0 && Math.sin(t * (2 + this.warn * 7) * Math.PI * 2) > 0;
+    const openBays = this.doorBays.filter((d) => d.open);
+    let primaryZ: number | null = null;
+    if (openBays.length) {
+      const focusZ = this.guidePinSpawn || this.guidePlayerZ == null ? PLAYER_START_Z : this.guidePlayerZ;
+      let best = openBays[0];
+      let bestD = Math.abs(best.z - focusZ);
+      for (const bay of openBays) {
+        const dd = Math.abs(bay.z - focusZ);
+        if (dd < bestD) {
+          best = bay;
+          bestD = dd;
+        }
+      }
+      // No player yet (menus): keep a single quiet arrow on the first open bay.
+      primaryZ = this.guidePlayerZ == null && !this.guidePinSpawn ? openBays[0].z : best.z;
+    }
 
     for (const d of this.doorBays) {
       if (d.flashT > 0) d.flashT = Math.max(0, d.flashT - dt);
@@ -949,9 +986,19 @@ export class TrainScene {
         d.psdPos.position.set(wall - 0.22, 0, d.z + (0.48 + 0.9 * this.doorOpen));
         // Still shut (arrival): no exit arrow, and not the red "this door never opens" lamp.
         const waiting = this.doorOpen < 0.05 && this.warn <= 0;
+        const primary = primaryZ != null && Math.abs(d.z - primaryZ) < 0.05;
         d.guide.visible = !waiting;
-        if (!waiting) d.guide.position.y = 2.4 + Math.sin(t * 3.6 + d.z) * 0.14;
-        if (this.guideMat) this.guideMat.opacity = 0.75 + 0.2 * Math.sin(t * 4);
+        if (!waiting) {
+          if (primary) {
+            d.guide.scale.setScalar(1);
+            d.guide.position.y = 2.4 + Math.sin(t * 3.6 + d.z) * 0.14;
+            d.guideMat.opacity = 0.88 + 0.12 * Math.sin(t * 4);
+          } else {
+            d.guide.scale.setScalar(0.4);
+            d.guide.position.y = 2.12;
+            d.guideMat.opacity = 0.12;
+          }
+        }
 
         if (this.warn > 0) {
           // Closing: flashing amber on open bays.
@@ -981,10 +1028,10 @@ export class TrainScene {
 
     if (this.warn > 0) {
       this.exitMat.color.setHex(warnFlash ? 0xff5050 : 0xffcc33);
-      this.exitMat.opacity = warnFlash ? 0.45 : 0.2;
+      this.exitMat.opacity = warnFlash ? 0.2 : 0.07;
     } else {
       this.exitMat.color.setHex(0x66ff99);
-      this.exitMat.opacity = 0.22 + 0.14 * Math.sin(t * 3);
+      this.exitMat.opacity = 0.045 + 0.03 * Math.sin(t * 3);
     }
   }
 

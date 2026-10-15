@@ -7,7 +7,7 @@ import { Effects } from './Effects';
 import { InputController } from './Input';
 import { GameAudio } from './Audio';
 import { haptic } from './haptics';
-import { getLevel, playableLevels, isFinaleUnlocked, type LevelDef } from './levels';
+import { getLevel, isLevelUnlocked, playableLevels, type LevelDef } from './levels';
 import { modifiersFromSkills, resetActiveLoadout, switchLoadout } from './SkillTree';
 import { CHARACTERS, characterOf, modsFor, activeTreeState, type CharacterId, type PlayerMods } from './charactersDef';
 import {
@@ -519,8 +519,9 @@ export class Game {
   startLevel(id: number): void {
     const level = getLevel(id);
     if (!level || !level.playable) return;
-    if (id === 100 && !isFinaleUnlocked(this.save.cleared, this.save.highestCleared)) {
-      this.hooks.onToast?.(t().finaleLocked);
+    // Trials are scripted cars, not the station grid. Everyone else plays in order.
+    if (!this.trial && !isLevelUnlocked(this.save, id)) {
+      this.hooks.onToast?.(id === 100 ? t().finaleLocked : t().levelLocked);
       return;
     }
     this.audio.unlock();
@@ -1546,6 +1547,8 @@ export class Game {
       this.train.follow({ x: 0, z: PLAYER_START.z }, dt);
     }
 
+    if (sim && !sim.ambient) this.train.setGuideFocus(sim.player.body.z, this.showFtueGhost);
+    else this.train.setGuideFocus(null, false);
     this.train.update(dt);
     this.effects.update(dt);
     this.updateVignette(dt);

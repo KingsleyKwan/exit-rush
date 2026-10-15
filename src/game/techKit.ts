@@ -205,13 +205,21 @@ export function coinsEarned(cleared: readonly number[], ledger: TechProgress['le
   return { first, fast, replay, total: first + fast + replay };
 }
 
-export function itemSpend(items: TechProgress['items']): number {
+/**
+ * Sum of owned tiers. When `starterGranted`, Hydraulic Gloves G1 tier 1 is a gift
+ * (the first 100 is not charged). G1 → 2 and every other piece still cost their prices.
+ */
+export function itemSpend(items: TechProgress['items'], starterGranted = false): number {
   let n = 0;
+  const waiveStarter = starterGranted && (items.G1 ?? 0) >= 1;
   for (const [id, tier] of Object.entries(items)) {
     const def = itemDef(id);
     if (!def || def.slot === 'consumable') continue;
     const t = Math.max(0, Math.min(def.price.length, tier));
-    for (let i = 0; i < t; i++) n += def.price[i];
+    for (let i = 0; i < t; i++) {
+      if (waiveStarter && id === 'G1' && i === 0) continue;
+      n += def.price[i];
+    }
   }
   return n;
 }
@@ -226,8 +234,23 @@ export function gridSpend(gridTier: number): number {
 export function coinBalance(save: Pick<SaveData, 'tech' | 'progress' | 'character'>): number {
   const cleared = progressOf(save as SaveData, 'tech').cleared;
   const earned = coinsEarned(cleared, save.tech.ledger).total;
-  const spent = itemSpend(save.tech.items) + gridSpend(save.tech.gridTier) + Math.max(0, save.tech.consumableSpend | 0);
+  const spent = itemSpend(save.tech.items, save.tech.starterGranted) + gridSpend(save.tech.gridTier) + Math.max(0, save.tech.consumableSpend | 0);
   return earned - spent;
+}
+
+/**
+ * Fresh Gear L: gifted G1, nothing else owned, no clears, and no coins.
+ * The menu shows a starter chip; the workshop explains the gloves instead of a lock wall.
+ */
+export function gearStarterFace(save: Pick<SaveData, 'tech' | 'progress' | 'character'>): boolean {
+  const tech = save.tech;
+  if (!tech?.starterGranted || (tech.items.G1 ?? 0) !== 1) return false;
+  if (progressOf(save as SaveData, 'tech').cleared.length > 0) return false;
+  for (const [id, tier] of Object.entries(tech.items)) {
+    if (tier > 0 && id !== 'G1') return false;
+  }
+  for (const n of Object.values(tech.stock)) if ((n | 0) > 0) return false;
+  return coinBalance(save) <= 0;
 }
 
 /** Shrink a saved 3×3–4×4 bag down to the cap and drop pieces that no longer fit. */
@@ -265,19 +288,36 @@ function clampBag(save: SaveData): boolean {
   return changed;
 }
 
+function bagIsEmpty(tech: TechProgress): boolean {
+  const emptyItems = Object.keys(tech.items).length === 0;
+  const noPlace = tech.sets.every((s) => s.placements.length === 0);
+  const noStock = Object.values(tech.stock).every((n) => (n | 0) <= 0);
+  return emptyItems && noPlace && noStock && (tech.consumableSpend | 0) <= 0 && tech.gridTier === 0;
+}
+
+function placeStarterGloves(tech: TechProgress): void {
+  tech.items.G1 = 1;
+  if (!tech.sets[tech.activeSet]) tech.sets[tech.activeSet] = { placements: [] };
+  tech.sets[tech.activeSet].placements = [{ id: 'G1', tier: 1, x: 0, y: 0, rot: 0 }];
+}
+
 /**
  * First Gear L bag: persist Hydraulic Gloves G1 in the active 2×2 set.
- * One-shot via `starterGranted`. Empty-bag tests never call this.
+ * One-shot via `starterGranted`. Also puts the gloves back if a negative
+ * balance reconcile wiped the free pair (grid still 2×2, nothing else owned).
  */
 export function grantTechStarterIfNeeded(tech: TechProgress): boolean {
-  if (tech.starterGranted) return false;
+  if (tech.starterGranted) {
+    // Reconcile used to delete the free gloves when they were priced at 100.
+    if (!bagIsEmpty(tech)) return false;
+    placeStarterGloves(tech);
+    return true;
+  }
   const emptyItems = Object.keys(tech.items).length === 0;
   const noPlace = tech.sets.every((s) => s.placements.length === 0);
   tech.starterGranted = true;
   if (!emptyItems || !noPlace) return true;
-  tech.items.G1 = 1;
-  if (!tech.sets[tech.activeSet]) tech.sets[tech.activeSet] = { placements: [] };
-  tech.sets[tech.activeSet].placements = [{ id: 'G1', tier: 1, x: 0, y: 0, rot: 0 }];
+  placeStarterGloves(tech);
   return true;
 }
 
@@ -1222,6 +1262,29 @@ export function techKitSelfTest(): string[] {
   already.items = { S1: 1 };
   already.sets[0].placements = [{ id: 'S1', tier: 1, x: 0, y: 0, rot: 0 }];
   eq('starter skips a bag that already has kit', grantTechStarterIfNeeded(already) && already.items.G1 == null && already.starterGranted);
+  const giftTech = emptyTech();
+  giftTech.items = { G1: 1 };
+  const giftSave = {
+    tech: giftTech,
+    progress: {
+      hero: { cleared: [], clears: {}, highestCleared: 0, seenBosses: [] },
+      mage: { cleared: [], clears: {}, highestCleared: 0, seenBosses: [] },
+      tech: { cleared: [], clears: {}, highestCleared: 0, seenBosses: [] },
+    },
+    character: 'tech' as const,
+  } as unknown as SaveData;
+  eq('starter G1 is free', coinBalance(giftSave) === 0 && gearStarterFace(giftSave), String(coinBalance(giftSave)));
+  giftTech.items.G1 = 2;
+  eq('G1 upgrade still costs', coinBalance(giftSave) === -200, String(coinBalance(giftSave)));
+  giftTech.items.G1 = 1;
+  const paidGloves = emptyTech();
+  paidGloves.starterGranted = false;
+  paidGloves.items = { G1: 1 };
+  const paidSave = { ...giftSave, tech: paidGloves } as unknown as SaveData;
+  eq('bought G1 still costs 100', coinBalance(paidSave) === -100, String(coinBalance(paidSave)));
+  const wiped = emptyTech();
+  eq('wiped starter comes back', grantTechStarterIfNeeded(wiped) && wiped.items.G1 === 1 && wiped.sets[0].placements[0]?.id === 'G1');
+  eq('wiped starter stays once', grantTechStarterIfNeeded(wiped) === false);
   const buzz = emptyTech();
   buzz.items = { G3: 1 };
   buzz.sets[0].placements = [{ id: 'G3', tier: 1, x: 0, y: 0, rot: 0 }];

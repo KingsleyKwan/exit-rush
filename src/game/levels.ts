@@ -1,5 +1,6 @@
 import type { PassengerKind } from './PassengerTypes';
 import type { BossKind } from './bosses';
+import { progressOf, type SaveData } from './storage';
 
 export interface LevelDef {
   id: number;
@@ -1329,4 +1330,20 @@ export function crowdCount(density: number): number {
  */
 export function isFinaleUnlocked(cleared: number[], _highestCleared?: number): boolean {
   return cleared.includes(FINALE_UNLOCK_AFTER) || cleared.includes(100);
+}
+
+/**
+ * Sequential station lock. L1 is always open. Later stations open once the previous
+ * one is the highest clear (`highestCleared >= id - 1`). L100 stays on `isFinaleUnlocked`.
+ */
+export function isLevelUnlocked(
+  save: Pick<SaveData, 'progress' | 'character' | 'cleared' | 'highestCleared'>,
+  id: number,
+): boolean {
+  if (!Number.isInteger(id)) return false;
+  const prog = progressOf(save);
+  if (id === 100) return isFinaleUnlocked(prog.cleared, prog.highestCleared);
+  if (id === 1) return true;
+  if (id < 1 || id > 99) return false;
+  return prog.highestCleared >= id - 1;
 }
