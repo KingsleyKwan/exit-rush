@@ -302,6 +302,9 @@ export class Sim {
     return this.player.activateUltimate(kind, this.time, this.world, this.crowd, this.emit);
   }
 
+  /** First run-only Breeze already aimed at the bay (one shot per run). */
+  private starterNudged = false;
+
   /** v0.8: cast a bar spell by ability id (mage). */
   tryAbility(abilityId: string): boolean {
     if (this.result) return false;
@@ -317,7 +320,29 @@ export class Sim {
       return true;
     }
     if (!this.player.beginSpell(def.id, def.cost, def.cd)) return false;
+    this.maybeNudgeStarterBreeze(abilityId, pm);
     return def.cast(this.abilityCtx());
+  }
+
+  /**
+   * First empty-book Breeze, stick idle: face the open bay through the same
+   * gap assist the dash path uses. A real steer (moving > 0.25) is left alone.
+   */
+  private maybeNudgeStarterBreeze(abilityId: string, pm: PlayerMods): void {
+    if (abilityId !== 'w1' || !pm.starterBreeze || this.starterNudged) return;
+    this.starterNudged = true;
+    const pl = this.player;
+    if (pl.moving > 0.25) return;
+    const wall = doorWallX();
+    let dx = wall + 0.2 - pl.body.x;
+    let dz = pl.targetDoorZ - pl.body.z;
+    const len = Math.hypot(dx, dz);
+    if (len < 0.05) return;
+    dx /= len;
+    dz /= len;
+    const [ax, az] = pl.assistDir(pl.body.x, pl.body.z, dx, dz, 1, this.world);
+    pl.aimX = pl.faceX = ax;
+    pl.aimZ = pl.faceZ = az;
   }
 
   private abilityCtx(): AbilityCtx {

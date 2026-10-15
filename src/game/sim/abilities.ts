@@ -445,7 +445,12 @@ function spellAbility(node: SpellNodeDef, mods: PlayerMods): AbilityDef | null {
   const cd = W.cd[node.line] * (mods.cdr || 1);
 
   if (node.line === 'w') {
-    return coneAbility(node, cost, cd, W.w[rank], ['wind'], () => {});
+    const base = W.w[rank];
+    // Empty-book starter Breeze only. A learned w1 keeps the table numbers.
+    const row = node.id === 'w1' && mods.starterBreeze
+      ? { range: base.range * 1.08, width: base.width * 1.08, impulse: base.impulse * 1.12 }
+      : base;
+    return coneAbility(node, cost, cd, row, ['wind'], () => {});
   }
   if (node.line === 'iw') {
     const row = W.iw[rank];

@@ -113,6 +113,8 @@ export interface BossState {
   /** Luggage / couple link rest length override. */
   rest: number;
   clusterId: number;
+  /** First lean this life already told the view (temper-bar teach). */
+  taught: boolean;
 }
 
 export interface CrowdCtx {
@@ -972,7 +974,7 @@ export class CrowdSim {
   /** Spawn one boss (public for scripted tests). */
   spawnBoss(kind: BossKind, x: number, z: number, size: number = TUNING.boss.scale): void {
     const B = TUNING.boss;
-    const st: BossState = { kind, stub: 1, yieldUntil: -1, size, cd: 1.2, hitCd: 0, lastPushT: -9, linkT: -9, rest: 0, clusterId: 0 };
+    const st: BossState = { kind, stub: 1, yieldUntil: -1, size, cd: 1.2, hitCd: 0, lastPushT: -9, linkT: -9, rest: 0, clusterId: 0, taught: false };
     if (kind === 'couple') {
       // Hand in hand across the approach to the door (Z span), both crowned.
       st.rest = B.couple.rest * (size / B.scale);
@@ -1063,6 +1065,10 @@ export class CrowdSim {
             if (d < b.r + pl.r + 0.07 && (dx * ctx.playerDirX + dz * ctx.playerDirZ) / d > 0.15) touching = true;
           }
         }
+      }
+      if (touching && !s.taught) {
+        s.taught = true;
+        ctx.emit({ t: 'bossTouch', x: pl.x, z: pl.z });
       }
       if (!yielding) {
         if (touching) {
