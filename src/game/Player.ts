@@ -48,11 +48,12 @@ export class Player {
     // X-ray silhouette: drawn in the opaque pass after the crowd (renderOrder 1)
     // but before the hero body (2), with GreaterDepth — so it only lights up
     // where passengers stand in front of the hero, never over the hero itself.
-    const xr = new THREE.CapsuleGeometry(0.24, 0.62, 3, 10);
+    const xr = new THREE.CapsuleGeometry(0.28, 0.7, 3, 10);
     xr.translate(0, 0.62, 0);
     this.xrayMat = new THREE.MeshBasicMaterial({
       color: 0x5ad2ff,
-      opacity: 0.55,
+      transparent: true,
+      opacity: 0.82,
       blending: THREE.AdditiveBlending,
       depthWrite: false,
       depthFunc: THREE.GreaterDepth,
@@ -191,7 +192,7 @@ export class Player {
     else if (p.winded) g.setRGB(1, 0.3, 0.3);
     else if (braced) g.setRGB(0.86, 0.62, 1);
     else g.setRGB(0.35, 0.82, 1);
-    this.glowMat.opacity = (this.skin === 'mage' ? 0.9 : 0.75) + 0.25 * Math.sin(time * 4);
+    this.glowMat.opacity = (this.skin === 'mage' ? 0.96 : 0.88) + 0.12 * Math.sin(time * 4);
     this.xrayMat.color.copy(g);
     const braceOp = braced ? 0.95 : 0;
     for (const mat of [this.braceMatA, this.braceMatB]) {

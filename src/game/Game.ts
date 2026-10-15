@@ -18,6 +18,7 @@ import {
   packActive,
   placeInto,
   coinBalance,
+  grantTechStarterIfNeeded,
   reconcileTech,
   removeAt,
   resolveKit,
@@ -107,6 +108,12 @@ export class Game {
   showFtueGhost = false;
   /** Seconds remaining for FTUE ghost (visual only). */
   ftueGhostT = 0;
+  /** First-run L1: door timer waits until the player actually steers. */
+  ftueHoldTimer = false;
+  /** Brief early-run teach chip: hold-shove / breeze / gloves. */
+  teachTip: 'shove' | 'cast' | 'gear' | null = null;
+  /** Seconds left on the teach chip (visual; chip hides via CSS). */
+  teachTipT = 0;
   /** Level-start door-count banner countdown (seconds). 0 = hidden. */
   doorBannerT = 0;
   /** Open-door count shown on the level-start banner. */
@@ -147,7 +154,10 @@ export class Game {
     this.canvas = canvas;
     this.hooks = hooks;
     this.save = loadSave();
-    if (reconcileTech(this.save)) writeSave(this.save);
+    {
+      const dirty = reconcileTech(this.save) || grantTechStarterIfNeeded(this.save.tech);
+      if (dirty) writeSave(this.save);
+    }
     initEntitlements(this.save.entitlementCache);
     // Fail-closed: if selected character isn't owned, fall back to hero.
     if (!entitlements().canPlay(this.save.character)) this.save.character = 'hero';
@@ -244,6 +254,8 @@ export class Game {
       const earned = earnedFrom(progressOf(this.save, 'mage').cleared);
       slot.points = Math.max(0, earned - spentOf(slot));
       this.save.mage.loadouts[this.save.mage.active] = slot;
+    } else if (id === 'tech') {
+      grantTechStarterIfNeeded(this.save.tech);
     }
     syncTopLevelProgress(this.save);
     this.persist();
@@ -524,9 +536,15 @@ export class Game {
     this.doorBannerOpen = openN;
     this.doorBannerT = openN < 3 ? 3.6 : 0;
     this.closedDoorToastAt = -99;
+    const who = this.trial?.character ?? this.save.character;
+    if (who === 'tech' && !this.trial && grantTechStarterIfNeeded(this.save.tech)) this.persist();
     this.runSkills = this.trial?.character === 'mage'
       ? trialSpellState()
       : { ...activeTreeState(this.save) };
+    // Run-only Breeze: empty Mage book would otherwise have no cast and no shove.
+    if (who === 'mage' && !this.trial && !(this.runSkills.known && this.runSkills.known.length)) {
+      this.runSkills = { ...this.runSkills, known: ['w1'] };
+    }
     this.runMods = this.computeMods(this.runSkills);
     const sim = new Sim(level, this.runMods, Math.random);
     this.bindSim(sim);
@@ -542,9 +560,14 @@ export class Game {
     this.train.setDoorOpenValue(0);
     this.train.setWarning(0);
 
-    // FTUE ghost on first L1
-    this.showFtueGhost = id === 1 && !this.save.ftueDone;
-    this.ftueGhostT = this.showFtueGhost ? 5 : 0;
+    // FTUE ghost on first L1 — door clock waits until the first real steer.
+    this.ftueHoldTimer = id === 1 && !this.save.ftueDone && !this.trial;
+    this.showFtueGhost = this.ftueHoldTimer;
+    this.ftueGhostT = this.showFtueGhost ? 6 : 0;
+    sim.holdDoorTimer = this.ftueHoldTimer;
+    this.teachTip = null;
+    this.teachTipT = 0;
+    if (!this.showFtueGhost) this.armEarlyTeach();
 
     const intro = level.introKind;
     if (intro && !this.save.seenIntros.includes(intro)) {
@@ -677,6 +700,31 @@ export class Game {
     this.ftueGhostT = 0;
   }
 
+  private releaseFtueHold(): void {
+    this.ftueHoldTimer = false;
+    if (this.sim) this.sim.holdDoorTimer = false;
+  }
+
+  /** Light L1–L5 shove / first Mage Breeze / first Gear L gloves chip. */
+  private armEarlyTeach(): void {
+    if (this.teachTip || this.showFtueGhost) return;
+    const who = this.trial?.character ?? this.save.character;
+    const id = this.level?.id ?? 0;
+    if (who === 'hero' && id >= 1 && id <= 5 && progressOf(this.save).highestCleared < 5) {
+      this.teachTip = 'shove';
+      this.teachTipT = 6;
+    } else if (who === 'mage' && !this.trial) {
+      const saved = activeTreeState(this.save);
+      if (!(saved.known && saved.known.length)) {
+        this.teachTip = 'cast';
+        this.teachTipT = 6;
+      }
+    } else if (who === 'tech' && !this.trial && progressOf(this.save).highestCleared === 0) {
+      this.teachTip = 'gear';
+      this.teachTipT = 6;
+    }
+  }
+
   /** Pause a running level (no-op otherwise). `auto` = backgrounded / blurred. */
   pause(auto = false): void {
     if (this.screen === 'intro') return;
@@ -724,6 +772,9 @@ export class Game {
     this.pendingIntro = null;
     this.activeTip = null;
     this.showFtueGhost = false;
+    this.ftueHoldTimer = false;
+    this.teachTip = null;
+    this.teachTipT = 0;
     this.level = null;
     this.arrival = null;
     this.input.reset();
@@ -1474,12 +1525,23 @@ export class Game {
     const now = sim.time;
 
     // Result handling (short celebration / slam before the overlay).
-    if (this.showFtueGhost && this.screen === 'playing') {
-      this.ftueGhostT -= dt;
-      if (this.input.drag.magnitude > 0.25 || this.ftueGhostT <= 0) {
+    if (this.screen === 'playing') {
+      const moved = this.input.drag.magnitude > 0.25;
+      if (this.ftueHoldTimer && moved) {
+        this.releaseFtueHold();
         this.completeFtue();
+        this.armEarlyTeach();
         this.hooks.onState();
+      } else if (this.showFtueGhost) {
+        this.ftueGhostT -= dt;
+        if (this.ftueGhostT <= 0) {
+          this.showFtueGhost = false;
+          this.ftueGhostT = 0;
+          this.armEarlyTeach();
+          this.hooks.onState();
+        }
       }
+      if (this.teachTipT > 0) this.teachTipT = Math.max(0, this.teachTipT - dt);
     }
 
     if (sim.result && this.screen === 'playing') {

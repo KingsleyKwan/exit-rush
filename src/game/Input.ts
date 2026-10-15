@@ -156,6 +156,7 @@ export class InputController {
     const k = l > r ? r / l : 1;
     this.joy.style.transform = `translate(${this.baseX}px, ${this.baseY}px)`;
     this.knob.style.transform = `translate(${dx * k}px, ${dy * k}px)`;
+    this.joy.classList.toggle('over-exit', this.baseX < window.innerWidth * 0.42);
   }
 
   private onKeyDown = (e: KeyboardEvent): void => {
