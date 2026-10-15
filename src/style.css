@@ -1573,20 +1573,23 @@ button {
   bottom: auto;
   transform: none;
   display: inline-flex;
-  align-items: center;
+  align-items: flex-start;
   gap: 6px;
-  padding: 8px 12px;
-  border-radius: 999px;
+  padding: 7px 12px;
+  border-radius: 14px;
   background: rgba(14, 18, 28, 0.82);
   color: #fff;
-  font-size: 12px;
+  font-size: 11px;
   font-weight: 700;
+  line-height: 1.3;
   pointer-events: none;
   z-index: 5;
   max-width: 86vw;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
+  white-space: normal;
+  overflow: visible;
+  text-overflow: unset;
+  word-break: normal;
+  overflow-wrap: anywhere;
 }
 .door-banner {
   position: relative;
@@ -2089,14 +2092,15 @@ button {
 }
 .constellation.mage .b-spd .skill-ico { background: linear-gradient(180deg, #ffb74d, #ef6c00); color: #3e1f00; --ico-ink: #e65100; }
 .constellation.mage .b-sta .skill-ico { background: linear-gradient(180deg, #42a5f5, #1565c0); color: #fff; --ico-ink: #0d47a1; }
-/* Tip chip: top-left under meters — never overlaps action buttons on the right. */
+/* Tip chip: top-left under meters — never overlaps action buttons on the right.
+   v0.8.9: wrap + wider max so EN Breeze / gloves tips paint the full sentence. */
 .tip-chip {
   left: max(10px, env(safe-area-inset-left));
   right: auto;
   top: calc(102px + env(safe-area-inset-top, 0px));
   bottom: auto;
   transform: none;
-  max-width: min(220px, calc(100vw - 120px));
+  max-width: min(320px, calc(100vw - 96px));
   z-index: 9;
 }
 
@@ -2105,17 +2109,30 @@ button {
   left: auto; right: auto; top: auto; bottom: auto;
   transform: none;
   align-self: flex-start;
-  max-width: min(240px, 70vw);
+  max-width: min(320px, 88vw);
   margin-top: 2px;
   z-index: 9;
   background: rgba(8, 12, 20, 0.92);
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.45);
+  white-space: normal;
+  overflow: visible;
 }
 .tip-chip.teach-chip {
   z-index: 9;
   background: rgba(8, 12, 20, 0.94);
   border: 1px solid rgba(90, 210, 255, 0.35);
+  white-space: normal;
+  overflow: visible;
 }
+.tip-chip > span {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+.tip-chip > .ico {
+  flex-shrink: 0;
+  margin-top: 1px;
+}
+
 .skill-use.ult-mage {
   width: 62px !important;
   height: 62px !important;
