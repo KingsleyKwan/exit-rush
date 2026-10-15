@@ -1,7 +1,7 @@
 # Paid characters: GDD · 付費角色設計文件
 
 **Game:** 逼落車 / Exit Rush (香城鐵路 · Hong City Rail parody)
-**Cast:** 主角「上班族」 Office Worker (free, "Hero" in this doc) · 魔法師「凱婷」 Bad Girl · 高科技人「裝備L」 Gear L
+**Cast:** 主角「上班族」 Office Worker (free, "Hero" in this doc) · 魔法師「凱婷」 Katie · 高科技人「裝備L」 Gear L
 **Status:** Approved for v0.8.0 P1 (Kingsley). Live economy (v0.8.1): 100 levels, 1 skill point per 10 first clears, one point learns one skill, free respec + 3 loadouts, bosses every 10 levels from L20 to L90, all 8 at L100.
 **Scope:** design only. No code in this doc ships. **Every number is a proposal, marked tunable (🎛️), and must be checked with `npm run test:sim` before it lands.**
 
@@ -11,7 +11,7 @@ Legend: 🤖 = box agent can do it · 🛠️ = Kingsley's local Grok Build (Cap
 
 ## 0. TL;DR · 一頁睇晒
 
-| | 主角「上班族」 Office Worker (FREE 免費) | 魔法師「凱婷」 Bad Girl (PAID 付費) | 高科技人「裝備L」 Gear L (PAID 付費) |
+| | 主角「上班族」 Office Worker (FREE 免費) | 魔法師「凱婷」 Katie (PAID 付費) | 高科技人「裝備L」 Gear L (PAID 付費) |
 |---|---|---|---|
 | Fantasy | Commuter who pushes through | Umbrella-wand witch who casts her way out | Gadget geek with a backpack full of toys |
 | Progression | 力量 / 速度 / 體力 constellation (existing) | 風 / 冰 / 重力 on a wheel, plus the three mixes between them. Farther from the centre is stronger. Not the hero's tree | No tree. Coins 💰 → shop 🛒 → items in 平/中價/名貴 (Cheap/Mid/Luxury) tiers placed in a **backpack grid 背囊格** (2×2, one expansion to 2×3) |
@@ -51,7 +51,7 @@ Legend: 🤖 = box agent can do it · 🛠️ = Kingsley's local Grok Build (Cap
 
 ---
 
-## 3. 魔法師（女）Mage · 「凱婷」 Bad Girl
+## 3. 魔法師（女）Mage · 「凱婷」 Katie
 
 ### 3.1 Concept & skin · 造型
 
@@ -712,7 +712,7 @@ Branching: work on feature branches with PRs (`feat/v0.8-characters-*`), never d
 | D7 | Web | GitHub Pages/web = **demo for friends, everything unlocked**, no IAP, no ads. Paid locks only in the iOS build via `VITE_PLATFORM=web\|ios` (§7.5, §8.4) |
 | D8 | Hero name | **「上班族」**, EN **Office Worker** (the free protagonist, called "Hero" in technical sections) |
 | D9 | Tech name | Keep **「裝備L」 / Gear L** as is |
-| D10 | Mage EN name | **Bad Girl** (an English name, not a romanisation of 凱婷) |
+| D10 | Mage EN name | **Katie** (an English name, not a romanisation of 凱婷) |
 | D11 | Tech item tier labels | **平 / 中價 / 名貴** (EN: **Cheap / Mid / Luxury**). Replaces earlier 細/中/傳說 (S/M/LG). Code still uses numeric tiers 1/2/3; player-facing copy uses the new labels |
 | D12 | Level progress | **Separate per character** (replaces shared progress). Unlocks, best clears, boss cutscenes, and SP/coins derive from that character's own first clears |
 
