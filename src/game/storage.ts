@@ -109,12 +109,14 @@ export interface SaveData {
   progress: Record<CharacterIdSave, CharRunProgress>;
   /** v0.8.1: one-time notice after mage spell points were refunded to match mage-only clears. */
   progressSplitNotice: boolean;
+  /** v0.8.6: first boss contact already taught the temper-bar wear-down. */
+  bossWearSeen: boolean;
 }
 
 /** Points granted each time the player completes another block of levels. */
 export const SP_PER_CLEAR = 1;
-/** First clears per skill point. 100 levels → 10 points. */
-export const LEVELS_PER_SKILL_POINT = 10;
+/** First clears per skill point. 100 levels → 20 points. */
+export const LEVELS_PER_SKILL_POINT = 5;
 export const LOADOUT_SLOTS = 3;
 /**
  * Skills bought.
@@ -222,7 +224,7 @@ function upgradeBar(ids: readonly string[], known: readonly string[]): string[] 
   }
   return out;
 }
-/** Skill points earned: one per 10 distinct first clears. Replays add nothing. */
+/** Skill points earned: one per 5 distinct first clears. Replays add nothing. */
 export function earnedFrom(cleared: readonly number[]): number {
   return Math.floor(new Set(cleared).size / LEVELS_PER_SKILL_POINT) * SP_PER_CLEAR;
 }
@@ -406,6 +408,7 @@ export function defaultSave(): SaveData {
     trialsPlayed: {},
     progress: { hero: emptyProgress(), mage: emptyProgress(), tech: emptyProgress() },
     progressSplitNotice: false,
+    bossWearSeen: false,
   };
 }
 
@@ -588,6 +591,7 @@ export function normalizeSave(parsed: Partial<SaveData> | null | undefined): Sav
   const progressSplitNotice =
     (parsed as { progressSplitNotice?: boolean }).progressSplitNotice === true
     || (migratingSplit && mageRefunded);
+  const bossWearSeen = (parsed as { bossWearSeen?: boolean }).bossWearSeen === true;
 
   const out: SaveData = {
     version: 1,
@@ -619,6 +623,7 @@ export function normalizeSave(parsed: Partial<SaveData> | null | undefined): Sav
     trialsPlayed,
     progress,
     progressSplitNotice,
+    bossWearSeen,
   };
   syncTopLevelProgress(out);
   return out;

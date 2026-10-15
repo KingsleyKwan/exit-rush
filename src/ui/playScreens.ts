@@ -141,7 +141,7 @@ export function renderPlayHud(game: Game): HTMLElement {
         ${doorBanner}
         ${game.trial ? `<div class="trial-banner" role="status">${dict.trialBanner}</div>` : ''}
         ${game.activeTip ? `<div class="tip-chip tip-under-meters" id="tip-chip">${icon(`kind_${game.activeTip}`, 'xs')}<span>${dict.tipChip}: ${getLang() === 'en' ? (INTROS[game.activeTip as IntroKind]?.tipEn ?? '') : (INTROS[game.activeTip as IntroKind]?.tipZh ?? '')}</span></div>` : ''}
-        ${game.teachTip ? `<div class="tip-chip tip-under-meters teach-chip" id="teach-chip">${icon(game.teachTip === 'cast' ? 'wind' : 'shove', 'xs')}<span>${dict.tipChip}: ${game.teachTip === 'shove' ? dict.tipShoveHold : game.teachTip === 'cast' ? dict.tipMageBreeze : dict.tipTechGloves}</span></div>` : ''}
+        ${game.teachTip ? `<div class="tip-chip tip-under-meters teach-chip" id="teach-chip">${icon(teachIcon(game.teachTip), 'xs')}<span>${dict.tipChip}: ${teachCopy(game.teachTip, dict)}</span></div>` : ''}
       </div>
       <div class="drag-hint ${game.showFtueGhost ? 'ftue-ghost' : ''}" aria-hidden="true">
         ${game.showFtueGhost ? `<span class="ghost-hand"></span><span class="ghost-exit">${icon('door')}</span><span class="ghost-label">${dict.hintDragGreen}</span>` : icon('drag')}
@@ -377,6 +377,30 @@ function endPortrait(game: Game): string {
   return `<img class="end-portrait who-${id}" src="${url}" width="112" height="112" alt="" />`;
 }
 
+function teachIcon(tip: NonNullable<Game['teachTip']>): string {
+  if (tip === 'cast') return 'wind';
+  if (tip === 'boss') return 'crown';
+  return 'shove';
+}
+
+function teachCopy(tip: NonNullable<Game['teachTip']>, dict: ReturnType<typeof t>): string {
+  if (tip === 'cast') return dict.tipMageBreeze;
+  if (tip === 'boss') return dict.tipBossWear;
+  if (tip === 'gear') return dict.tipTechGloves;
+  return dict.tipShoveHold;
+}
+
+/** First-clear progress toward the next skill point. Hidden once the ladder is full. */
+function skillProgressLine(game: Game): string {
+  const cleared = progressOf(game.save).cleared.length;
+  const step = LEVELS_PER_SKILL_POINT;
+  if (cleared >= 100) return '';
+  const dict = t();
+  const into = cleared % step;
+  if (into === 0) return `<p class="howto">${fmt(dict.nextSkillPoint, { n: step })}</p>`;
+  return `<p class="howto">${fmt(dict.skillProgress, { n: into, max: step })}</p>`;
+}
+
 function endBonus(game: Game): string {
   const dict = t();
   const c = game.lastClear;
@@ -384,11 +408,11 @@ function endBonus(game: Game): string {
   if (game.save.character === 'tech') {
     return `<p class="bonus">${star}${fmt(dict.coinGain, { n: c?.coins ?? 0 })}</p>`;
   }
-  if (c?.awarded) return `<p class="bonus">${star}${fmt(dict.clearBonusN, { n: 1 })}</p>`;
+  const first = !!c && c.count <= 1;
+  const progress = first ? skillProgressLine(game) : '';
+  if (c?.awarded) return `<p class="bonus">${star}${fmt(dict.clearBonusN, { n: 1 })}</p>${progress}`;
   if (c && c.count > 1) return `<p class="howto">${dict.clearNoBonus}</p>`;
-  const cleared = progressOf(game.save).cleared.length;
-  const into = cleared % LEVELS_PER_SKILL_POINT;
-  if (into > 0) return `<p class="howto">${fmt(dict.nextSkillPoint, { n: LEVELS_PER_SKILL_POINT - into })}</p>`;
+  if (progress) return progress;
   return `<p class="howto">${dict.clearNoBonus}</p>`;
 }
 

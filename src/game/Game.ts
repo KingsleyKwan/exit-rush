@@ -110,10 +110,12 @@ export class Game {
   ftueGhostT = 0;
   /** First-run L1: door timer waits until the player actually steers. */
   ftueHoldTimer = false;
-  /** Brief early-run teach chip: hold-shove / breeze / gloves. */
-  teachTip: 'shove' | 'cast' | 'gear' | null = null;
+  /** Brief early-run teach chip: hold-shove / breeze / gloves / first boss. */
+  teachTip: 'shove' | 'cast' | 'gear' | 'boss' | null = null;
   /** Seconds left on the teach chip (visual; chip hides via CSS). */
   teachTipT = 0;
+  /** Empty-book Breeze pulse stays up until the first successful w1. */
+  private teachSticky = false;
   /** Level-start door-count banner countdown (seconds). 0 = hidden. */
   doorBannerT = 0;
   /** Open-door count shown on the level-start banner. */
@@ -542,10 +544,14 @@ export class Game {
       ? trialSpellState()
       : { ...activeTreeState(this.save) };
     // Run-only Breeze: empty Mage book would otherwise have no cast and no shove.
+    // Not persisted. starterBreeze is a mild w1 bump for this grant only.
+    let starterBreeze = false;
     if (who === 'mage' && !this.trial && !(this.runSkills.known && this.runSkills.known.length)) {
       this.runSkills = { ...this.runSkills, known: ['w1'] };
+      starterBreeze = true;
     }
     this.runMods = this.computeMods(this.runSkills);
+    if (starterBreeze) this.runMods = { ...this.runMods, starterBreeze: true };
     const sim = new Sim(level, this.runMods, Math.random);
     this.bindSim(sim);
     this.player.setSkin(characterOf(this.trial?.character ?? this.save.character).skin);
@@ -567,6 +573,7 @@ export class Game {
     sim.holdDoorTimer = this.ftueHoldTimer;
     this.teachTip = null;
     this.teachTipT = 0;
+    this.teachSticky = false;
     if (!this.showFtueGhost) this.armEarlyTeach();
 
     const intro = level.introKind;
@@ -705,6 +712,22 @@ export class Game {
     if (this.sim) this.sim.holdDoorTimer = false;
   }
 
+  /** One-shot: first lean or bounce on any king explains the temper bar. */
+  private noteBossWear(): void {
+    if (this.save.bossWearSeen) return;
+    this.save.bossWearSeen = true;
+    if (!this.trial) this.persist();
+    // Keep the sticky Breeze button if she still has not cast.
+    if (this.teachSticky && this.teachTip === 'cast') {
+      this.hooks.onToast?.(t().tipBossWear);
+      return;
+    }
+    this.teachTip = 'boss';
+    this.teachTipT = 6.5;
+    this.teachSticky = false;
+    this.hooks.onState();
+  }
+
   /** Light L1–L5 shove / first Mage Breeze / first Gear L gloves chip. */
   private armEarlyTeach(): void {
     if (this.teachTip || this.showFtueGhost) return;
@@ -718,6 +741,7 @@ export class Game {
       if (!(saved.known && saved.known.length)) {
         this.teachTip = 'cast';
         this.teachTipT = 6;
+        this.teachSticky = true;
       }
     } else if (who === 'tech' && !this.trial && progressOf(this.save).highestCleared === 0) {
       this.teachTip = 'gear';
@@ -775,6 +799,7 @@ export class Game {
     this.ftueHoldTimer = false;
     this.teachTip = null;
     this.teachTipT = 0;
+    this.teachSticky = false;
     this.level = null;
     this.arrival = null;
     this.input.reset();
@@ -1081,6 +1106,11 @@ export class Game {
   tryAbility(id: string): void {
     if (this.screen !== 'playing' || !this.sim || this.sim.ambient) return;
     if (this.sim.tryAbility(id)) {
+      if (id === 'w1' && this.teachTip === 'cast') {
+        this.teachTip = null;
+        this.teachTipT = 0;
+        this.teachSticky = false;
+      }
       this.flushSimEvents();
       this.audio.ultimate();
       this.hooks.onState();
@@ -1115,7 +1145,7 @@ export class Game {
       noteTechResult(this.save, id, true, timeLeft, timer, first, this.sim?.player.consumables);
     }
     const coins = techRun ? Math.max(0, coinBalance(this.save) - coinsBefore) : 0;
-    // One skill point per 10 first clears. Tech earns coins, not points.
+    // One skill point per 5 first clears. Tech earns coins, not points.
     const gained = !techRun && first ? Math.max(0, earnedFrom(progressOf(this.save).cleared) - pointsBefore) : 0;
     const awarded = gained > 0;
     if (awarded) {
@@ -1212,6 +1242,7 @@ export class Game {
         break;
       }
       case 'bossBounce':
+        this.noteBossWear();
         cam.addTrauma(0.3);
         cam.kickCamera(e.dx, e.dz, 1.6);
         this.hitStop = Math.max(this.hitStop, 0.04);
@@ -1219,6 +1250,9 @@ export class Game {
         this.player.punch(2.5);
         this.audio.thud(0.8);
         haptic(25, 0);
+        break;
+      case 'bossTouch':
+        this.noteBossWear();
         break;
       case 'bossYield':
         fx.puff(e.x, 1.2, e.z, 16, 0x9ccc65, 2.2, 1.2, 0.55);
@@ -1527,11 +1561,15 @@ export class Game {
     // Result handling (short celebration / slam before the overlay).
     if (this.screen === 'playing') {
       const moved = this.input.drag.magnitude > 0.25;
-      if (this.ftueHoldTimer && moved) {
-        this.releaseFtueHold();
-        this.completeFtue();
-        this.armEarlyTeach();
-        this.hooks.onState();
+      if (this.ftueHoldTimer) {
+        // Green-door cue stays for the whole hold. It only leaves on a real steer.
+        this.showFtueGhost = true;
+        if (moved) {
+          this.releaseFtueHold();
+          this.completeFtue();
+          this.armEarlyTeach();
+          this.hooks.onState();
+        }
       } else if (this.showFtueGhost) {
         this.ftueGhostT -= dt;
         if (this.ftueGhostT <= 0) {
@@ -1541,7 +1579,9 @@ export class Game {
           this.hooks.onState();
         }
       }
-      if (this.teachTipT > 0) this.teachTipT = Math.max(0, this.teachTipT - dt);
+      if (this.teachTipT > 0 && !(this.teachSticky && this.teachTip === 'cast')) {
+        this.teachTipT = Math.max(0, this.teachTipT - dt);
+      }
     }
 
     if (sim.result && this.screen === 'playing') {

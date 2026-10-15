@@ -765,27 +765,27 @@ function counterTests(): CounterResult[] {
     push('Save key migration', okA && okB && okC, `moved [${movedA.join(', ')}]; new key wins=${okB}; no-op=${okC}`);
   }
   {
-    // 1 skill point per 10 first clears. One point learns one skill (+10 power) or the ultimate.
+    // 1 skill point per 5 first clears. One point learns one skill (+10 power) or the ultimate.
     const ids = (n: number) => Array.from({ length: n }, (_, i) => i + 1);
-    const rate = earnedFrom(ids(9)) === 0 && earnedFrom(ids(10)) === 1 && earnedFrom(ids(100)) === 10;
-    // 30 clears earn 3. A full branch + ult + two partials is 9 skills → refund.
+    const rate = earnedFrom(ids(4)) === 0 && earnedFrom(ids(5)) === 1 && earnedFrom(ids(10)) === 2 && earnedFrom(ids(100)) === 20;
+    // 30 clears earn 6. A full branch + ult + two partials is 9 skills → refund.
     const old = normalizeSave({ version: 1, cleared: ids(30), skills: { str: 60, spd: 15, sta: 14, ultStr: true, ultSpd: false, ultSta: false, points: 0 } } as unknown as Partial<SaveData>);
-    const okOld = old.skills.points === 3 && spentPoints(old.skills) === 0 && old.respecNotice && old.activeLoadout === 0 && old.loadouts.length === 3;
-    // 40 clears earn 4. Skills at 20 and 10 cost 3, so the build stays and 1 point is spare.
+    const okOld = old.skills.points === 6 && spentPoints(old.skills) === 0 && old.respecNotice && old.activeLoadout === 0 && old.loadouts.length === 3;
+    // 40 clears earn 8. Skills at 20 and 10 cost 3, so the build stays and 5 points are spare.
     const fit = normalizeSave({ version: 1, cleared: ids(40), skills: { str: 20, spd: 10, sta: 0, ultStr: false, ultSpd: false, ultSta: false, points: 90 } } as unknown as Partial<SaveData>);
-    const okFit = fit.skills.str === 20 && fit.skills.spd === 10 && fit.skills.points === 1 && !fit.respecNotice && fit.loadouts[0].str === 20;
+    const okFit = fit.skills.str === 20 && fit.skills.spd === 10 && fit.skills.points === 5 && !fit.respecNotice && fit.loadouts[0].str === 20;
     const oneTap = spendPoint({ ...fit.skills, points: 1, str: 0 }, 'str');
     const okTap = oneTap.str === 10 && oneTap.points === 0;
-    push('SP economy + migration', rate && okOld && okFit && okTap, `10 clears → 1 pt; over-spent refund ${old.skills.points} notice=${old.respecNotice}; kept 20/10 spare ${fit.skills.points}; one tap str=${oneTap.str}`);
-    // 80 clears earn 8. Six taps fill speed, the seventh is the ultimate, the eighth learns strength.
+    push('SP economy + migration', rate && okOld && okFit && okTap, `5 clears → 1 pt; 100 → 20; over-spent refund ${old.skills.points} notice=${old.respecNotice}; kept 20/10 spare ${fit.skills.points}; one tap str=${oneTap.str}`);
+    // 80 clears earn 16. Six taps fill speed, the seventh is the ultimate, the eighth learns strength (8 spare).
     const sv = normalizeSave({ version: 1, cleared: ids(80) } as Partial<SaveData>);
     for (let i = 0; i < 6; i++) sv.skills = spendPoint(sv.skills, 'spd');
     sv.skills = spendPoint(sv.skills, 'spd');
     sv.skills = spendPoint(sv.skills, 'str');
     const spent = spentPoints(sv.skills);
-    const filled = sv.skills.spd === 60 && sv.skills.ultSpd && sv.skills.str === 10 && sv.skills.points === 0;
+    const filled = sv.skills.spd === 60 && sv.skills.ultSpd && sv.skills.str === 10 && sv.skills.points === 8;
     resetActiveLoadout(sv);
-    const okReset = spent === 8 && filled && sv.skills.points === earnedPoints(sv) && sv.skills.points === 8 && !sv.skills.ultSpd && sv.skills.spd === 0;
+    const okReset = spent === 8 && filled && sv.skills.points === earnedPoints(sv) && sv.skills.points === 16 && !sv.skills.ultSpd && sv.skills.spd === 0;
     push('Respec (reset)', okReset, `spent ${spent} (6 speed + ult + 1 strength) → refund to ${sv.skills.points}/${earnedPoints(sv)}`);
     // Loadouts keep their own skills. 4 speed skills, then 5 stamina skills on the other build.
     for (let i = 0; i < 4; i++) sv.skills = spendPoint(sv.skills, 'spd');
@@ -794,11 +794,11 @@ function counterTests(): CounterResult[] {
     const m2 = modifiersFromSkills(sv.skills);
     switchLoadout(sv, 0);
     const m1 = modifiersFromSkills(sv.skills);
-    const back = sv.skills.spd === 40 && sv.skills.sta === 0 && sv.skills.points === 4 && sv.loadouts[1].sta === 50;
+    const back = sv.skills.spd === 40 && sv.skills.sta === 0 && sv.skills.points === 12 && sv.loadouts[1].sta === 50;
     const differ = JSON.stringify(m1) !== JSON.stringify(m2);
     push('Loadout switch', back && differ && sv.activeLoadout === 0, `slot1 speed 40 (+${sv.skills.points} spare) ↔ slot2 stamina 50; modifiers differ=${differ}`);
     const re = normalizeSave(JSON.parse(JSON.stringify(sv)) as Partial<SaveData>);
-    push('Loadout save round-trip', re.loadouts[1].sta === 50 && re.skills.spd === 40 && re.loadouts[2].points === 8, `slots ${re.loadouts.map((l) => `${l.str}/${l.spd}/${l.sta}+${l.points}`).join(' | ')}`);
+    push('Loadout save round-trip', re.loadouts[1].sta === 50 && re.skills.spd === 40 && re.loadouts[2].points === 16, `slots ${re.loadouts.map((l) => `${l.str}/${l.spd}/${l.sta}+${l.points}`).join(' | ')}`);
   }
 
   // ---------------------------------------------------------------- v0.7 bosses
@@ -1359,8 +1359,8 @@ async function main(): Promise<void> {
       recordClear(mig, 99);
       if (progressOf(mig, 'hero').cleared.includes(99)) { console.error('081 mage clear leaked to hero'); process.exit(1); }
       if (!progressOf(mig, 'mage').cleared.includes(99)) { console.error('081 mage clear missing'); process.exit(1); }
-      // Skill points: 1 per 10 clears. Hero has 40 clears → 4. Mage has 3 clears → 0.
-      if (earnedFrom(progressOf(mig, 'hero').cleared) !== 4) { console.error('081 hero SP', earnedFrom(progressOf(mig, 'hero').cleared)); process.exit(1); }
+      // Skill points: 1 per 5 clears. Hero has 40 clears → 8. Mage has 3 clears → 0.
+      if (earnedFrom(progressOf(mig, 'hero').cleared) !== 8) { console.error('081 hero SP', earnedFrom(progressOf(mig, 'hero').cleared)); process.exit(1); }
       if (earnedFrom(progressOf(mig, 'mage').cleared) !== 0) { console.error('081 mage SP', progressOf(mig, 'mage').cleared); process.exit(1); }
       console.log('save migration per-character progress ok');
       const kept = normalizeSave({
@@ -1392,7 +1392,7 @@ async function main(): Promise<void> {
         console.error('weather book should be kept as w1', keptSlot);
         process.exit(1);
       }
-      if (keptSlot.str !== 0 || spentOf(keptSlot) !== 1 || keptSlot.points !== 0) {
+      if (keptSlot.str !== 0 || spentOf(keptSlot) !== 1 || keptSlot.points !== 1) {
         console.error('known book spends 1 and drops old power', keptSlot);
         process.exit(1);
       }
