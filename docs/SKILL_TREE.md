@@ -2,26 +2,26 @@
 
 Assassin’s Creed Valhalla–style **constellation**: three coloured arms from a centre hub (**力量 Strength** · **速度 Speed** · **體力 Stamina**). Wisdom (智慧) was **replaced by Stamina** in v0.6; old saves migrate `wis` / `ultWis` → `sta` / `ultSta`.
 
-## Economy (v0.8.1)
+## Economy (v0.8.6)
 
 | Rule | Value |
 |------|-------|
-| Skill point | **1 per 10 first clears** (`LEVELS_PER_SKILL_POINT`). Replays award **0**. |
-| Max from content | 100 levels → **10** points |
+| Skill point | **1 per 5 first clears** (`LEVELS_PER_SKILL_POINT`). Replays award **0**. |
+| Max from content | 100 levels → **20** points |
 | One skill | **1 point**. Power lands on the next node: 10 / 20 / 30 / 40 / 50 / 60. Branch power still tops out at **60** (`BRANCH_FILL`). |
 | Ultimate | **1 point** after the branch is full. Power stays 60; the ultimate is a flag. |
-| Full branch + ult | **7** points (6 skills + ultimate). Reachable once 70 levels are first-cleared, same as before. |
-| What 10 points buy | that, plus **3** skills on other branches |
+| Full branch + ult | **7** points (6 skills + ultimate). Reachable once 35 levels are first-cleared. |
+| What 20 points buy | almost the whole tree (21 skills): two full branches with ultimates, plus the third branch |
 | Respec | **Free and instant**: refunds every skill (incl. ultimates) in the active build, after a confirm dialog |
 | Loadouts | **3 builds** (配點1/2/3), each its own allocation of the **same** earned total; switch from the skill tree, level select or result card; applies from the next run |
 
-Hint line under the tree title: 「每 10 關得 1 點。每個技能用 1 點。」 / "Every 10 levels earns 1 point. Each skill costs 1."
+Hint line under the tree title: 「每 5 關得 1 點。每個技能用 1 點。」 / "Every 5 clears earns 1 point. Each skill costs 1."
 
 The learn button on each arm spends 1 point and names the next skill. Tapping a node only shows its effect.
 
-**Points are derived, not stored.** On load, spare points are *earned − skills bought*. Earned is `floor(distinct first clears / 10)`. Each 10 power in a branch is one skill; an ultimate is one skill. Power left over below the next 10 (an old save) is kept until respec and does not count as an extra skill. If a build bought more skills than it now earns, that build is **fully refunded**, and the one-time notice 「技能點已重新計算 — 請重新配點 / Skill points recalculated — please re-allocate」 shows.
+**Points are derived, not stored.** On load, spare points are *earned − skills bought*. Earned is `floor(distinct first clears / 5)`. Each 10 power in a branch is one skill; an ultimate is one skill. Power left over below the next 10 (an old save) is kept until respec and does not count as an extra skill. If a build bought more skills than it now earns, that build is **fully refunded**, and the one-time notice 「技能點已重新計算 — 請重新配點 / Skill points recalculated — please re-allocate」 shows.
 
-A first-time player facing a boss has `floor((level − 1) / 10)` points: L20 → 1, L40 → 3, L60 → 5, L80 → 7. Spending every point on one branch still reaches power 40 at L41, power 50 at L51, and power 60 at L61, so the early kings are still worn down without their T3 counters (see [`BOSSES.md`](BOSSES.md)).
+A first-time player facing a boss has `floor((level − 1) / 5)` points: L20 → 3, L40 → 7, L60 → 11, L80 → 15. Three points is power 30, so L20 is still worn down without a T3 counter (power 40 needs 4 points, first available after 20 clears). A focused branch reaches power 60 and the ultimate after 35 first clears (see [`BOSSES.md`](BOSSES.md)). Katie's book still holds 10 spells; extra points sit spare once the book is full.
 
 The balance bot's "earned" spread is still one point of **branch power** per earlier level. That fixture is not this currency. Do not retune it so the win-rate bands match the new point count.
 

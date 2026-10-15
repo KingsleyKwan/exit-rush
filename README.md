@@ -2,7 +2,7 @@
 
 Mobile-first 3D crowd-exit game set on the fictional **香城鐵路 / Hong City Rail (HCR)**: get **off** the train while rush-hour crowds **force on** (逼上車). **Parody** of Hong Kong metro vibes (coloured stations, bilingual signs) — **original art & audio only**; not affiliated with the real-world operator or any real railway. Station names are playful parodies (see [`docs/STATIONS.md`](docs/STATIONS.md)).
 
-> **v0.8.5**: First-run L1 teaches the green exit and holds the door clock until you steer; Mage empty-book run-only Breeze; Gear L starter Hydraulic Gloves; early shove/stamina chip. Prior **v0.8.3**: Distinct cast VFX per Katie school/mix + Gear L item FX. Prior **v0.8.2**: Katie spell icons distinct by school/mix + workshop effect blurbs. Prior **v0.8.1**: Per-character progress + element colours. Prior **v0.8.0**: Mage 「凱婷」 Katie + character select; Gear L coming soon. Web demo unlocks Mage. Prior **v0.7.0**: 100 levels, eight boss kings, free respec + 3 loadouts. Vertical slice history: Steam-store polish is the aspiration; v0.2 added real crowd physics, counterflow boarding, joystick + shove controls and a juice pass; v0.2.1 was a balance pass (see [`docs/BALANCE.md`](docs/BALANCE.md)); v0.2.2 was a bug-fix / mobile-robustness pass; **v0.3.0 was the art & icon pass**; **v0.5.0 short levels + special intros**; v0.4.1 added audio, per-station themes, and HK-style side-wall sliding doors** (car ends are gangways only — see below).
+> **v0.8.6**: 1 skill point every 5 first clears (max 20), and the win card shows progress to the next point. The green-door ghost stays until you steer. Katie's Breeze button pulses until the first cast. The first boss contact teaches the temper bar. Prior **v0.8.5**: First-run L1 teaches the green exit and holds the door clock until you steer; Mage empty-book run-only Breeze; Gear L starter Hydraulic Gloves; early shove/stamina chip. Prior **v0.8.3**: Distinct cast VFX per Katie school/mix + Gear L item FX. Prior **v0.8.2**: Katie spell icons distinct by school/mix + workshop effect blurbs. Prior **v0.8.1**: Per-character progress + element colours. Prior **v0.8.0**: Mage 「凱婷」 Katie + character select; ~~Gear L coming soon~~ (Gear L is in). Web demo unlocks Mage. Prior **v0.7.0**: 100 levels, eight boss kings, free respec + 3 loadouts. Vertical slice history: Steam-store polish is the aspiration; v0.2 added real crowd physics, counterflow boarding, joystick + shove controls and a juice pass; v0.2.1 was a balance pass (see [`docs/BALANCE.md`](docs/BALANCE.md)); v0.2.2 was a bug-fix / mobile-robustness pass; **v0.3.0 was the art & icon pass**; **v0.5.0 short levels + special intros**; v0.4.1 added audio, per-station themes, and HK-style side-wall sliding doors** (car ends are gangways only — see below).
 
 <p align="center">
   <img src="docs/screens/ingame-l100.jpg" width="240" alt="Level 100 in-game, phone portrait">
@@ -12,6 +12,14 @@ Mobile-first 3D crowd-exit game set on the fictional **香城鐵路 / Hong City 
 <p align="center"><img src="docs/screens/desktop-l100.jpg" width="640" alt="Level 100, landscape"></p>
 
 <p align="center"><em>v0.4.1 — exits on the <strong>side wall</strong> (left); car ends are gangways. Screenshots: mid-run crowds boarding through open doors.</em></p>
+
+## v0.8.6 — Earlier points, teach that stays
+
+- **Skill points:** 1 per **5** first clears, max **20** from 100 levels (`LEVELS_PER_SKILL_POINT`). Replays still award 0. The win card shows `3/5 clears → next point`, and `Next point in 5 clears` on the clear that just paid a point.
+- **FTUE:** the green-door ghost and label stay while the door clock is held. They hide on the first real steer, not after 6 seconds.
+- **凱婷:** empty-book Breeze keeps the spell-button pulse until the first successful cast. An idle first cast nudges toward the green bay. That run-only Breeze is a little stronger. It is not saved, and she still cannot hold-shove.
+- **Bosses:** the first time you lean on a king, a tip explains the temper bar. The bar is a bit thicker. Once per save.
+- **L45 / L52 / L68:** two-door choice, a phone-canyon car, and a linked-hands aisle. Twelve mid-game station names in [`docs/STATIONS.md`](docs/STATIONS.md) are signed off (暫定 removed). 香城 is unchanged.
 
 ## v0.8.5 — First-run teach + Mage/Gear L cold start
 - **FTUE**: first L1 ghost-hand points at the green exit (「拖向綠色門」 / Drag to the green door); door timer waits until the first real steer.
@@ -34,11 +42,11 @@ Mobile-first 3D crowd-exit game set on the fictional **香城鐵路 / Hong City 
 - **Save migration**: all pre-0.8.1 clears belong to 上班族 (Hero). Mage keeps spent spell points only if backed by Mage clears; otherwise refund + one-time notice.
 - **UI**: character select shows each card's cleared count / highest station + progress bar; level select shows whose progress it is (portrait/name chip).
 - **凱婷's book**: a wheel. The start is the centre. Ice sits at 10 o'clock, wind at 2, gravity at 6. Only those three lines leave the centre. A mix of a rank needs both schools of that rank, and the last mix follows the mix before it. Farther out is stronger. Last skills lock only when they share an element.
-- **Skill points:** every 10 first clears earn 1 point. On the hero, one tap learns the next skill (or the ultimate). 100 levels = 10 points: a full branch + ultimate + 3 more skills. The power at each node is unchanged. 凱婷 spends the same 10 points on her own book.
+- **Skill points (v0.8.1, superseded by v0.8.6):** every 10 first clears earned 1 point (10 from 100 levels). Live rule is **1 per 5 first clears, max 20**. On the hero, one tap still learns the next skill (or the ultimate). 凱婷 spends points on her own book (10 spells max).
 
-## v0.8.0 — Mage 「凱婷」 Katie + character select (Gear L coming soon)
+## v0.8.0 — Mage 「凱婷」 Katie + character select (~~Gear L coming soon~~)
 
-- **Character select** (3D voxel portraits, all three cards visible). Free hero **「上班族」 / Office Worker**; Mage **「凱婷」 / Katie** (umbrella wand, mana + Fire/Ice/Lightning). **「裝備L」 / Gear L** shown as Coming soon.
+- **Character select** (3D voxel portraits, all three cards visible). Free hero **「上班族」 / Office Worker**; Mage **「凱婷」 / Katie** (umbrella wand, mana + Fire/Ice/Lightning). **「裝備L」 / Gear L** shipped after this note (no longer coming soon).
 - Shared clears → shared SP. `VITE_PLATFORM=web` (default / Pages): everything unlocked, no IAP/ads UI. `VITE_PLATFORM=ios`: locked + Buy/Restore hooks for Grok Build (`src/game/entitlements.ts`).
 - Hero tree behaviour unchanged (golden `modsFor` parity). Design: [`docs/CHARACTERS.md`](docs/CHARACTERS.md). Balance: `CHARS=hero,mage npm run test:sim`.
 
@@ -50,7 +58,7 @@ Mobile-first 3D crowd-exit game set on the fictional **香城鐵路 / Hong City 
   - Counter skills matter: Hurdle, Hold Breath, Leap, Unbothered, Second Wind, Thread, Stand Firm.
   - An entrance **cutscene** (letterbox, camera close-up, stomp and title card; 2.6 s first time, 1.1 s after, tap to skip) plays before the timer.
   - See [`docs/BOSSES.md`](docs/BOSSES.md).
-- **Economy:** **1 SP per first clear** (100 max). Old saves are recalculated and refunded once, with a notice. **Free respec** and **3 loadouts** (配點1/2/3) are switchable from the tree, level select and result card.
+- **Economy (v0.7, superseded):** this release used **1 SP per first clear** (100 max). Live rule is **1 SP / 5 first clears, max 20** (v0.8.6). Old saves are recalculated and refunded once, with a notice. **Free respec** and **3 loadouts** (配點1/2/3) are switchable from the tree, level select and result card.
 - **Balance:** every level 6–99 is in its band with earned builds (bot, deterministic seeds). L100 ult builds clear 26–45%. See [`docs/BALANCE.md`](docs/BALANCE.md).
 - **Fixes:** camera follow damping no longer stalls at clamped frame dt; sim ids reset per run (results identical for any worker count); station signs auto-fit long names.
 
@@ -84,7 +92,7 @@ Closed door bays stay visibly shut with a red indicator + 「此門不開」 / �
 - **~10–15 s levels** (1–30 + 100): L1–5 normals only; specials introduced at **6 / 9 / 12 / 15 / 18 / 21** with intro cards (EN + 粵), then two reinforce levels each; mixes on 24–30.
 - **FTUE:** first launch auto-starts L1 with a ghost-hand drag hint.
 - **L100 locked** until level **30** is cleared.
-- **Skill points:** **+3** on first clear only (replay farm removed). 31 × 3 = 93 SP reachable.
+- **Skill points (v0.5 only):** **+3** on first clear only (replay farm removed). 31 × 3 = 93 SP was the cap then. Live rule is **1 SP / 5 first clears, max 20**.
 - Screens: [`docs/screens-v05/`](docs/screens-v05/).
 
 <p align="center">
@@ -176,10 +184,10 @@ The Pages deploy builds with `BASE_PATH=/exit-rush/` so assets resolve under tha
   - *Low* = no shadow map (cheap blob shadows remain), no antialias, pixel ratio 1.
   - *Auto* starts from device hints (low if `deviceMemory` ≤ 4 GB, ≤ 4 CPU cores, or DPR ≥ 3 with ≤ 6 cores), then a ~2.5 s FPS probe drops High → Low if it averages < 45 fps. The result is cached in the save so later launches create the WebGL context with the right antialias setting. Shadows / pixel ratio switch live; antialias is fixed per WebGL context, so an AA change applies after a reload (the menu notes this).
 - **Crowd rendering:** passenger heads and blob shadows are now two shared `InstancedMesh`es (bodies keep a per-agent material for hit flashes); geometries/materials are shared; level restart clears and disposes per-agent objects and reuses the instanced pools (verified: renderer memory stays flat across repeated restarts).
-- **Skill-point economy (stop-gap):** with only 21 playable levels, a level now awards a point on its first clear **and on replays, up to 5 points per level** (`MAX_POINTS_PER_LEVEL` in `SkillTree.ts`) → 105 points reachable, enough for a full branch + ultimate and the ~99-point L100 loadout. Set it back to 1 when levels 21–99 ship.
+- **Skill-point economy (v0.2.2 stop-gap, not live):** with only 21 playable levels, a level awarded a point on its first clear **and on replays, up to 5 points per level** → 105 points reachable. Live rule is **1 SP / 5 first clears, max 20**.
 - Mobile polish: brand bar hidden during a run (HUD moves up under the notch), safe-area insets on all sides, every button ≥ 44 px, `prefers-reduced-motion` followed live, three.js split into its own cached chunk.
 
-## Status (v0.8.3)
+## Status (v0.8.6)
 
 | Area | Status |
 |------|--------|
@@ -194,7 +202,7 @@ The Pages deploy builds with `BASE_PATH=/exit-rush/` so assets resolve under tha
 | Door-closing warning (flashing lights, accelerating beeps, leaves physically close) | ✅ v0.2 |
 | Ultimates: STR shockwave · SPD dash + afterimages · WIS path highlight | ✅ v0.2 |
 | Headless sim test (`npm run test:sim`) | ✅ v0.2 |
-| Levels **1–100** playable, short timers, staged specials; L100 needs L99 clear + strong skills (100 SP cap) | ✅ v0.7 |
+| Levels **1–100** playable, short timers, staged specials; L100 needs L99 clear + strong skills (1 SP / 5 first clears, max 20) | ✅ v0.8.6 |
 | Boss kings L20–L90 + all eight at L100, entrance cutscenes | ✅ v0.7 |
 | Free respec + 3 skill loadouts | ✅ v0.7 |
 | HUD (door progress + milestones, stamina, timer, cooldowns) | ✅ |
