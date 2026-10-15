@@ -157,8 +157,11 @@ export class Game {
     this.hooks = hooks;
     this.save = loadSave();
     {
-      const dirty = reconcileTech(this.save) || grantTechStarterIfNeeded(this.save.tech);
-      if (dirty) writeSave(this.save);
+      // Always grant after reconcile — `||` short-circuit used to skip gloves when
+      // reconcile wiped a priced G1 and returned true.
+      const a = reconcileTech(this.save);
+      const b = grantTechStarterIfNeeded(this.save.tech);
+      if (a || b) writeSave(this.save);
     }
     initEntitlements(this.save.entitlementCache);
     // Fail-closed: if selected character isn't owned, fall back to hero.
@@ -540,7 +543,9 @@ export class Game {
     this.doorBannerT = openN < 3 ? 3.6 : 0;
     this.closedDoorToastAt = -99;
     const who = this.trial?.character ?? this.save.character;
-    if (who === 'tech' && !this.trial && grantTechStarterIfNeeded(this.save.tech)) this.persist();
+    if (who === 'tech' && !this.trial) {
+      if (grantTechStarterIfNeeded(this.save.tech)) this.persist();
+    }
     this.runSkills = this.trial?.character === 'mage'
       ? trialSpellState()
       : { ...activeTreeState(this.save) };
@@ -553,6 +558,12 @@ export class Game {
     }
     this.runMods = this.computeMods(this.runSkills);
     if (starterBreeze) this.runMods = { ...this.runMods, starterBreeze: true };
+    // Cold-start assert: Gear L must shove after grant. Re-grant + recompute if not.
+    if (who === 'tech' && !this.trial && this.runMods.techGloves !== true) {
+      grantTechStarterIfNeeded(this.save.tech);
+      this.persist();
+      this.runMods = this.computeMods(this.runSkills);
+    }
     const sim = new Sim(level, this.runMods, Math.random);
     this.bindSim(sim);
     this.player.setSkin(characterOf(this.trial?.character ?? this.save.character).skin);
@@ -744,7 +755,11 @@ export class Game {
         this.teachTipT = 6;
         this.teachSticky = true;
       }
-    } else if (who === 'tech' && !this.trial && progressOf(this.save).highestCleared === 0) {
+    } else if (
+      who === 'tech' && !this.trial
+      && this.runMods.techGloves === true
+      && progressOf(this.save).highestCleared === 0
+    ) {
       this.teachTip = 'gear';
       this.teachTipT = 6;
     }

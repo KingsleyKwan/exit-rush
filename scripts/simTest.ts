@@ -32,7 +32,7 @@ import { DOOR_BAYS, DOOR_Z, TUNING, doorWallX, nearestDoorBay, openDoorBays } fr
 import { isLevelUnlocked, LEVELS } from '../src/game/levels';
 import { BRANCH_FILL, modifiersFromSkills } from '../src/game/SkillTree';
 import { CHARACTERS, modsFor, type CharacterId, type PlayerMods } from '../src/game/charactersDef';
-import { kitForBot, resolveKit, techKitSelfTest } from '../src/game/techKit';
+import { kitForBot, resolveKit, techKitSelfTest, grantTechStarterIfNeeded, emptyTech } from '../src/game/techKit';
 import { grantsForProductIds } from '../src/game/entitlements';
 import { canLearn, defaultSpellBar, learnSpell, rank4Blocked } from '../src/game/SpellTree';
 import { defaultSkills, earnedFrom, migrateLegacyKeys, normalizeSave, progressOf, recordClear, SAVE_KEY, spentOf, type KeyValueStore, type SaveData, type SkillState } from '../src/game/storage';
@@ -1322,6 +1322,27 @@ async function main(): Promise<void> {
     if (!gloveMods.techGloves) {
       console.error('G1 should mark gloves');
       process.exit(1);
+    }
+    // Fresh Gear L cold start: grant → resolveKit → modsFor must enable shove.
+    {
+      const cold = emptyTech();
+      cold.starterGranted = false;
+      if (!grantTechStarterIfNeeded(cold) || cold.items.G1 !== 1) {
+        console.error('cold start grant failed', cold);
+        process.exit(1);
+      }
+      const coldMods = modsFor(CHARACTERS.tech, defaultSkills(), [], resolveKit(cold));
+      if (coldMods.techGloves !== true) {
+        console.error('cold start must set techGloves after grant');
+        process.exit(1);
+      }
+      // Stale flag + empty bag (reconcile wipe simulation).
+      const stale = emptyTech();
+      stale.starterGranted = true;
+      if (!grantTechStarterIfNeeded(stale) || resolveKit(stale).extras.techGloves !== true) {
+        console.error('stale starterGranted must re-equip G1');
+        process.exit(1);
+      }
     }
     const gloveRun = new Sim(LEVELS.find((l) => l.id === 1)!, gloveMods, mulberry32(3));
     for (let i = 0; i < 30; i++) gloveRun.step(dtShove, held);

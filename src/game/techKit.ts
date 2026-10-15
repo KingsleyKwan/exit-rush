@@ -295,30 +295,49 @@ function bagIsEmpty(tech: TechProgress): boolean {
   return emptyItems && noPlace && noStock && (tech.consumableSpend | 0) <= 0 && tech.gridTier === 0;
 }
 
+/** Own G1 and wear it on the active set. Never drop other worn pieces. */
 function placeStarterGloves(tech: TechProgress): void {
-  tech.items.G1 = 1;
+  const have = tech.items.G1 ?? 0;
+  if (have < 1) tech.items.G1 = 1;
   if (!tech.sets[tech.activeSet]) tech.sets[tech.activeSet] = { placements: [] };
-  tech.sets[tech.activeSet].placements = [{ id: 'G1', tier: 1, x: 0, y: 0, rot: 0 }];
+  const set = tech.sets[tech.activeSet];
+  // Already wearing any gloves → leave the bag alone.
+  if (set.placements.some((p) => itemDef(p.id)?.slot === 'gloves')) return;
+  const owned = tech.items;
+  const stock = tech.stock;
+  const tryPlace = (x: number, y: number): boolean => {
+    const p: Placement = { id: 'G1', tier: 1, x, y, rot: 0 };
+    if (!placeCheck(set.placements, tech.gridTier, owned, stock, p).ok) return false;
+    set.placements.push(p);
+    return true;
+  };
+  if (tryPlace(0, 0)) return;
+  const { cols, rows } = gridOf(tech.gridTier);
+  for (let y = 0; y < rows; y++) {
+    for (let x = 0; x < cols; x++) {
+      if (tryPlace(x, y)) return;
+    }
+  }
+  // Bag packed with no free cell: replace nothing; own G1 so the workshop still shows it.
 }
 
 /**
- * First Gear L bag: persist Hydraulic Gloves G1 in the active 2×2 set.
- * One-shot via `starterGranted`. Also puts the gloves back if a negative
- * balance reconcile wiped the free pair (grid still 2×2, nothing else owned).
+ * Ensure Gear L can shove: Hydraulic Gloves G1 owned + worn on the active bag.
+ * Idempotent. Restores gloves after a reconcile wipe or a stale `starterGranted`
+ * flag that never actually equipped them. Does not strip other worn pieces.
  */
 export function grantTechStarterIfNeeded(tech: TechProgress): boolean {
-  if (tech.starterGranted) {
-    // Reconcile used to delete the free gloves when they were priced at 100.
-    if (!bagIsEmpty(tech)) return false;
-    placeStarterGloves(tech);
+  const gloved = resolveKit(tech).extras.techGloves === true;
+  if (gloved) {
+    if (tech.starterGranted) return false;
+    tech.starterGranted = true;
     return true;
   }
-  const emptyItems = Object.keys(tech.items).length === 0;
-  const noPlace = tech.sets.every((s) => s.placements.length === 0);
+  const before = JSON.stringify({ items: tech.items, sets: tech.sets, flag: tech.starterGranted });
   tech.starterGranted = true;
-  if (!emptyItems || !noPlace) return true;
   placeStarterGloves(tech);
-  return true;
+  const after = JSON.stringify({ items: tech.items, sets: tech.sets, flag: tech.starterGranted });
+  return before !== after || resolveKit(tech).extras.techGloves === true;
 }
 
 /** Refund owned gear (not the grid, not used consumables) when a retune over-spends. */
@@ -1038,7 +1057,7 @@ export function applyRecommend(save: SaveData, levelId: number): void {
   activeSet(save.tech).placements = packFitted(save.tech, Object.keys(want.items).filter(isItemId));
 }
 
-function emptyTech(): TechProgress {
+export function emptyTech(): TechProgress {
   return {
     items: {},
     gridTier: 0,
@@ -1261,9 +1280,17 @@ export function techKitSelfTest(): string[] {
   already.starterGranted = false;
   already.items = { S1: 1 };
   already.sets[0].placements = [{ id: 'S1', tier: 1, x: 0, y: 0, rot: 0 }];
-  eq('starter skips a bag that already has kit', grantTechStarterIfNeeded(already) && already.items.G1 == null && already.starterGranted);
+  eq('starter adds G1 beside existing kit', grantTechStarterIfNeeded(already) && already.items.G1 === 1
+    && already.sets[0].placements.some((p) => p.id === 'G1')
+    && already.sets[0].placements.some((p) => p.id === 'S1')
+    && resolveKit(already).extras.techGloves === true);
+  const flaggedEmpty = emptyTech();
+  flaggedEmpty.starterGranted = true; // stale flag, never equipped
+  eq('stale flag still equips G1', grantTechStarterIfNeeded(flaggedEmpty) && flaggedEmpty.items.G1 === 1
+    && resolveKit(flaggedEmpty).extras.techGloves === true);
   const giftTech = emptyTech();
   giftTech.items = { G1: 1 };
+  giftTech.starterGranted = true;
   const giftSave = {
     tech: giftTech,
     progress: {
