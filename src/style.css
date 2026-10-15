@@ -1675,6 +1675,7 @@ button {
   display: grid;
   place-items: center;
   box-shadow: 0 0 14px rgba(29, 185, 84, 0.85);
+  animation: ftue-exit-pulse 1.6s ease-in-out infinite;
 }
 .drag-hint .ghost-exit .ico {
   width: 26px;
@@ -1690,6 +1691,10 @@ button {
 @keyframes ftue-nudge {
   0%, 100% { transform: translate(-10px, 10px); opacity: 0.95; }
   50% { transform: translate(-38px, -36px); opacity: 1; }
+}
+@keyframes ftue-exit-pulse {
+  0%, 100% { box-shadow: 0 0 10px rgba(29, 185, 84, 0.55); transform: scale(1); }
+  50% { box-shadow: 0 0 22px rgba(29, 185, 84, 1); transform: scale(1.08); }
 }
 
 /* ---- v0.7 level select for 100 levels: sticky loadout + jump bar, act headers, exam tags ---- */

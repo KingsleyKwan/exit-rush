@@ -47,8 +47,10 @@ export interface Dict {
   /** Replay clear bonus; {n} = this level's clears, {max} = cap. */
   replayBonus: string;
   clearNoBonus: string;
-  /** {n} clears until the next skill point. */
+  /** {n} clears until the next skill point. Shown when a point was just earned (n = the block size). */
   nextSkillPoint: string;
+  /** {n} first clears so far in this block, {max} clears per point. */
+  skillProgress: string;
   back: string;
   levelsTeaser: string;
   /** How skill points are earned and spent. No placeholders. */
@@ -154,6 +156,8 @@ export interface Dict {
   tipMageBreeze: string;
   /** First Gear L run after starter gloves. */
   tipTechGloves: string;
+  /** First time the player leans on any boss. */
+  tipBossWear: string;
   finale: string;
   cleared: string;
   artCredit: string;
@@ -367,10 +371,11 @@ export const en: Dict = {
   clearBonus: '+1 skill point',
   replayBonus: '+{n} skill points (replay {n}/{max})',
   clearNoBonus: 'No more skill points from this level — first clear only',
-  nextSkillPoint: '{n} more clears for 1 point',
+  nextSkillPoint: 'Next point in {n} clears',
+  skillProgress: '{n}/{max} clears → next point',
   back: 'Back',
   levelsTeaser: 'All 100 levels · clear 99 to unlock the Lv100 finale',
-  skillHowto: 'Every 10 levels earns 1 point. Each skill costs 1.',
+  skillHowto: 'Every 5 clears earns 1 point. Each skill costs 1.',
   spellHowto: 'Three lines leave the centre. A skill between two others needs both of that rank, and the mix before it.',
   spellNeed: 'Learn {name} first.',
   spellNeedTwo: 'Learn {a} and {b} first.',
@@ -454,8 +459,9 @@ export const en: Dict = {
   hintGear: 'Gear',
   hintExit: 'Get off',
   tipShoveHold: 'Hold shove — stamina drains',
-  tipMageBreeze: 'Cast Breeze to clear a path',
+  tipMageBreeze: 'Tap Breeze toward the green door',
   tipTechGloves: 'Hold shove with your gloves',
+  tipBossWear: 'Push the king — the temper bar drains, then he yields',
   finale: 'Finale',
   cleared: 'Cleared',
   artCredit: 'Concept art: Grok Image. 香城鐵路 is fiction — inspired by HK metro, not affiliated.',
