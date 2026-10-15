@@ -173,7 +173,7 @@ export function renderLevels(game: Game): HTMLElement {
         <span class="lv-badge">${lv.id}<span class="lv-lines">${lines.map((l) => `<i style="background:${LINE_COLORS[l]}"></i>`).join('')}</span></span>
         <span class="lv-station"><b class="${titleCls(stationName(lv))}">${stationName(lv)}</b><small class="${fitCls(stationAlt(lv))}">${stationAlt(lv)}</small></span>
         <span class="lv-meta"><span>${icon('crowd', 'xs')}${lv.density}</span><span>${icon('timer', 'xs')}${lv.timer}</span></span>
-        <span class="lv-state">${done ? icon('check', 'sm') : finale ? icon('star', 'sm') : ''}</span>
+        <span class="lv-state">${locked ? icon('lock', 'sm') : done ? icon('check', 'sm') : finale ? icon('star', 'sm') : ''}</span>
         ${finale ? `<span class="lv-finale">${dict.finale}</span>` : ''}
         ${lv.exam ? `<span class="lv-exam">${dict.examTag}</span>` : ''}
         ${lv.boss?.length && !finale ? `<span class="lv-boss">${icon('crown', 'xs')}${getLang() === 'en' ? BOSSES[lv.boss[0]].en : BOSSES[lv.boss[0]].zh}</span>` : ''}

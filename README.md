@@ -2,7 +2,7 @@
 
 Mobile-first 3D crowd-exit game set on the fictional **香城鐵路 / Hong City Rail (HCR)**: get **off** the train while rush-hour crowds **force on** (逼上車). **Parody** of Hong Kong metro vibes (coloured stations, bilingual signs) — **original art & audio only**; not affiliated with the real-world operator or any real railway. Station names are playful parodies (see [`docs/STATIONS.md`](docs/STATIONS.md)).
 
-> **v0.8.3**: Distinct cast VFX per Katie school/mix + Gear L item FX. Prior **v0.8.2**: Katie spell icons distinct by school/mix + workshop effect blurbs. Prior **v0.8.1**: Per-character progress + element colours. Prior **v0.8.0**: Mage 「凱婷」 Bad Girl + character select; Gear L coming soon. Web demo unlocks Mage. Prior **v0.7.0**: 100 levels, eight boss kings, free respec + 3 loadouts. Vertical slice history: Steam-store polish is the aspiration; v0.2 added real crowd physics, counterflow boarding, joystick + shove controls and a juice pass; v0.2.1 was a balance pass (see [`docs/BALANCE.md`](docs/BALANCE.md)); v0.2.2 was a bug-fix / mobile-robustness pass; **v0.3.0 was the art & icon pass**; **v0.5.0 short levels + special intros**; v0.4.1 added audio, per-station themes, and HK-style side-wall sliding doors** (car ends are gangways only — see below).
+> **v0.8.5**: First-run L1 teaches the green exit and holds the door clock until you steer; Mage empty-book run-only Breeze; Gear L starter Hydraulic Gloves; early shove/stamina chip. Prior **v0.8.3**: Distinct cast VFX per Katie school/mix + Gear L item FX. Prior **v0.8.2**: Katie spell icons distinct by school/mix + workshop effect blurbs. Prior **v0.8.1**: Per-character progress + element colours. Prior **v0.8.0**: Mage 「凱婷」 Katie + character select; Gear L coming soon. Web demo unlocks Mage. Prior **v0.7.0**: 100 levels, eight boss kings, free respec + 3 loadouts. Vertical slice history: Steam-store polish is the aspiration; v0.2 added real crowd physics, counterflow boarding, joystick + shove controls and a juice pass; v0.2.1 was a balance pass (see [`docs/BALANCE.md`](docs/BALANCE.md)); v0.2.2 was a bug-fix / mobile-robustness pass; **v0.3.0 was the art & icon pass**; **v0.5.0 short levels + special intros**; v0.4.1 added audio, per-station themes, and HK-style side-wall sliding doors** (car ends are gangways only — see below).
 
 <p align="center">
   <img src="docs/screens/ingame-l100.jpg" width="240" alt="Level 100 in-game, phone portrait">
@@ -12,6 +12,12 @@ Mobile-first 3D crowd-exit game set on the fictional **香城鐵路 / Hong City 
 <p align="center"><img src="docs/screens/desktop-l100.jpg" width="640" alt="Level 100, landscape"></p>
 
 <p align="center"><em>v0.4.1 — exits on the <strong>side wall</strong> (left); car ends are gangways. Screenshots: mid-run crowds boarding through open doors.</em></p>
+
+## v0.8.5 — First-run teach + Mage/Gear L cold start
+- **FTUE**: first L1 ghost-hand points at the green exit (「拖向綠色門」 / Drag to the green door); door timer waits until the first real steer.
+- **凱婷**: empty spellbook gets a run-only Breeze so the first web unlock is actually playable (not persisted).
+- **裝備L**: empty bag grants starter Hydraulic Gloves G1 once so shove is available.
+- **L1–L5**: brief hold-shove / stamina chip; Katie/Gear L get a short first-run cast/gloves tip.
 
 ## v0.8.3 — Distinct school / verb VFX
 - **Cast silhouette pass**: wind is gust streaks along a cone/lane; ice plants frost crystals + freeze shells / icy tint; gravity is downward pull on her body (not a floor boom); Cool Breeze keeps the geometric floor ice array while people leave; ig = freezing sink; wg = funnel pull.
@@ -30,9 +36,9 @@ Mobile-first 3D crowd-exit game set on the fictional **香城鐵路 / Hong City 
 - **凱婷's book**: a wheel. The start is the centre. Ice sits at 10 o'clock, wind at 2, gravity at 6. Only those three lines leave the centre. A mix of a rank needs both schools of that rank, and the last mix follows the mix before it. Farther out is stronger. Last skills lock only when they share an element.
 - **Skill points:** every 10 first clears earn 1 point. On the hero, one tap learns the next skill (or the ultimate). 100 levels = 10 points: a full branch + ultimate + 3 more skills. The power at each node is unchanged. 凱婷 spends the same 10 points on her own book.
 
-## v0.8.0 — Mage 「凱婷」 Bad Girl + character select (Gear L coming soon)
+## v0.8.0 — Mage 「凱婷」 Katie + character select (Gear L coming soon)
 
-- **Character select** (3D voxel portraits, all three cards visible). Free hero **「上班族」 / Office Worker**; Mage **「凱婷」 / Bad Girl** (umbrella wand, mana + Fire/Ice/Lightning). **「裝備L」 / Gear L** shown as Coming soon.
+- **Character select** (3D voxel portraits, all three cards visible). Free hero **「上班族」 / Office Worker**; Mage **「凱婷」 / Katie** (umbrella wand, mana + Fire/Ice/Lightning). **「裝備L」 / Gear L** shown as Coming soon.
 - Shared clears → shared SP. `VITE_PLATFORM=web` (default / Pages): everything unlocked, no IAP/ads UI. `VITE_PLATFORM=ios`: locked + Buy/Restore hooks for Grok Build (`src/game/entitlements.ts`).
 - Hero tree behaviour unchanged (golden `modsFor` parity). Design: [`docs/CHARACTERS.md`](docs/CHARACTERS.md). Balance: `CHARS=hero,mage npm run test:sim`.
 

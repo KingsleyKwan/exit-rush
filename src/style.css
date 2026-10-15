@@ -963,9 +963,17 @@ button {
   opacity: 0;
   transition: opacity 0.12s ease;
 }
-.joy.idle,
+.joy.idle {
+  opacity: 0.34;
+}
 .joy.on {
-  opacity: 1;
+  opacity: 0.9;
+}
+.joy.idle.over-exit {
+  opacity: 0.16;
+}
+.joy.on.over-exit {
+  opacity: 0.42;
 }
 .joy.idle::before,
 .joy.on::before {
@@ -1332,6 +1340,23 @@ button {
 .shove-btn:active {
   filter: brightness(1.15);
 }
+@keyframes teach-pulse {
+  0%, 100% { box-shadow: 0 6px 0 #5e0e18, 0 0 0 0 rgba(255, 213, 79, 0.55); }
+  50% { box-shadow: 0 6px 0 #5e0e18, 0 0 0 10px rgba(255, 213, 79, 0.18); transform: scale(1.06); }
+}
+.shove-btn.teach {
+  animation: teach-pulse 0.9s ease-in-out infinite;
+}
+.skill-use.teach {
+  animation: teach-pulse 0.9s ease-in-out infinite;
+}
+.teach-chip {
+  transition: opacity 0.35s ease;
+}
+.teach-chip.gone {
+  opacity: 0;
+  pointer-events: none;
+}
 
 /* ------------------------------------------------------ v0.3 HUD overrides */
 
@@ -1583,15 +1608,22 @@ button {
   to { opacity: 1; transform: translateY(0); }
 }
 .lv-card.locked {
-  opacity: 0.45;
-  filter: grayscale(0.4);
+  opacity: 0.34;
+  filter: grayscale(0.85) brightness(0.62);
+  box-shadow: inset 0 0 0 2px rgba(0, 0, 0, 0.4);
 }
 .lv-card.locked::after {
   content: '🔒';
   position: absolute;
-  right: 10px;
-  top: 10px;
-  font-size: 14px;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  font-size: 22px;
+  filter: drop-shadow(0 2px 4px #000);
+  pointer-events: none;
+}
+.lv-card.locked .lv-state {
+  color: #fff;
 }
 .legend-txt .linkish {
   display: inline-flex;
@@ -1634,6 +1666,20 @@ button {
   background: #b01c2e;
   transform: rotate(-25deg);
   box-shadow: 10px -4px 0 -2px #b01c2e;
+}
+.drag-hint .ghost-exit {
+  width: 40px;
+  height: 40px;
+  border-radius: 10px;
+  background: #1db954;
+  display: grid;
+  place-items: center;
+  box-shadow: 0 0 14px rgba(29, 185, 84, 0.85);
+}
+.drag-hint .ghost-exit .ico {
+  width: 26px;
+  height: 26px;
+  --ico-ink: #fff;
 }
 .drag-hint .ghost-label {
   font-size: 13px;
