@@ -4,6 +4,8 @@
 <!-- v0.4.1: side-wall sliding doors; car ends = gangway -->
 # Game Design — 逼落車 (Exit Rush)
 
+> **Live SP (v0.8.6):** 1 skill point per 5 first clears, max 20. Older sentences below that say +1 per clear, +3 per clear, or 93 SP are historical.
+
 ## Elevator pitch
 
 You must **exit** a packed metro car before the doors close. Crowds are trying to board (逼上車). Density, passenger types, and timer scale with **station + time of day**. Feel like Golden Week 望角 — not a sterile sim.

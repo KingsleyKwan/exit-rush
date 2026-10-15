@@ -151,9 +151,9 @@ Mix weights are relative to `normal 10`. "Doors open" is only listed where it di
 
 Numbers and method: [`BALANCE.md`](BALANCE.md).
 
-## Skill points (v0.8.1)
+## Skill points (v0.8.6)
 
-Every **10** first clears award **1** skill point; replays award **0**. One point learns one skill, and the branch power jumps to the next node (10 / 20 / 30 / 40 / 50 / 60). The ultimate is one more point after the branch is full. 100 levels = **10** points: one full branch (6) + ultimate (1) + 3 more skills. A focused branch still reaches power 40 after 40 first clears and the ultimate after 70. Spare points are re-derived on load. A build that bought more skills than it earns is refunded once, with the 「技能點已重新計算」 notice. Free respec and three loadouts (配點1/2/3) are described in [`SKILL_TREE.md`](SKILL_TREE.md).
+Every **5** first clears award **1** skill point; replays award **0**. One point learns one skill, and the branch power jumps to the next node (10 / 20 / 30 / 40 / 50 / 60). The ultimate is one more point after the branch is full. 100 levels = **20** points. A focused branch reaches power 40 after 20 first clears and the ultimate after 35. Spare points are re-derived on load. A build that bought more skills than it earns is refunded once, with the 「技能點已重新計算」 notice. Free respec and three loadouts (配點1/2/3) are described in [`SKILL_TREE.md`](SKILL_TREE.md).
 
 ## Teach order
 

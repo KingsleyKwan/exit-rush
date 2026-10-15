@@ -1,6 +1,6 @@
 # Station & line parody map (香城鐵路 / Hong City Rail)
 
-> **Kingsley：** 呢度列晒第 1–100 關嘅站名。第 31–99 關係暫定名（標咗「暫定」），隨便改。改完話我知，我會跟你嘅名補完關卡。
+> **Kingsley：** 呢度列晒第 1–100 關嘅站名。第 31–99 關大部分仲係暫定名（標咗「暫定」），隨便改。v0.8.6 簽咗 12 個已經好睇嘅名（暫定格空白）。改完話我知，我會跟你嘅名補完關卡。
 
 Player-facing names are **fiction**. Real-world names appear here and in `src/game/stations.ts` as **dev-only** `realEn` / `realZh` fields so wall colours / fonts can still follow the station being parodied. They are never shown in UI, signs, or store text.
 
@@ -49,37 +49,37 @@ Levels **23–30** reuse earlier parody stations with new flavour text (same dis
 | 29 | 天王 | Tin Wong | L7 |
 | 30 | 灣女 | Wan Neoi | L8 |
 
-## Levels 31–99 (in the game since v0.7.0 · names still 暫定 until Kingsley signs off)
+## Levels 31–99 (in the game since v0.7.0 · v0.8.6 signed 12 names)
 
-Same pattern as above: a real station (any line) with **one character** punned. Since v0.7.0 these are wired into `src/game/levels.ts` / `stations.ts` exactly as written here, with Kingsley's v0.7 中 edits. The EN and Note columns still describe the earlier puns where only 中 changed; owner to confirm. Remove 「暫定」 once a name is final. L20/30/…/90 are boss levels ([`BOSSES.md`](BOSSES.md)). L100 is above (頓沙嘴).
+Same pattern as above: a real station (any line) with **one character** punned. Since v0.7.0 these are wired into `src/game/levels.ts` / `stations.ts` exactly as written here, with Kingsley's v0.7 中 edits. Remove 「暫定」 once a name is final. **v0.8.6** signed twelve rows (暫定 cell blank). Their display names already match `stations.ts` and `levels.ts`; nothing was renamed, including 香城. The rest stay 暫定. L20/30/…/90 are boss levels ([`BOSSES.md`](BOSSES.md)). L100 is above (頓沙嘴).
 
 | Level | Real (dev) | Parody 中 | Parody EN | Note | 暫定 |
 |------:|------------|-----------|-----------|------|:----:|
 | 31 | 西營盤 Sai Ying Pun | 東營盤 | East Ying Pun | 營→贏 | 暫定 |
-| 32 | 香港大學 HKU | 香城大學 | Hong City University | 港→城 | 暫定 |
+| 32 | 香港大學 HKU | 香城大學 | Hong City University | 港→城 | |
 | 33 | 堅尼地城 Kennedy Town | 堅貼地城 | Down-to-Earth Town | 城→港 | 暫定 |
 | 34 | 西灣河 Sai Wan Ho | 東灣河 | East Wan Ho | 西→東 | 暫定 |
 | 35 | 筲箕灣 Shau Kei Wan | 竹箕灣 | Bamboo Kei Wan | 灣→彎 | 暫定 |
 | 36 | 杏花邨 Heng Fa Chuen | 牧童邨 | Shepherd Boy Chuen | 杏→李 | 暫定 |
 | 37 | 柴灣 Chai Wan | 柴港 | Chai Kong | 灣→港 | 暫定 |
-| 38 | 油麻地 Yau Ma Tei | 油麻天 | Yau Ma Sky | 地→天 | 暫定 |
+| 38 | 油麻地 Yau Ma Tei | 油麻天 | Yau Ma Sky | 地→天 | |
 | 39 | 佐敦 Jordan | 米高 | Michael | 敦→登 | 暫定 |
-| 40 | 長沙灣 Cheung Sha Wan | 短沙灣 | Short Sand Bay | 長→短 | 暫定 |
+| 40 | 長沙灣 Cheung Sha Wan | 短沙灣 | Short Sand Bay | 長→短 | |
 | 41 | 荔景 Lai King | 荔晴 | Lai Ching | 景→晴 | 暫定 |
 | 42 | 葵芳 Kwai Fong | 葵廣 | Kwai Kwong | 芳→香 | 暫定 |
 | 43 | 葵興 Kwai Hing | 葵旺 | Kwai Wong | 興→旺 | 暫定 |
-| 44 | 大窩口 Tai Wo Hau | 大鍋口 | Big Wok Mouth | 窩→鍋 | 暫定 |
+| 44 | 大窩口 Tai Wo Hau | 大鍋口 | Big Wok Mouth | 窩→鍋 | |
 | 45 | 荃灣西 Tsuen Wan West | 荃灣東 | Tsuen Wan East | 西→溪 | 暫定 |
 | 46 | 石硤尾 Shek Kip Mei | 石硤頭 | Shek Kip Head | 尾→頭 | 暫定 |
 | 47 | 九龍塘 Kowloon Tong | 九龍大學 | Kowloon University | 塘→糖 | 暫定 |
-| 48 | 樂富 Lok Fu | 老虎 | Tiger | 富→貴 | 暫定 |
+| 48 | 樂富 Lok Fu | 老虎 | Tiger | 樂富→老虎 | |
 | 49 | 黃大仙 Wong Tai Sin | 藍大仙 | Blue Tai Sin | 大→小 | 暫定 |
-| 50 | 鑽石山 Diamond Hill | 寶石山 | Gem Hill | 鑽→寶 | 暫定 |
+| 50 | 鑽石山 Diamond Hill | 寶石山 | Gem Hill | 鑽→寶 | |
 | 51 | 彩虹 Choi Hung | 彩雲 | Choi Wan | 虹→雲 | 暫定 |
 | 52 | 九龍灣 Kowloon Bay | 九鳳灣 | Nine Phoenix Bay | 龍→鳳 | 暫定 |
-| 53 | 牛頭角 Ngau Tau Kok | 牛尾角 | Ox Tail Point | 頭→尾 | 暫定 |
+| 53 | 牛頭角 Ngau Tau Kok | 牛尾角 | Ox Tail Point | 頭→尾 | |
 | 54 | 觀塘 Kwun Tong | 觀堂 | Kwun Hall | 塘→堂 | 暫定 |
-| 55 | 藍田 Lam Tin | 綠田 | Green Field | 藍→綠 | 暫定 |
+| 55 | 藍田 Lam Tin | 綠田 | Green Field | 藍→綠 | |
 | 56 | 油塘 Yau Tong | 油湯 | Oil Soup | 塘→湯 | 暫定 |
 | 57 | 調景嶺 Tiu Keng Leng | 調景峰 | Tiu Keng Peak | 嶺→峰 | 暫定 |
 | 58 | 將軍澳 Tseung Kwan O | 將兵澳 | Tseung Bing O | 軍→兵 | 暫定 |
@@ -88,15 +88,15 @@ Same pattern as above: a real station (any line) with **one character** punned. 
 | 61 | 康城 LOHAS Park | 康鎮 | Hong Town | 城→鎮 | 暫定 |
 | 62 | 黃埔 Whampoa | 藍埔 | Blue Po | 黃→紅 | 暫定 |
 | 63 | 何文田 Ho Man Tin | 何武田 | Ho Mo Tin | 文→武 | 暫定 |
-| 64 | 土瓜灣 To Kwa Wan | 木瓜灣 | Papaya Bay | 土→木 | 暫定 |
+| 64 | 土瓜灣 To Kwa Wan | 木瓜灣 | Papaya Bay | 土→木 | |
 | 65 | 宋皇臺 Sung Wong Toi | 秦王臺 | Chun Wong Terrace | 皇→王 | 暫定 |
 | 66 | 啟德 Kai Tak | 舊機場 | Old Airport | 德→得 | 暫定 |
 | 67 | 顯徑 Hin Keng | 顯路 | Hin Lou | 徑→路 | 暫定 |
 | 68 | 車公廟 Che Kung Temple | 車婆廟 | Che Po Temple | 公→婆 | 暫定 |
 | 69 | 沙田圍 Sha Tin Wai | 沙田圈 | Sha Tin Ring | 圍→圈 | 暫定 |
-| 70 | 第一城 City One | 第二城 | City Two | 一→二 | 暫定 |
+| 70 | 第一城 City One | 第二城 | City Two | 一→二 | |
 | 71 | 石門 Shek Mun | 鐵門 | Iron Gate | 石→鐵 | 暫定 |
-| 72 | 大水坑 Tai Shui Hang | 大火坑 | Big Fire Pit | 水→火 | 暫定 |
+| 72 | 大水坑 Tai Shui Hang | 大火坑 | Big Fire Pit | 水→火 | |
 | 73 | 恒安 Heng On | 恒樂 | Heng Lok | 安→樂 | 暫定 |
 | 74 | 馬鞍山 Ma On Shan | 馬鞍海 | Ma On Sea | 山→海 | 暫定 |
 | 75 | 烏溪沙 Wu Kai Sha | 烏溪石 | Wu Kai Rock | 沙→石 | 暫定 |
@@ -109,7 +109,7 @@ Same pattern as above: a real station (any line) with **one character** punned. 
 | 82 | 旺角東 Mong Kok East | 旺角西 | Mong Kok West | 東→冬 | 暫定 |
 | 83 | 大圍 Tai Wai | 小圍 | Siu Wai | 大→小 | 暫定 |
 | 84 | 沙田 Sha Tin | 舊城市 | Old City | 田→甜 | 暫定 |
-| 85 | 火炭 Fo Tan | 冰炭 | Bing Tan | 火→冰 | 暫定 |
+| 85 | 火炭 Fo Tan | 冰炭 | Bing Tan | 火→冰 | |
 | 86 | 馬場 Racecourse | 牛場 | Ox Course | 馬→牛 | 暫定 |
 | 87 | 大學 University | 中學 | Secondary School | 大→中 | 暫定 |
 | 88 | 大埔墟 Tai Po Market | 大埔市 | Tai Po Mart | 墟→市 | 暫定 |

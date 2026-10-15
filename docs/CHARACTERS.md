@@ -2,7 +2,9 @@
 
 **Game:** 逼落車 / Exit Rush (香城鐵路 · Hong City Rail parody)
 **Cast:** 主角「上班族」 Office Worker (free, "Hero" in this doc) · 魔法師「凱婷」 Katie · 高科技人「裝備L」 Gear L
-**Status:** Approved for v0.8.0 P1 (Kingsley). Live economy (v0.8.1): 100 levels, 1 skill point per 10 first clears, one point learns one skill, free respec + 3 loadouts, bosses every 10 levels from L20 to L90, all 8 at L100.
+**Status:** Approved for v0.8.0 P1 (Kingsley). Live economy (v0.8.6): 100 levels, **1 skill point per 5 first clears (max 20)**, one point learns one skill, free respec + 3 loadouts, bosses every 10 levels from L20 to L90, all 8 at L100.
+
+**Cold start (v0.8.6):** an empty Katie book gets run-only Breeze (not saved). The Breeze button keeps pulsing until the first successful cast, and an idle first cast nudges toward the green bay. An empty Gear L bag gets starter Hydraulic Gloves once. Mage still cannot hold-shove.
 **Scope:** design only. No code in this doc ships. **Every number is a proposal, marked tunable (🎛️), and must be checked with `npm run test:sim` before it lands.**
 
 Legend: 🤖 = box agent can do it · 🛠️ = Kingsley's local Grok Build (Capacitor / Xcode / device) · 👤 = owner-only decision or account action.
@@ -16,9 +18,9 @@ Legend: 🤖 = box agent can do it · 🛠️ = Kingsley's local Grok Build (Cap
 | Fantasy | Commuter who pushes through | Umbrella-wand witch who casts her way out | Gadget geek with a backpack full of toys |
 | Progression | 力量 / 速度 / 體力 constellation (existing) | 風 / 冰 / 重力 on a wheel, plus the three mixes between them. Farther from the centre is stronger. Not the hero's tree | No tree. Coins 💰 → shop 🛒 → items in 平/中價/名貴 (Cheap/Mid/Luxury) tiers placed in a **backpack grid 背囊格** (2×2, one expansion to 2×3) |
 | Resource | Stamina 體力 | Stamina 體力 + **Mana 魔力** (separate bar) | Stamina 體力 + item cooldowns + ≤ 3 consumables (in grid) |
-| Points / coins | 1 point per 10 first clears (10) | 1 point per 10 of her own first clears (10) | Coins per clear, bounded replay coins, ⚡ fast-exit bonus |
+| Points / coins | 1 point per 5 first clears (20) | 1 point per 5 of her own first clears (20). Book still holds 10 spells | Coins per clear, bounded replay coins, ⚡ fast-exit bonus |
 | Respec | Free, 3 loadouts | Free, 3 loadouts | 100 % item sell-back, 3 grid layouts (套裝); grid expansions permanent |
-| Power cap | 10 points: full branch (power 60) + ult + 3 skills | 10 points, chosen from 24. Last ranks lock only when they share an element | **Grid cells** (6 max) + body rule (1 shoes / gloves / head / core) |
+| Power cap | 20 points: almost the whole tree (21 skills). Branch power still tops at 60 | 20 points, book holds 10 of 24. Last ranks lock only when they share an element | **Grid cells** (6 max) + body rule (1 shoes / gloves / head / core) |
 | Counters all 8 specials + 8 bosses | ✅ | ✅ | ✅ |
 | Price ✅ decided | Free | US$2.99 ≈ HK$23 | US$2.99 ≈ HK$23 (pack of both US$4.99 ≈ HK$38) |
 | Web / Pages demo | Unlocked | **Unlocked** (no IAP, no ads) | **Unlocked** (no IAP, no ads) |
@@ -28,7 +30,7 @@ Legend: 🤖 = box agent can do it · 🛠️ = Kingsley's local Grok Build (Cap
 ## 1. Pillars · 設計原則
 
 1. **Different, not stronger · 唔同玩法，唔係課金變強.** A paid character changes *how* you solve a car, not *whether* you can. Every level, L100 included, must stay beatable with the free Hero. No paid character has an exclusive level, exclusive skip, extra timer or revive.
-2. **Same power budget · 同一個力量上限.** Each character's endgame power is still the Hero's old budget, paid in fewer taps: **10 skill points** buy one full branch (power 60) + ultimate + 3 more skills (30 power). The Mage uses the same point economy. The Tech's power is capped by **backpack grid space (max 2×3, 6 cells)**, not by how many coins you hoard. One packed set is a stage kit. The other two sets are how you cover a different car.
+2. **Same power budget · 同一個力量上限.** v0.8.6 earns **20 skill points** (1 per 5 first clears). That buys almost the whole hero tree. One full branch (power 60) + ultimate is 7 points. The Mage spends the same points; her book still holds 10 spells. The Tech's power is capped by **backpack grid space (max 2×3, 6 cells)**, not by how many coins you hoard. One packed set is a stage kit. The other two sets are how you cover a different car.
 3. **Clear-rate parity · 過關率相近 (measurable).** Balance-bot target: for every level band, each character's `earned` win rate is within **±10 pp** of the Hero's. At L100, each character's best build is within ±10 pp of the Hero's best ult build (Hero target band 30–55 %, see `docs/BALANCE.md`). 🎛️
 4. **Every special has an answer in every kit · 每種乘客都有剋星.** All 8 special passengers and all 8 bosses have at least one counter per character (table in §4).
 5. **No real-money currency · 金幣唔賣錢.** Tech coins are **earned in play only**. They are never sold for real money, never granted by IAP, and never granted by ads. No loot boxes, no randomised paid items.
@@ -75,7 +77,7 @@ Budget check: a 15 s level gives about 100 + 15 × 8 = 220 mana, roughly **6–8
 
 ### 3.3 Spellbook economy · 魔法點
 
-Same point budget as the Hero, different shape. **1 point per 10 first clears, 10 total. Each skill costs 1 point.** There is no power ladder (10/20/…/60) on this book. Free respec, 3 loadouts (魔法配置 1/2/3).
+Same shape as before, faster drip. **1 point per 5 first clears, 20 total. Each skill costs 1 point. The book still holds 10 spells** (extra points sit spare). There is no power ladder (10/20/…/60) on this book. Free respec, 3 loadouts (魔法配置 1/2/3).
 
 The book is a wheel. The centre is the start, not a skill. Ice (`i1`) sits at 10 o'clock, wind (`w1`) at 2 o'clock, gravity (`g1`) at 6 o'clock. Each next node on that ray is a stronger version of the same skill, not a different verb. Each skill costs 1 point. She can hold 10. There are 24 nodes, so a book is a choice.
 
@@ -141,7 +143,7 @@ Each pure start is already a cast. A mix of ranks 1–3 needs both schools at th
 
 ## 4. Counter matrix · 剋制表 (all 8 specials + 8 bosses × 3 characters)
 
-Hero entries match `SkillTree.ts` / `bosses.ts`. Level = earliest that counter exists if every point so far went into that branch (one skill per 10 first clears; the level is unchanged from the old 1-power-per-clear timing), or the shop unlock level (Tech).
+Hero entries match `SkillTree.ts` / `bosses.ts`. Level = earliest that counter exists if every point so far went into that branch (one skill per 5 first clears), or the shop unlock level (Tech).
 
 ### 4.1 Special passengers · 特別乘客
 
