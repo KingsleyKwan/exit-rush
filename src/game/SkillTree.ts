@@ -12,10 +12,10 @@ export const BRANCH_TOTAL = BRANCH_NODES + 1;
 
 /**
  * Skill points (see docs/SKILL_TREE.md):
- * - Every 10 first clears award 1 point. Replays award nothing. 100 levels → 10 points.
+ * - Every 5 first clears award 1 point. Replays award nothing. 100 levels → 20 points.
  * - One point learns the next skill on a branch (power jumps 10 / 20 / 30 / 40 / 50 / 60).
  * - The ultimate is one more skill after the branch is full.
- * - A full branch + ultimate is 7 points, so 10 points is that plus 3 skills on other branches.
+ * - A full branch + ultimate is 7 points. 20 points buy almost the whole tree (21 skills).
  */
 export const POINTS_PER_FIRST_CLEAR = SP_PER_CLEAR;
 /** Kept for UI/docs: only the first clear of a level awards points. */
@@ -436,7 +436,7 @@ export function nextNodeAt(filled: number): number | null {
 
 // ------------------------------------------------------------------ v0.7 respec + loadouts
 
-/** Skill points earned by the active character (1 per 10 of that character's first clears). */
+/** Skill points earned by the active character (1 per 5 of that character's first clears). */
 export function earnedPoints(save: SaveData): number {
   return earnedFrom(progressOf(save).cleared);
 }

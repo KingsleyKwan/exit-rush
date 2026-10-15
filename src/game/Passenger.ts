@@ -189,12 +189,12 @@ export class Passenger {
     tag.position.set(0, barY + 0.16 * inv + 0.12 * inv * 1.45, 0);
     this.mesh.add(tag);
     const frame = new THREE.Sprite(M.barFrame);
-    frame.scale.set(1.21 * inv, 0.19 * inv, 1);
+    frame.scale.set(1.34 * inv, 0.28 * inv, 1);
     frame.position.set(0, barY, 0);
     frame.renderOrder = 8;
     this.mesh.add(frame);
     const barBg = new THREE.Sprite(M.barBg);
-    barBg.scale.set(1.15 * inv, 0.13 * inv, 1);
+    barBg.scale.set(1.26 * inv, 0.2 * inv, 1);
     barBg.renderOrder = 9;
     barBg.position.set(0, barY, 0);
     this.mesh.add(barBg);
@@ -327,11 +327,11 @@ export class Passenger {
       this.tint.setRGB(this.tint.r * t[0] * k, this.tint.g * t[1] * k, this.tint.b * t[2] * k);
       // Stubbornness bar: full = immovable (red-orange) … empty = yields (green flash).
       const inv = 1 / a.scale;
-      const w = 1.09 * inv;
+      const w = 1.2 * inv;
       const f = Math.max(0.001, st.stub);
       B.bar.visible = this.hudOn && (st.stub > 0.01 || yielding);
       const shown = yielding ? 1 : f;
-      B.bar.scale.set(w * shown, 0.085 * inv, 1);
+      B.bar.scale.set(w * shown, 0.14 * inv, 1);
       B.bar.center.set(0.5 / shown, 0.5);
       if (yielding) B.barMat.color.setRGB(0.45 + 0.3 * Math.sin(time * 14), 0.9, 0.5);
       else B.barMat.color.setRGB(1, 0.22 + 0.4 * (1 - f), 0.08);

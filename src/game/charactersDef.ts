@@ -177,6 +177,11 @@ export interface PlayerMods extends SkillModifiers {
   techPassBossCase?: boolean;
   techGpRadius?: number;
   techGpLuggage?: number;
+  /**
+   * Run-only Breeze (empty persisted book). Mild cone bump on w1 only.
+   * Learned Breeze does not set this.
+   */
+  starterBreeze?: boolean;
   /** G1–G3 worn. Hold-to-shove exists only with these. */
   techGloves?: boolean;
   techActives?: string[];
