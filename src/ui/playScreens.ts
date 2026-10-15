@@ -141,16 +141,17 @@ export function renderPlayHud(game: Game): HTMLElement {
         ${doorBanner}
         ${game.trial ? `<div class="trial-banner" role="status">${dict.trialBanner}</div>` : ''}
         ${game.activeTip ? `<div class="tip-chip tip-under-meters" id="tip-chip">${icon(`kind_${game.activeTip}`, 'xs')}<span>${dict.tipChip}: ${getLang() === 'en' ? (INTROS[game.activeTip as IntroKind]?.tipEn ?? '') : (INTROS[game.activeTip as IntroKind]?.tipZh ?? '')}</span></div>` : ''}
+        ${game.teachTip ? `<div class="tip-chip tip-under-meters teach-chip" id="teach-chip">${icon(game.teachTip === 'cast' ? 'wind' : 'shove', 'xs')}<span>${dict.tipChip}: ${game.teachTip === 'shove' ? dict.tipShoveHold : game.teachTip === 'cast' ? dict.tipMageBreeze : dict.tipTechGloves}</span></div>` : ''}
       </div>
       <div class="drag-hint ${game.showFtueGhost ? 'ftue-ghost' : ''}" aria-hidden="true">
-        ${game.showFtueGhost ? `<span class="ghost-hand"></span><span class="ghost-label">${dict.hintDrag}</span>` : icon('drag')}
+        ${game.showFtueGhost ? `<span class="ghost-hand"></span><span class="ghost-exit">${icon('door')}</span><span class="ghost-label">${dict.hintDragGreen}</span>` : icon('drag')}
       </div>
       <div class="hud-actions">
         <div class="ult-col ${who === 'mage' ? 'mage-cast' : ''}">
           ${who === 'mage' ? mageActions(game, dict) : who === 'tech' ? techActions(game, dict) : `
-          ${ult('str', dict.ultStr, s.ultStr)}
-          ${ult('spd', dict.ultSpd, s.ultSpd)}
-          ${ult('sta', dict.ultSta, s.ultSta)}
+          ${s.ultStr ? ult('str', dict.ultStr, true) : ''}
+          ${s.ultSpd ? ult('spd', dict.ultSpd, true) : ''}
+          ${s.ultSta ? ult('sta', dict.ultSta, true) : ''}
           ${mods.hasLeap ? act('leap', `${dict.skillNodeActive}: ${dict.skLeap}`, true, 'kind_squat') : ''}
           ${mods.hasSecondWind ? act('wind', `${dict.skillNodeActive}: ${dict.skSecondWind}`, true, 'sta') : ''}
           `}
@@ -260,6 +261,7 @@ export function updatePlayHud(root: HTMLElement, game: Game): void {
     b.classList.toggle('cooling', cd > 0);
     // Typical mage CD 2–6 s; map remaining onto a full pie.
     b.style.setProperty('--cd', String(Math.min(1, cd / 6)));
+    b.classList.toggle('teach', game.teachTip === 'cast' && game.teachTipT > 0);
   });
   // 大聲公 noise zone: pulse the stamina bar + show the loudmouth chip.
   const noisy = game.noiseDrain() > 0;
@@ -275,7 +277,9 @@ export function updatePlayHud(root: HTMLElement, game: Game): void {
     shove.style.setProperty('--charge', game.shoveCharge().toFixed(3));
     shove.classList.toggle('cooling', game.shoveCooldown() > 0);
     shove.classList.toggle('charging', game.shoveCharge() > 0);
+    shove.classList.toggle('teach', (game.teachTip === 'shove' || game.teachTip === 'gear') && game.teachTipT > 0);
   }
+  root.querySelector('#teach-chip')?.classList.toggle('gone', game.teachTipT <= 0);
   root.querySelectorAll<HTMLElement>('[data-act-skill]').forEach((b) => {
     const id = b.dataset.actSkill as 'leap' | 'wind';
     const cd = game.activeCooldown(id);

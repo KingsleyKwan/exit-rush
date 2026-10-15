@@ -142,10 +142,18 @@ export interface Dict {
   on: string;
   off: string;
   hintDrag: string;
+  /** FTUE L1: drag toward the open green exit bay. */
+  hintDragGreen: string;
   hintShove: string;
   hintCast: string;
   hintGear: string;
   hintExit: string;
+  /** Early-run tip: hold shove, stamina drains. */
+  tipShoveHold: string;
+  /** First Mage run with an empty book: Breeze is available. */
+  tipMageBreeze: string;
+  /** First Gear L run after starter gloves. */
+  tipTechGloves: string;
   finale: string;
   cleared: string;
   artCredit: string;
@@ -440,10 +448,14 @@ export const en: Dict = {
   on: 'On',
   off: 'Off',
   hintDrag: 'Drag',
+  hintDragGreen: 'Drag to the green door',
   hintShove: 'Hold',
   hintCast: 'Blow',
   hintGear: 'Gear',
   hintExit: 'Get off',
+  tipShoveHold: 'Hold shove — stamina drains',
+  tipMageBreeze: 'Cast Breeze to clear a path',
+  tipTechGloves: 'Hold shove with your gloves',
   finale: 'Finale',
   cleared: 'Cleared',
   artCredit: 'Concept art: Grok Image. 香城鐵路 is fiction — inspired by HK metro, not affiliated.',
