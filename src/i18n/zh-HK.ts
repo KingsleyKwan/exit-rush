@@ -153,6 +153,7 @@ export const zhHK: Dict = {
   introTap: '撳一下開始',
   introTitle: '新乘客',
   tipChip: '提示',
+  courtesyChip: '呼籲',
   reviewIntro: '點樣擋住你',
   clearBonusN: '+{n} 技能點',
   levelsTeaserV05: '短關卡 · 每隔幾關學一種特殊乘客',
