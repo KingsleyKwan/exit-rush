@@ -176,6 +176,8 @@ export interface Dict {
   introTap: string;
   introTitle: string;
   tipChip: string;
+  /** Label on the post-clear station courtesy chip. */
+  courtesyChip: string;
   reviewIntro: string;
   clearBonusN: string;
   levelsTeaserV05: string;
@@ -494,6 +496,7 @@ export const en: Dict = {
   introTap: 'Tap to start',
   introTitle: 'New passenger',
   tipChip: 'Tip',
+  courtesyChip: 'Courtesy',
   reviewIntro: 'How they block you',
   clearBonusN: '+{n} skill point',
   levelsTeaserV05: 'Short exits · learn one special every few levels',

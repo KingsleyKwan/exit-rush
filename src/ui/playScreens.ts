@@ -1,5 +1,6 @@
 import { t, getLang, fmt } from '../i18n';
 import type { Game } from '../game/Game';
+import { pickCourtesy } from '../game/courtesy';
 import { INTROS, type IntroKind } from '../game/intros';
 import { playableLevels } from '../game/levels';
 import { modifiersFromSkills } from '../game/SkillTree';
@@ -362,6 +363,7 @@ export function renderEnd(game: Game, win: boolean): HTMLElement {
         <h2>${win ? dict.win : dict.lose}</h2>
         ${lv ? `<p class="end-station"><span class="lv-badge sm" style="--line:${lineColor(lv.stationEn)}">${lv.id}</span>${stationName(lv)}</p>` : ''}
         ${win ? endBonus(game) : `<p class="howto">${loseCopy(game, dict)}</p>`}
+        ${win ? endCourtesy(game) : ''}
         ${game.save.character === 'tech' ? '' : loadoutStrip(game, { cls: 'on-end' })}
         ${
           hasNext
@@ -422,6 +424,20 @@ function skillProgressLine(game: Game): string {
     ? fmt(dict.nextSkillPoint, { n: drip.step })
     : fmt(dict.skillProgress, { n: drip.into, max: drip.step });
   return `<p class="howto sp-drip-end">${copy}</p>`;
+}
+
+/** Station courtesy line on a clear. Win path only — caller gates on `win`. */
+function endCourtesy(game: Game): string {
+  const dict = t();
+  const s = pickCourtesy(game.level?.id);
+  return `<div class="courtesy-chip" role="status">
+  ${icon('crowd', 'xs')}
+  <div class="courtesy-lines">
+    <span class="courtesy-lbl">${dict.courtesyChip}</span>
+    <span class="courtesy-zh">${s.zh}</span>
+    <span class="courtesy-en">${s.en}</span>
+  </div>
+</div>`;
 }
 
 function endBonus(game: Game): string {
